@@ -2,6 +2,13 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.2
+
+- The phone has a Stem volumes screen: a level and a mute per stem for the sound played on that phone.
+- Buttons on the phone respond to a tap with a ripple and a short vibration.
+- The Android app can save the original audio, or every stem as its own file, to Music/Prismix as M4A.
+- Exported and saved audio carries the cover, title, artist, album, year and genre from the iTunes catalogue (the YouTube title and a square thumbnail when nothing matches), in MP3, M4A and FLAC.
+
 ## 0.0.1
 
 - Stem separation, a synced lyrics and chord studio, and Band mode: phones on the same network follow or drive the host's player.

@@ -201,3 +201,22 @@ dialog[open]::backdrop { opacity: 1; }
 .pl-top { display: flex; align-items: center; gap: .75rem; }
 .btn-line { min-height: 36px; padding: 0 .8rem; border-radius: 999px; background: var(--surface-2); color: var(--ink); font-weight: 600; }
 .lib li.wait { opacity: .5; cursor: default; }
+
+/* press feedback */
+button, .lib li, .pls li, [role=tab], [role=radio] { position: relative; overflow: hidden; }
+button:active, .lib li:active, [role=tab]:active, [role=radio]:active { filter: brightness(1.18); }
+.seg button:active, .roles button:active, .btn:active, .lib li:active { transform: scale(.97); }
+.rip { position: absolute; border-radius: 50%; pointer-events: none; background: currentColor; opacity: .22; transform: scale(0); animation: rip .55s var(--ease) forwards; }
+@keyframes rip { to { transform: scale(1); opacity: 0; } }
+#toast { position: fixed; inset: auto auto calc(env(safe-area-inset-bottom) + 6.5rem) 50%; margin: 0; border: 0; overflow: visible; transform: translate(-50%, 12px); max-width: 86vw; padding: .65rem 1.1rem; border-radius: 999px; background: var(--ink); color: var(--bg); font-size: .9rem; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 50; }
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
+#toast:not(:popover-open) { display: none; }
+
+/* stem volumes and saving */
+.mix { display: grid; gap: .5rem; margin: .8rem 0 1.1rem; }
+.mrow { display: grid; grid-template-columns: 5.2rem auto 1fr 3rem; gap: .6rem; align-items: center; padding: .6rem .8rem; border-radius: var(--r); background: var(--surface); }
+.mrow.off b, .mrow.off input, .mrow.off output { opacity: .4; }
+.mrow output { text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; font-size: .85rem; }
+.mrow .mute { min-width: 4.4rem; min-height: 34px; padding: 0 .8rem; border-radius: 999px; background: var(--surface-2); font-weight: 650; font-size: .82rem; }
+.mrow.off .mute { background: var(--bad); color: #fff; }
+.saves { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: .6rem; }
