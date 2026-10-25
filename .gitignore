@@ -1,0 +1,26 @@
+# Runtime data (downloaded audio, separated stems)
+/data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets
+.env
+*.env
+*cookies*.txt
+
+# IDE / OS
+.idea/
+.DS_Store
+
+# Desktop build
+/build/
+/dist/
+packaging/icon.*
+
+# Android build output
+android/build/

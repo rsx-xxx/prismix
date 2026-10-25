@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#121110">
+  <title>Prismix Band</title>
+  <link rel="stylesheet" href="remote.css">
+  <script type="module" src="remote.js"></script>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" fill="currentColor"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.3" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.3" fill="currentColor"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-6.7 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m12 1.5-3.5 3.5L12 8.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="16" text-anchor="middle" font-size="7.5" font-weight="700" fill="currentColor">5</text></symbol>
+    <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 0 6.7 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m12 1.5 3.5 3.5L12 8.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="16" text-anchor="middle" font-size="7.5" font-weight="700" fill="currentColor">5</text></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 5.8v12.4a.8.8 0 0 1-1.25.66l-8.6-6.2a.8.8 0 0 1 0-1.3l8.6-6.2A.8.8 0 0 1 19 5.8Z" fill="currentColor"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 5.8v12.4a.8.8 0 0 0 1.25.66l8.6-6.2a.8.8 0 0 0 0-1.3l-8.6-6.2A.8.8 0 0 0 5 5.8Z" fill="currentColor"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="18.5" r="1.8" fill="currentColor"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-singer" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-guitar" viewBox="0 0 24 24"><path d="m14 10 6.5-6.5M18 3h3v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.2 10.8c-1.4-1.4-3.6-.9-4.6.6-.6.9-1.6 1.3-2.6 1.3-1.7 0-3 1.3-3 3a5 5 0 0 0 5 5c1.7 0 3-1.3 3-3 0-1 .4-2 1.3-2.6 1.5-1 2-3.2.600-4.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="9" cy="15" r="1.1" fill="currentColor"/></symbol>
+    <symbol id="i-bass" viewBox="0 0 24 24"><path d="m11.5 12.5 8-8M17.5 2.5l4 4M16 4l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.7 11.3c-1.2-1.2-3.1-.8-4 .5-.5.8-1.4 1.1-2.2 1.1-1.5 0-2.7 1.2-2.7 2.7a4.5 4.5 0 0 0 4.5 4.5c1.5 0 2.7-1.2 2.7-2.7 0-.8.3-1.7 1.1-2.2 1.3-.9 1.7-2.8.600-3.9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-keys" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.8 5v14M15.2 5v14" stroke="currentColor" stroke-width="1.8"/><rect x="7" y="5" width="3.6" height="8" rx=".8" fill="currentColor"/><rect x="13.4" y="5" width="3.6" height="8" rx=".8" fill="currentColor"/></symbol>
+    <symbol id="i-drums" viewBox="0 0 24 24"><ellipse cx="12" cy="13" rx="8.5" ry="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 13v4.5c0 1.9 3.8 3.5 8.5 3.5s8.5-1.6 8.5-3.5V13M8 16.5v3.7M16 16.5v3.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m6 3 5 6.5M18 3l-5 6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-other" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16.5" cy="16" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></symbol>
+  </svg>
+
+  <div id="boot" class="boot"><span class="spin"></span><p>Connecting…</p></div>
+
+  <form id="join" class="join" hidden>
+    <div class="join-head">
+      <h1>Who's playing?</h1>
+      <p>Pick your part. You can change it later.</p>
+    </div>
+    <div class="roles" id="roles" role="radiogroup" aria-label="Your part">
+      <button type="button" role="radio" data-role="singer"><svg class="ri"><use href="#i-singer"/></svg><b>Vocals</b><span>Lyrics</span></button>
+      <button type="button" role="radio" data-role="guitar"><svg class="ri"><use href="#i-guitar"/></svg><b>Guitar</b><span>Chords on lyrics</span></button>
+      <button type="button" role="radio" data-role="bass"><svg class="ri"><use href="#i-bass"/></svg><b>Bass</b><span>Chords on lyrics</span></button>
+      <button type="button" role="radio" data-role="keys"><svg class="ri"><use href="#i-keys"/></svg><b>Keys</b><span>Chords on lyrics</span></button>
+      <button type="button" role="radio" data-role="drums"><svg class="ri"><use href="#i-drums"/></svg><b>Drums</b><span>Bars</span></button>
+      <button type="button" role="radio" data-role="other"><svg class="ri"><use href="#i-other"/></svg><b>Other</b><span>Bars</span></button>
+    </div>
+    <label class="field"><span>Name</span><input id="j-name" maxlength="24" autocomplete="nickname" placeholder="Your name"></label>
+    <label class="field" id="j-pin-row" hidden><span>Host PIN</span><input id="j-pin" inputmode="numeric" maxlength="12" autocomplete="off"></label>
+    <p id="j-err" class="err" role="alert"></p>
+    <button class="btn primary wide" type="submit">Join the band</button>
+  </form>
+
+  <main id="app" hidden>
+    <header class="top">
+      <div class="who" id="who"><b id="title">Waiting for the host…</b><span id="sub"></span></div>
+      <span id="dot" class="dot" title="Connection"></span>
+      <button id="songs-btn" class="icon" type="button" aria-label="Songs"><svg><use href="#i-list"/></svg></button>
+      <button id="more" class="icon" type="button" aria-label="Controls and settings"><svg><use href="#i-more"/></svg></button>
+    </header>
+
+    <div class="modes">
+      <div class="seg" id="tabs" role="tablist">
+        <button role="tab" data-view="lyrics">Lyrics</button>
+        <button role="tab" data-view="chords">Chords</button>
+      </div>
+      <label class="switch" id="chord-sw">
+        <input type="checkbox" id="with-chords">
+        <span class="track"></span>
+        <span class="lbl">Chords on lyrics</span>
+      </label>
+    </div>
+
+    <section id="stage" class="stage" aria-live="off"></section>
+
+    <footer class="dock">
+      <div class="seekrow">
+        <time id="t-cur">0:00</time>
+        <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Position">
+        <time id="t-dur">0:00</time>
+      </div>
+      <div class="ctl">
+        <button id="where" class="where" type="button" aria-label="Open controls">
+          <small>Bar</small><b id="w-bar">–</b><span id="w-chord"></span>
+        </button>
+        <div class="xport">
+          <button id="pl-prev" class="icon round" type="button" aria-label="Previous song in playlist" hidden><svg><use href="#i-prev"/></svg></button>
+          <button id="back" class="icon round" type="button" aria-label="Back 5 seconds"><svg><use href="#i-back"/></svg></button>
+          <button id="play" class="play" type="button" aria-label="Play or pause"><svg><use id="play-i" href="#i-play"/></svg></button>
+          <button id="fwd" class="icon round" type="button" aria-label="Forward 5 seconds"><svg><use href="#i-fwd"/></svg></button>
+          <button id="pl-next" class="icon round" type="button" aria-label="Next song in playlist" hidden><svg><use href="#i-next"/></svg></button>
+        </div>
+        <button id="tune" class="tune" type="button" aria-label="Tempo and key"><small>Tempo · Key</small><b id="tune-v">100% · 0</b></button>
+      </div>
+      <p id="locked" class="note" hidden>The host locked playback controls.</p>
+    </footer>
+  </main>
+
+  <dialog id="songs">
+    <div class="sheet-bar"><h2>Songs</h2><button id="songs-close" class="icon" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button></div>
+    <div class="sheet-body">
+      <div class="seg wide" id="song-tabs" role="tablist"><button role="tab" data-tab="songs" aria-selected="true">Songs</button><button role="tab" data-tab="lists" aria-selected="false">Playlists</button></div>
+      <input id="song-q" class="search" type="search" placeholder="Search songs" autocomplete="off" aria-label="Search songs">
+      <ul id="lib" class="lib"></ul>
+      <div id="pls" class="pls" hidden></div>
+    </div>
+  </dialog>
+
+  <dialog id="sheet">
+    <div class="sheet-bar"><h2>Controls</h2><button id="sheet-close" class="icon" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button></div>
+    <div class="sheet-body">
+      <section class="group">
+        <h3>Playback</h3>
+        <div class="stepper">
+          <div class="s-head"><span>Tempo</span><output id="t-out">100%</output><button id="t-reset" class="link" type="button">Reset</button></div>
+          <div class="s-ctl"><button id="t-down" class="icon round" type="button" aria-label="Slower"><svg><use href="#i-minus"/></svg></button><input id="t-range" type="range" min="50" max="150" step="5" value="100"><button id="t-up" class="icon round" type="button" aria-label="Faster"><svg><use href="#i-plus"/></svg></button></div>
+        </div>
+        <div class="stepper">
+          <div class="s-head"><span>Key</span><output id="k-out">0</output><button id="k-reset" class="link" type="button">Reset</button></div>
+          <div class="s-ctl"><button id="k-down" class="icon round" type="button" aria-label="Lower"><svg><use href="#i-minus"/></svg></button><input id="k-range" type="range" min="-12" max="12" step="1" value="0"><button id="k-up" class="icon round" type="button" aria-label="Higher"><svg><use href="#i-plus"/></svg></button></div>
+        </div>
+      </section>
+
+      <section class="group">
+        <h3>Sound</h3>
+        <div class="seg wide" id="mode-seg" role="radiogroup">
+          <button role="radio" data-mode="follow">Room only</button>
+          <button role="radio" data-mode="listen">Hear here</button>
+          <button role="radio" data-mode="solo">Solo</button>
+        </div>
+        <p id="m-note" class="hint"></p>
+        <div id="lat-row" class="stepper" hidden>
+          <div class="s-head"><span>Sound delay</span><output id="lat-out">0 ms</output><button id="resync" class="link" type="button">Re-sync</button></div>
+          <input id="lat" type="range" min="-300" max="500" step="5" value="0">
+          <p class="hint">Later if this phone is ahead of the room, earlier if behind.</p>
+        </div>
+      </section>
+
+      <section class="group">
+        <h3>Display</h3>
+        <div class="row-between"><span>Text size</span>
+          <div class="pair"><button id="fs-down" class="icon round" type="button" aria-label="Smaller text"><span class="aa small">A</span></button><button id="fs-up" class="icon round" type="button" aria-label="Larger text"><span class="aa">A</span></button></div></div>
+        <label class="switch" id="simple-sw">
+          <input type="checkbox" id="simple">
+          <span class="track"></span>
+          <span class="lbl">Simpler chords <small>7ths and 6ths as plain major or minor, on this phone only</small></span>
+        </label>
+        <div class="row-between"><span>Theme</span>
+          <div class="seg" id="theme-seg" role="radiogroup"><button role="radio" data-theme="auto">Auto</button><button role="radio" data-theme="light">Light</button><button role="radio" data-theme="dark">Dark</button></div></div>
+      </section>
+
+      <section class="group">
+        <h3>This device</h3>
+        <div class="row-between"><span id="me">–</span><button id="change-me" class="link" type="button">Change</button></div>
+        <div class="row-between"><span>Host</span><b id="host-name">–</b></div>
+        <div class="row-between" id="host-row" hidden><span>Another host</span><button id="switch-host" class="link" type="button">Find hosts</button></div>
+        <p id="net" class="hint"></p>
+      </section>
+    </div>
+  </dialog>
+</body>
+</html>

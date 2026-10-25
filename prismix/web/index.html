@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>Prismix — split, mute, transpose</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23111'/%3E%3Cpath d='M8 20v-8M13 24V8M18 18v-4M23 22V10' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script src="theme.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/" aria-label="Prismix home">
+      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="9" fill="currentColor" opacity=".14"/><path d="M8 20v-8M13 24V8M18 18v-4M23 22V10" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"/></svg>
+      <span>Prismix</span>
+    </a>
+    <a class="ver" id="ver" href="https://github.com/rsx-xxx/prismix/releases" target="_blank" rel="noopener" title="Release notes" hidden></a>
+    <form id="omni" class="omni" autocomplete="off">
+      <svg class="omni-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="q" type="text" placeholder="Paste a YouTube link, or search for a song" aria-label="YouTube link or search" spellcheck="false" enterkeyhint="go">
+      <select id="task" aria-label="What to do" title="What to prepare"><option value="all">Stems + chords</option><option value="stems">Stems only</option><option value="chords">Chords only</option></select>
+      <select id="quality" aria-label="Separation quality"></select>
+      <button class="btn primary" type="submit" data-ico="split">Split</button>
+    </form>
+    <button class="btn ghost" id="up-btn" type="button" data-ico="upload" title="Upload an audio or video file from this computer">Upload</button>
+    <input id="up-file" type="file" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.wma,.aif,.aiff,.mkv,.m4b" hidden>
+    <button class="btn ghost" id="pl-btn" type="button" data-ico="list" title="Pick from your YouTube playlists">Playlists</button>
+    <button class="btn ghost" id="band-btn" type="button" title="Phones on this Wi-Fi can follow and control the player">Band</button>
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="Theme"></button>
+    <button class="icon-btn" id="help-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
+  </header>
+
+  <main>
+    <section id="home">
+      <div id="notice" class="notice" role="alert" hidden></div>
+      <div id="job" class="job" hidden></div>
+      <div id="preview" class="preview" hidden>
+        <div class="frame"><iframe id="pv-frame" title="YouTube preview" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe><video id="pv-media" controls playsinline preload="metadata" hidden></video></div>
+        <div class="pv-side">
+          <div><div id="pv-title" class="t"></div><div id="pv-sub" class="muted"></div></div>
+          <div class="pv-actions">
+            <button class="btn primary" id="pv-split" type="button" data-ico="split">Split into stems</button>
+            <button class="btn ghost" id="pv-close" type="button">Close</button>
+          </div>
+        </div>
+      </div>
+      <div id="results" class="results" hidden></div>
+      <section id="pl-sec" hidden>
+        <div class="section-head"><h2>Playlists</h2></div>
+        <div id="pl-cards" class="plcards"></div>
+      </section>
+      <section id="plpage" class="plpage" hidden>
+        <div class="pp-head">
+          <button class="icon-btn" id="pp-back" type="button" aria-label="Back to library"><svg viewBox="0 0 24 24" width="20" height="20"><path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div class="th-text"><h1 id="pp-name"></h1><p class="muted"><span id="pp-count"></span> <span id="pp-status"></span></p></div>
+          <button class="btn primary" id="pp-process" type="button" title="Split and analyse every song that is not prepared yet">Process all</button>
+          <button class="btn ghost" id="pp-rename" type="button">Rename</button>
+          <button class="btn ghost" id="pp-delete" type="button">Delete</button>
+        </div>
+        <div id="pp-list" class="pp-list"></div>
+      </section>
+      <div class="section-head">
+        <h2>Your library</h2>
+        <span id="lib-count" class="muted"></span>
+      </div>
+      <div id="library" class="grid"></div>
+      <div id="empty" class="empty" hidden>
+        <div class="empty-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <h3>Turn any song into separate tracks</h3>
+        <p>Paste a YouTube link above, or drop an audio file here. Vocals, drums, bass and the rest are split once, cached, and ready to mute, solo, transpose or slow down.</p>
+      </div>
+    </section>
+
+    <section id="studio" hidden>
+      <div class="trackhead">
+        <button class="icon-btn" id="back" aria-label="Back to library">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <img id="th-cover" alt="" width="64" height="64">
+        <div class="th-text">
+          <h1 id="th-title"></h1>
+          <p id="th-sub" class="muted"></p>
+        </div>
+        <div id="th-models" class="seg" role="group" aria-label="Separation model"></div>
+        <button class="btn" id="export-btn" type="button" title="Download audio with the current tempo and key (D)">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Download
+        </button>
+      </div>
+
+      <div id="loading" class="loading" hidden>
+        <div class="bar"><i id="loading-bar"></i></div>
+        <span id="loading-text" class="muted">Loading stems…</span>
+      </div>
+
+      <nav id="blockbar" class="blockbar" aria-label="Blocks"></nav>
+
+      <aside id="video" class="video float" hidden aria-label="Video">
+        <div class="video-head block-head" id="video-head">
+          <span>Video, in sync with your edits</span>
+          <button class="btn small ghost" id="video-sound" type="button" data-ico="mute" aria-pressed="false" title="Hear the video's own sound instead of the stems. Tempo follows; key does not">Sound off</button>
+          <button class="btn small ghost" id="video-mode" type="button" data-ico="dock" title="Float, dock beside the lyrics, or wide">Dock</button>
+          <button class="icon-btn" id="video-close" type="button" aria-label="Close video">×</button>
+        </div>
+        <div class="video-frame"><div id="yt"></div></div>
+      </aside>
+
+      <section id="stems" class="block stems">
+      <div class="score-head block-head"><h2>Stems</h2>
+      </div>
+      <div id="presets" class="chips" aria-label="Quick mixes"></div>
+
+      <div id="mixer" class="mixer">
+        <div class="ctl-col" id="ctl-col"><div class="ruler-spacer" id="ctl-ruler" hidden></div></div>
+        <div class="lane-col" id="lane-col">
+          <div class="ruler" id="ruler" hidden aria-label="Bars and chords"></div>
+          <div class="shade" id="shade"></div>
+          <div class="loop-region" id="loop-region" hidden></div>
+          <div class="playhead" id="playhead"></div>
+        </div>
+      </div>
+      </section>
+
+      <div id="panes" class="panes">
+      <section id="lyrics" class="block lyrics" hidden>
+        <div class="blk-top">
+          <div class="score-head block-head">
+            <h2>Lyrics</h2>
+            <span id="ly-credit" class="muted"></span>
+            <button class="btn small ghost" id="ly-layout" type="button" data-ico="layers" aria-pressed="false" title="Show chords above the words, or in their own box beside the lyrics">Side by side</button>
+          </div>
+        </div>
+        <div id="ly-body" class="ly-body" aria-live="off"></div>
+      </section>
+
+      <section id="score" class="block score" hidden>
+        <div class="blk-top">
+          <div class="score-head block-head">
+            <h2>Chords</h2>
+            <button class="btn small" id="sc-pdf" type="button" data-ico="doc">Chart PDF</button>
+          </div>
+          <p id="sc-meta" class="meta"></p>
+        </div>
+        <div id="sc-body" class="sc-body"></div>
+      </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="dock" id="dock" hidden>
+    <div class="sing" id="sing" hidden aria-label="Current lyric line"></div>
+    <div class="ahead" id="ahead" hidden aria-label="Upcoming chords"></div>
+    <div class="secband" id="secband" hidden aria-label="Song sections"></div>
+    <div class="seek" id="seek" role="slider" aria-label="Position" aria-valuemin="0" tabindex="0">
+      <div class="seek-fill" id="seek-fill"></div>
+      <div class="seek-loop" id="seek-loop" hidden></div>
+      <div class="seek-knob" id="seek-knob"></div>
+    </div>
+    <div class="dock-row">
+      <div class="group transport">
+        <button class="icon-btn" id="pl-prev" aria-label="Previous song in playlist" title="Previous song" hidden>
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 5v14M19 5 9 12l10 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" id="rew" aria-label="Back 5 seconds" title="Back 5 s (←)">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M11 5 4 12l7 7M20 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="play" id="play" aria-label="Play" title="Play / pause (Space)"></button>
+        <button class="icon-btn" id="fwd" aria-label="Forward 5 seconds" title="Forward 5 s (→)">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="m13 5 7 7-7 7M4 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" id="pl-next" aria-label="Next song in playlist" title="Next song" hidden>
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M18 5v14M5 5l10 7-10 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="time"><b id="t-now">0:00</b><span id="t-total">0:00</span></div>
+        <div class="where" id="where" aria-live="off"></div>
+      </div>
+
+      <div class="group knob">
+        <label for="tempo">Tempo</label>
+        <button class="reset" id="tempo-reset" type="button" aria-label="Reset tempo to 100%" title="Reset tempo (R)" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="stepper">
+          <button id="tempo-down" aria-label="Slower" title="Slower ([)">−</button>
+          <output id="tempo-out" for="tempo">100%</output>
+          <button id="tempo-up" aria-label="Faster" title="Faster (])">+</button>
+        </div>
+        <input id="tempo" type="range" min="50" max="150" step="1" value="100">
+      </div>
+
+      <div class="group knob">
+        <label for="key">Key</label>
+        <button class="reset" id="key-reset" type="button" aria-label="Reset key to original" title="Reset key (Shift+R)" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="stepper">
+          <button id="key-down" aria-label="Lower by a semitone" title="Lower (,)">−</button>
+          <output id="key-out" for="key">0</output>
+          <button id="key-up" aria-label="Higher by a semitone" title="Higher (.)">+</button>
+        </div>
+        <input id="key" type="range" min="-12" max="12" step="1" value="0">
+      </div>
+
+      <div class="group">
+        <button class="btn small" id="video-btn" type="button" aria-pressed="false" title="Watch the video along with your edits (V)" hidden>
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 10.5 5-3v9l-5-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          Video
+        </button>
+      </div>
+
+      <div class="group marks">
+        <button class="btn small ghost ic" id="go-music" type="button" data-ico="start" title="Jump to where the music starts" aria-label="Jump to the music" hidden>Music</button>
+        <button class="btn small ghost ic" id="go-lyrics" type="button" data-ico="lyrics" title="Jump to the first lyric" aria-label="Jump to the lyrics" hidden>Lyrics</button>
+      </div>
+
+      <details class="group more">
+        <summary class="icon-btn" aria-label="More options" title="More options">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        </summary>
+        <div class="popover">
+          <div class="loopctl">
+            <span>Loop</span>
+            <button class="btn small" id="loop-a" title="Set loop start (A)">A</button>
+            <button class="btn small" id="loop-b" title="Set loop end (B)">B</button>
+            <button class="btn small ghost ic" id="loop-clear" title="Clear loop (C)" aria-label="Clear loop" data-ico="clear" hidden>Clear</button>
+          </div>
+          <label class="switch"><input type="checkbox" id="formants" checked><span></span>Keep voices natural when transposing</label>
+          <label class="slider-row">Fine tune <output id="cents-out">0 ct</output>
+            <input id="cents" type="range" min="-50" max="50" step="1" value="0"></label>
+          <label class="slider-row">Master volume
+            <input id="master" type="range" min="0" max="100" step="1" value="90"></label>
+          <button class="btn small ghost" id="reset-tune" data-ico="reset">Reset tempo, key &amp; fine tune</button>
+        </div>
+      </details>
+    </div>
+  </footer>
+
+  <dialog id="export" class="wide">
+    <form id="export-form" method="dialog">
+      <h3>Download</h3>
+      <div id="ex-source" class="seg" role="group" aria-label="What to download">
+        <button type="button" data-src="mix" aria-pressed="true">Your mix</button>
+        <button type="button" data-src="orig" aria-pressed="false">Original</button>
+      </div>
+      <div id="ex-orig" hidden>
+        <p class="muted">The track as it is on YouTube: no stems, tempo or key changes.</p>
+        <fieldset>
+          <legend>Type</legend>
+          <div id="eo-kind" class="seg" role="group" aria-label="Type"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Format</legend>
+          <div id="eo-formats" class="seg" role="group" aria-label="Original format"></div>
+          <label id="eo-height-row" class="slider-row" hidden>Quality
+            <select id="eo-height" aria-label="Video quality"></select></label>
+          <p id="eo-hint" class="muted small"></p>
+        </fieldset>
+      </div>
+      <div id="ex-mix">
+      <p id="ex-summary" class="muted"></p>
+      <fieldset>
+        <legend>What</legend>
+        <label class="radio"><input type="radio" name="scope" value="heard" checked> <span><b>As you hear it</b><small id="ex-heard"></small></span></label>
+        <label class="radio"><input type="radio" name="scope" value="all"> <span><b>Everything</b><small>Full mix of all stems</small></span></label>
+        <label class="radio"><input type="radio" name="scope" value="pick"> <span><b>Choose stems</b><small>Tick the ones you want</small></span></label>
+        <div id="ex-stems" class="chips" hidden></div>
+        <label class="switch" id="ex-sep-row"><input type="checkbox" id="ex-sep"><span></span>Separate file for each stem (zip)</label>
+      </fieldset>
+      <fieldset>
+        <legend>Format</legend>
+        <div id="ex-formats" class="seg" role="group" aria-label="Format"></div>
+        <p id="ex-fmt-hint" class="muted small"></p>
+      </fieldset>
+      </div>
+      <p id="ex-error" class="notice" role="alert" hidden></p>
+      <div class="dlg-actions">
+        <button class="btn ghost" id="ex-cancel" type="button">Cancel</button>
+        <button class="btn primary" id="ex-go" type="submit">Download</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="playlists" class="wide">
+    <div class="pl-head"><h3>Playlists</h3><button class="icon-btn" id="pl-close" type="button" aria-label="Close">×</button></div>
+    <div id="pl-body" class="pl-body"></div>
+  </dialog>
+
+  <dialog id="addpl">
+    <div class="pl-head"><h3 id="addpl-title">Add to playlist</h3><button class="icon-btn" id="addpl-close" type="button" aria-label="Close">×</button></div>
+    <div id="addpl-body" class="pl-body"></div>
+  </dialog>
+
+  <dialog id="band">
+    <div class="pl-head"><h3>Band</h3><button class="icon-btn" id="band-close" type="button" aria-label="Close">×</button></div>
+    <p class="muted" id="band-hint"></p>
+    <div class="band-tabs" id="band-tabs" role="tablist">
+      <button type="button" role="tab" data-kind="app" aria-selected="true">Prismix Band app</button>
+      <button type="button" role="tab" data-kind="web" aria-selected="false">Browser</button>
+    </div>
+    <div id="band-qr" class="band-qr" hidden></div>
+    <p id="band-url" class="band-url"></p>
+    <label class="band-row"><input type="checkbox" id="band-lock"> Lock phones to view only</label>
+    <label class="band-row">PIN <input id="band-pin" type="text" inputmode="numeric" maxlength="12" placeholder="none"></label>
+    <ul id="band-clients" class="band-clients"></ul>
+  </dialog>
+
+  <div class="cheats" id="cheats" hidden role="dialog" aria-label="Keyboard shortcuts">
+    <div class="cheats-card">
+      <div class="cheats-head"><h3>Keyboard shortcuts</h3><span class="cheats-tip">Tap <kbd>⌘</kbd> to show or hide</span><button class="icon-btn" id="cheats-close" type="button" aria-label="Close">×</button></div>
+      <div class="cheats-grid" id="cheats-grid"></div>
+    </div>
+  </div>
+</body>
+</html>
