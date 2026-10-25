@@ -428,6 +428,31 @@ def create_app() -> FastAPI:
             "Cache-Control": "no-store",
         })
 
+    @app.get("/api/dl/{video_id}/original.m4a")
+    async def phone_original(video_id: str):
+        try:
+            res = await asyncio.to_thread(original.audio, video_id, "m4a")
+        except (export.ExportError, ValueError) as e:
+            raise HTTPException(400, str(e)) from e
+        return FileResponse(res.path, media_type=res.mime, headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(res.name)}",
+            "Cache-Control": "no-store",
+        }, background=BackgroundTask(res.cleanup))
+
+    @app.get("/api/dl/{video_id}/{model}/{stem}.m4a")
+    async def phone_stem(video_id: str, model: str, stem: str):
+        if model not in MODELS:
+            raise HTTPException(400, "Unknown model")
+        spec = export.ExportSpec(video_id, model, [stem], format="m4a")
+        try:
+            data, name, mime = await asyncio.to_thread(export.render, spec)
+        except (export.ExportError, ValueError) as e:
+            raise HTTPException(400, str(e)) from e
+        return Response(data, media_type=mime, headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}",
+            "Cache-Control": "no-store",
+        })
+
     @app.post("/api/original")
     async def original_media(req: OriginalRequest):
         def build() -> original.Result:

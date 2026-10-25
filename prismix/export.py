@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import library
+from . import library, tagging
 from .config import SAMPLE_RATE, ffmpeg_exe
 
 # id -> (extension, mime, ffmpeg codec args)
@@ -97,16 +97,30 @@ def _limit(audio: np.ndarray, fmt: str) -> np.ndarray:
     return audio * (ceiling / peak) if peak > ceiling else audio
 
 
-def _encode(audio: np.ndarray, fmt: str, tags: dict[str, str]) -> bytes:
+COVER_FORMATS = {"mp3", "m4a", "flac"}
+
+
+def cover_args(fmt: str, cover: Path | None) -> tuple[list[str], list[str]]:
+    """(extra input args, output args) that attach `cover` as the picture, for formats that can carry one."""
+    if not cover or fmt not in COVER_FORMATS:
+        return [], []
+    out = ["-map", "0:a", "-map", "1:v", "-c:v", "copy", "-disposition:v:0", "attached_pic"]
+    if fmt == "mp3":
+        out += ["-id3v2_version", "3"]
+    return ["-i", str(cover)], out
+
+
+def _encode(audio: np.ndarray, fmt: str, tags: dict[str, str], cover: Path | None = None) -> bytes:
     ext, _, codec = FORMATS[fmt]
     meta = [a for k, v in tags.items() if v for a in ("-metadata", f"{k}={v}")]
+    cin, cout = cover_args(fmt, cover)
     # Output to a pipe is not seekable (breaks m4a/wav headers), so go through a temp file.
     with tempfile.TemporaryDirectory() as tmp:
         dest = Path(tmp) / f"out.{ext}"
         pcm = np.ascontiguousarray(np.clip(audio.T, -1, 1), dtype="<f4").tobytes()
         proc = subprocess.run(
             [ffmpeg_exe(), "-v", "error", "-nostdin", "-y", "-f", "f32le", "-ac", "2",
-             "-ar", str(SAMPLE_RATE), "-i", "-", *codec, *meta, str(dest)],
+             "-ar", str(SAMPLE_RATE), "-i", "-", *cin, *codec, *cout, *meta, str(dest)],
             input=pcm, capture_output=True, check=False,
         )
         if proc.returncode:
@@ -148,7 +162,9 @@ def render(spec: ExportSpec) -> tuple[bytes, str, str]:
     title = meta.get("title", "track")
     base = _safe(title) + describe(spec)
     mdir = library.model_dir(spec.video_id, spec.model)
-    tags = {"title": title, "artist": meta.get("channel", ""),
+    found, cover = tagging.for_track(spec.video_id)
+    title = found.get("title") or title
+    tags = {**found, "title": title, "artist": found.get("artist") or meta.get("channel", ""),
             "comment": f"Stems: {', '.join(names)}; tempo {spec.tempo:.2f}x; {spec.semitones:+g} semitones"}
 
     def gain(name: str) -> float:
@@ -161,7 +177,7 @@ def render(spec: ExportSpec) -> tuple[bytes, str, str]:
         mix = np.zeros((2, length), dtype=np.float32)
         for a in stems.values():
             mix[:, : a.shape[1]] += a
-        data = _encode(_limit(stretch(mix, spec.tempo, spec.semitones), spec.format), spec.format, tags)
+        data = _encode(_limit(stretch(mix, spec.tempo, spec.semitones), spec.format), spec.format, tags, cover)
         label = "" if len(names) == len(available) else f" ({' + '.join(names)})"
         return data, f"{base}{label}.{ext}", mime
 
@@ -169,5 +185,5 @@ def render(spec: ExportSpec) -> tuple[bytes, str, str]:
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:  # audio is already compressed
         for n, a in stems.items():
             out = _limit(stretch(a, spec.tempo, spec.semitones), spec.format)
-            zf.writestr(f"{base} - {n}.{ext}", _encode(out, spec.format, {**tags, "title": f"{title} ({n})"}))
+            zf.writestr(f"{base} - {n}.{ext}", _encode(out, spec.format, {**tags, "title": f"{title} ({n})"}, cover))
     return buf.getvalue(), f"{base} - stems.zip", "application/zip"
