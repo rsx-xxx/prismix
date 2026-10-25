@@ -1,30 +1,19 @@
-# Build and runtime
-/backend/downloads/
-/backend/processed/
+# Runtime data (downloaded audio, separated stems)
+/data/
+
+# Python
 __pycache__/
 *.pyc
-*.pyo
+.venv/
+.pytest_cache/
+.ruff_cache/
 
-# Environment and secrets
-/.env
+# Secrets
+.env
 *.env
-*_cookies.txt
-cookies.txt
+*cookies*.txt
 
-# IDE and OS
-/.idea/
-/.claude/
+# IDE / OS
+.idea/
+.claude/
 .DS_Store
-*.swp
-*.swo
-*~
-
-# Tests
-/tests/
-
-# Dependencies (optional, usually committed)
-# poetry.lock
-
-# Chrome/browser data
-/chrome/
-chrome
