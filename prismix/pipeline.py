@@ -180,8 +180,8 @@ def download(video_id: str, report: Report) -> dict:
                     f"Video is {duration // 60} min long; the limit is {MAX_DURATION_SEC // 60} min"
                 )
             ydl.process_ie_result(meta, download=True)
-    except yt_dlp.utils.DownloadError as e:
-        msg = str(e).replace("ERROR: ", "").splitlines()[0][:300]
+    except (yt_dlp.utils.YoutubeDLError, OSError) as e:  # network resets and extractor bugs, not just DownloadError
+        msg = (str(e).replace("ERROR: ", "").splitlines() or [type(e).__name__])[0][:300]
         raise PipelineError(f"YouTube download failed: {msg}") from e
 
     if not library.find_source(video_id):
