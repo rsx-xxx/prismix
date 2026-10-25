@@ -13,9 +13,9 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import library
+from . import library, tagging
 from .config import ffmpeg_exe
-from .export import FORMATS, ExportError
+from .export import FORMATS, ExportError, cover_args
 from .pipeline import _ydl_opts
 
 AS_IS = "original"
@@ -63,8 +63,11 @@ def audio(video_id: str, fmt: str) -> Result:
     ext, mime, codec = FORMATS[fmt]
     tmp = Path(tempfile.mkdtemp(prefix=".orig-"))
     out = tmp / f"audio.{ext}"
+    tags, cover = tagging.for_track(video_id)
+    cin, cout = cover_args(fmt, cover)
+    meta = [a for k, v in tags.items() if v for a in ("-metadata", f"{k}={v}")]
     proc = subprocess.run(
-        [ffmpeg_exe(), "-v", "error", "-nostdin", "-i", str(src), "-vn", "-map_metadata", "-1", *codec, str(out)],
+        [ffmpeg_exe(), "-v", "error", "-nostdin", "-i", str(src), *cin, *([] if cin else ["-vn"]), "-map_metadata", "-1", *codec, *cout, *meta, str(out)],
         capture_output=True, check=False,
     )
     if proc.returncode or not out.is_file():

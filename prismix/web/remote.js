@@ -617,6 +617,75 @@ $('who')?.addEventListener('click', openSongs);
 $('songs-close').onclick = () => songs.close();
 songs.addEventListener('click', (e) => { if (e.target === songs) songs.close(); });
 $('song-q').oninput = () => paintLibrary();
+// ── press feedback: a ripple and a short tick on every tap ──
+let toastTimer;
+function notice(text) {
+  let t = $('toast');
+  if (!t) { t = el('div', { id: 'toast', role: 'status' }); t.popover = 'manual'; document.body.append(t); } // the top layer, above open sheets
+  t.textContent = text;
+  try { if (!t.matches(':popover-open')) t.showPopover(); } catch { /* no popover support: stays behind sheets */ }
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.classList.remove('on'); try { t.hidePopover(); } catch { /* not shown */ } }, 2600);
+}
+document.addEventListener('pointerdown', (e) => {
+  const b = e.target.closest?.('button, [role=tab], [role=radio], .lib li, .pls li, .pls button');
+  if (!b || b.disabled) return;
+  if (droid?.tap) droid.tap(); else navigator.vibrate?.(8);
+  const r = b.getBoundingClientRect();
+  const size = Math.max(r.width, r.height) * 1.6;
+  const dot = el('span', { className: 'rip' });
+  Object.assign(dot.style, { width: `${size}px`, height: `${size}px`, left: `${e.clientX - r.left - size / 2}px`, top: `${e.clientY - r.top - size / 2}px` });
+  b.append(dot);
+  dot.addEventListener('animationend', () => dot.remove());
+}, { passive: true });
+
+// ── stem volumes (this phone only; they shape what it plays in "Hear here" and "Solo") ──
+const mixer = $('mixer');
+const mix = store.mix || {};
+const mixOf = (n) => mix[n] || (mix[n] = { v: 1, m: false });
+const mixMuted = () => Object.keys(mix).filter((n) => mix[n].m);
+function applyMix() {
+  const p = S.local;
+  if (!p) return;
+  for (const s of p.stems) p.setVolume(s.name, mixOf(s.name).v);
+  if (S.mode === 'solo') p.setMuteSet(mixMuted());
+}
+function paintMixer() {
+  const names = (S.track?.meta.stems || []).map((s) => s.name);
+  const live = S.mode !== 'follow';
+  $('mix-note').textContent = !names.length ? 'No song yet.' : live ? 'Changes apply to the sound on this phone only.' : 'Switch to "Hear here" or "Solo" in Controls to play the song on this phone, then set the levels here.';
+  $('mix-list').replaceChildren(...names.map((n) => {
+    const m = mixOf(n);
+    const out = el('output', { textContent: `${Math.round(m.v * 100)}%` });
+    const range = el('input', { type: 'range', min: 0, max: 150, step: 5, value: Math.round(m.v * 100), ariaLabel: `${n} volume` });
+    const btn = el('button', { type: 'button', className: 'mute', textContent: m.m ? 'Muted' : 'On', ariaPressed: String(m.m) });
+    const row = el('div', { className: `mrow${m.m ? ' off' : ''}` }, el('b', { textContent: n[0].toUpperCase() + n.slice(1) }), btn, range, out);
+    range.oninput = () => { m.v = range.value / 100; out.textContent = `${range.value}%`; store.mix = mix; save(); applyMix(); };
+    btn.onclick = () => { m.m = !m.m; btn.textContent = m.m ? 'Muted' : 'On'; btn.ariaPressed = String(m.m); row.classList.toggle('off', m.m); store.mix = mix; save(); applyMix(); syncLocal(false); };
+    return row;
+  }));
+}
+$('mix-btn').onclick = () => { paintMixer(); mixer.showModal(); };
+$('mixer-close').onclick = () => mixer.close();
+mixer.addEventListener('click', (e) => { if (e.target === mixer) mixer.close(); });
+$('mix-reset').onclick = () => { for (const k of Object.keys(mix)) delete mix[k]; store.mix = mix; save(); applyMix(); syncLocal(false); paintMixer(); };
+
+// ── save to this phone (Android app only) ──
+if (droid?.download) {
+  $('save-group').hidden = false;
+  const abs = (p) => new URL(withPin(p), location.href).href;
+  const need = () => { if (!S.track) { notice('Pick a song first.'); return null; } return S.track; };
+  const folder = (t) => t.meta.title || t.id;
+  $('save-orig').onclick = () => { const t = need(); if (!t) return; droid.download(abs(`/api/dl/${t.id}/original.m4a`), folder(t)); notice('Saving the original…'); };
+  $('save-stems').onclick = () => {
+    const t = need();
+    if (!t) return;
+    for (const s of t.meta.stems) droid.download(abs(`/api/dl/${t.id}/${t.model}/${encodeURIComponent(s.name)}.m4a`), folder(t));
+    notice(`Saving ${t.meta.stems.length} stems…`);
+  };
+}
+
 const openSheet = () => { sheet.showModal(); showHostName(); modeUi(); $('me').textContent = `${store.name || 'You'} · ${ROLES[store.role] || ''}`; };
 $('more').onclick = openSheet;
 $('where').onclick = openSheet;
@@ -769,7 +838,8 @@ async function setMode(mode) {
     if (mode === 'solo' && S.local) {
       S.local.setTempo(S.solo.tempo); S.local.setSemitones(S.solo.semitones);
       S.local.seek(hostPos());
-      S.local.setMuteSet([]);
+      S.local.setMuteSet(mixMuted());
+      applyMix();
       if (prev === 'listen') S.local.pause();
     }
     if (mode === 'listen') syncLocal(true);
@@ -796,6 +866,7 @@ async function ensureLocal() {
   delete note.dataset.busy;
   S.local = p;
   S.localTrack = `${t.id}/${t.model}`;
+  applyMix();
   modeUi();
   p.addEventListener('ended', () => { if (S.mode === 'solo') last = {}; });
 }
@@ -807,7 +878,8 @@ function syncLocal(force = false) {
   if (p.tempo !== h.tempo) p.setTempo(h.tempo);
   if (p.semitones !== h.semitones) p.setSemitones(h.semitones);
   if (p.cents !== h.cents) p.setCents(h.cents);
-  p.setMuteSet(h.solo?.length ? p.stems.map((s) => s.name).filter((n) => !h.solo.includes(n)) : h.muted || []);
+  const off = h.solo?.length ? p.stems.map((s) => s.name).filter((n) => !h.solo.includes(n)) : h.muted || [];
+  p.setMuteSet([...new Set([...off, ...mixMuted()])]);
   if (h.loop) p.setLoop(h.loop.a, h.loop.b); else if (p.loop) p.setLoop(null, null);
   const want = hostPos() + S.lat / 1000 * h.tempo; // where the room is, nudged by this phone's delay
   const ahead = (0.05 + p.outLatency) * h.tempo; // a seek lands this far later and is heard later still
