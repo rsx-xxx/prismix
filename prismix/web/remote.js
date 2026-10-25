@@ -3,7 +3,7 @@
 // and can drive the host, hear it locally, or go solo.
 import { chordName, chordPaint, fifthsFor, simplify } from './theory.js';
 import { createMedia } from './media.js';
-import { timeLine } from './lyrics.js';
+import { timeLine, splitAt } from './lyrics.js';
 
 const $ = (id) => document.getElementById(id);
 const LS = 'prismix.remote';
@@ -53,6 +53,8 @@ const S = {
   mode: store.mode || 'follow', // follow | listen | solo
   view: store.view || 'lyrics', // lyrics | chords
   withChords: store.chords ?? false,
+  tabChords: store.tabChords ?? true, // chords above the tab staff
+  part: store.part || null, // guitar | bass, which tab to show
   simple: store.simple ?? false, // simpler chord names, on this phone only
   locked: false,
   local: null, // StemPlayer, created on demand
@@ -227,7 +229,7 @@ async function loadTrack(id, model) {
       getJson(`/media/${id}/structure.json`).catch(() => null),
     ]);
     if (mine !== loadToken) return;
-    const t = { id, model, meta, structure, lyrics: null, pending: true };
+    const t = { id, model, meta, structure, lyrics: null, pending: true, tabDone: !structure };
     // The host may have to recognise or align the words first, which takes minutes: show the song meanwhile.
     getJson(`/api/lyrics/${id}`).then((lyrics) => {
       if (mine !== loadToken) return;
@@ -236,6 +238,15 @@ async function loadTrack(id, model) {
       render();
     }).catch(() => { t.pending = false; if (mine === loadToken) render(); });
     if (structure) {
+      getJson(`/api/tabdata/${id}`).then((d) => {
+        if (mine !== loadToken) return;
+        t.tabDone = true;
+        if (!d?.found) { chrome(); if (S.view === 'tab') render(); return; }
+        t.tab = d;
+        if (!S.part || !d.tracks[S.part]) S.part = d.tracks[roleKey()] ? roleKey() : d.tracks.guitar ? 'guitar' : 'bass';
+        chrome();
+        if (S.view === 'tab') render();
+      }).catch(() => { t.tabDone = true; });
       const b = structure.beats;
       t.beatSec = (x) => {
         if (x <= 0) return b[0] + x * (b[1] - b[0]);
@@ -291,15 +302,20 @@ function relabel() {
 function fit() {
   if (S.view !== 'lyrics' || !nodes.lines) return;
   const sys = nodes.lines.map((n) => n.syl).filter((l) => l.length);
-  for (const line of sys) for (const sy of line) sy.el.style.marginRight = '';
+  for (const line of sys) for (const sy of line) { sy.el.style.marginRight = ''; }
   const plan = [];
   for (const line of sys) {
     line.forEach((sy, k) => {
       const chs = sy.el.firstElementChild;
       const nx = line[k + 1];
-      if (!chs?.classList.contains('chs') || !nx || nx.el.firstElementChild?.classList.contains('chs')) return;
-      const over = chs.offsetWidth - sy.el.querySelector('.tx').offsetWidth;
-      if (over > 0) plan.push([sy.el, -Math.min(over, nx.el.querySelector('.tx').offsetWidth)]);
+      if (!chs?.classList.contains('chs') || !nx) return;
+      const tx = sy.el.querySelector('.tx');
+      const over = chs.offsetWidth - tx.offsetWidth;
+      if (over <= 0) return;
+      if (nx.el.firstElementChild?.classList.contains('chs')) {
+        return;
+      }
+      plan.push([sy.el, -Math.min(over, nx.el.querySelector('.tx').offsetWidth)]);
     });
   }
   for (const [e, m] of plan) e.style.marginRight = `${m}px`;
@@ -309,10 +325,21 @@ let last = {};
 let nodes = { chords: [] }; // per-view handles for cheap per-frame updates
 const scrollLock = { until: 0 };
 
+const roleKey = () => (store.role === 'bass' ? 'bass' : 'guitar');
+
 function chrome() {
+  if (S.view === 'tab' && S.track?.tabDone && !S.track.tab) S.view = 'lyrics'; // this song has no tab
   document.querySelectorAll('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === S.view)));
-  $('chord-sw').hidden = S.view !== 'lyrics';
-  $('with-chords').checked = S.withChords;
+  const tab = !!S.track?.tab;
+  $('tab-btn').hidden = !tab;
+  $('tab-part').hidden = !(tab && S.view === 'tab' && Object.keys(S.track.tab.tracks).length > 1);
+  document.querySelectorAll('#tab-part button').forEach((b) => {
+    b.hidden = !S.track?.tab?.tracks[b.dataset.part];
+    b.setAttribute('aria-selected', String(b.dataset.part === S.part));
+  });
+  $('chord-sw').hidden = S.view === 'chords';
+  $('chord-lbl').textContent = S.view === 'tab' ? 'Chords above tab' : 'Chords on lyrics';
+  $('with-chords').checked = S.view === 'tab' ? S.tabChords : S.withChords;
 }
 
 function render() {
@@ -331,8 +358,9 @@ function render() {
     return;
   }
   if (!t) { stage.append(el('p', { className: 'empty', textContent: S.host?.id ? 'Loading…' : 'Waiting for the host to open a song.' })); return; }
-  if (S.view === 'chords') renderChart(stage, t); else renderLyrics(stage, t);
+  if (S.view === 'chords') renderChart(stage, t); else if (S.view === 'tab' && t.tab) renderTab(stage, t); else renderLyrics(stage, t);
   fit();
+  fitTab();
   update();
 }
 
@@ -371,9 +399,10 @@ function renderLyrics(stage, t) {
       const prev = ci > 0 ? cs[ci - 1] : null;
       const here = [];
       while (ci < cs.length && cs[ci].t < tl.end) here.push(cs[ci++]);
+      splitAt(tl, here.map((k) => k.t));
       const slots = tl.syl.map(() => []);
       if (prev && (!here.length || here[0].t > tl.syl[0].t + 0.15)) slots[0].push({ ...prev, carry: true });
-      for (const k of here) slots[Math.max(0, tl.syl.findLastIndex((o) => o.t <= k.t + 0.15))].push(k);
+      for (const k of here) slots[Math.max(0, tl.syl.findLastIndex((o) => o.t <= k.t + 0.08))].push(k);
       let si = 0;
       for (const p of tl.parts) {
         if (p.space) continue;
@@ -397,6 +426,121 @@ function renderLyrics(stage, t) {
   });
   if (withChords && ci < cs.length) instr('Outro', cs.slice(ci));
   stage.append(box);
+}
+
+// ── tab ──
+// Songsterr's bars were matched to the recording's bars on the host, so a tab bar is drawn over exactly the
+// stretch of the song it is played in: notes, chords and words all sit at their time inside the bar.
+const TAB_BAR_MIN = 11; // rem a bar needs before a row takes one more
+
+function tabWords(t) {
+  const ly = t.lyrics;
+  if (!ly?.synced) return [];
+  const out = [];
+  ly.lines.forEach((ln, i) => {
+    if (!ln.text || ln.t == null) return;
+    let next = null;
+    for (let k = i + 1; k < ly.lines.length; k++) if (ly.lines[k].t != null) { next = ly.lines[k].t; break; }
+    for (const p of timeLine(ln.text, ln.t, next, ln.ws, ln.we).parts) {
+      if (p.pieces) out.push({ txt: p.pieces.map((o) => o.txt).join(''), t: p.pieces[0].t, e: p.pieces.at(-1).e });
+    }
+  });
+  return out;
+}
+
+function renderTab(stage, t) {
+  const tab = t.tab, st = t.structure, part = tab.tracks[S.part];
+  if (!part || !st) return;
+  const rows = Math.max(1, Math.floor(stage.clientWidth / (TAB_BAR_MIN * parseFloat(getComputedStyle(document.documentElement).fontSize))));
+  const bars = st.bars;
+  const diffs = bars.slice(1).map((b, i) => b - bars[i]).sort((a, b) => a - b);
+  const bpb = diffs.length ? diffs[diffs.length >> 1] : 4;
+  const endT = (j) => t.beatSec(bars[j + 1] ?? bars[j] + bpb);
+  const of = new Map(); // recording bar -> tab bar
+  tab.map.forEach((j, i) => { if (j != null && !of.has(j) && i < part.bars.length) of.set(j, i); });
+  const first = [...of.keys()].reduce((a, b) => Math.min(a, b), Infinity);
+  const last = [...of.keys()].reduce((a, b) => Math.max(a, b), -1);
+  const words = tabWords(t);
+  const strings = part.tuning.length;
+  const box = el('div', { className: `tab${S.tabChords ? ' with-chords' : ''}`, style: `--strings:${strings}` });
+  box.append(el('p', { className: 'tab-src' },
+    `${part.name.split('|').at(-1).trim() || S.part} · tab by `,
+    el('a', { href: tab.url, target: '_blank', rel: 'noopener', textContent: 'Songsterr' }),
+    ' · original key'));
+  nodes.bars = [];
+  nodes.tabWords = [];
+  nodes.tabCells = [];
+  let row = null, rowLane = null, rowStart = 0;
+  const wa = words.length ? floorIndex(t.barT, words[0].t) : Infinity, wz = words.length ? floorIndex(t.barT, words.at(-1).t) : -1;
+  const from = Math.max(0, Math.min(first - 1, wa)), to = Math.min(bars.length - 1, Math.max(last + 1, wz));
+  for (let j = from; j <= to; j++) {
+    if (!row || (j - from) % rows === 0) {
+      rowLane = el('div', { className: 'tly' });
+      row = el('div', { className: 'trow', style: `--cols:${rows}` });
+      rowStart = j;
+      box.append(row, rowLane);
+      rowLane.hidden = !words.length;
+    }
+    const b0 = t.barT[j], b1 = endT(j);
+    const tb = of.has(j) ? part.bars[of.get(j)] : null;
+    const cell = el('div', { className: `bar tb${tb ? '' : ' blank'}` });
+    cell.append(el('span', { className: 'n', textContent: String(j + (bars[0] > 0 ? 0 : 1)) }));
+    if (tb?.mark) cell.append(el('span', { className: 'sec-tag', textContent: tb.mark }));
+    const stf = el('div', { className: 'stf' });
+    if (tb) {
+      for (const [pos, , frets] of tb.n) for (const [s, f] of frets) {
+        const n = el('span', { className: 'f', textContent: String(f) });
+        n.style.left = `${pos * 100}%`;
+        n.style.top = `calc(${s} * var(--row))`;
+        stf.append(n);
+      }
+    }
+    stf.append(el('span', { className: 'cursor' }));
+    if (S.tabChords && t.chords) {
+      const lane = el('div', { className: 'tchs' });
+      t.chords.forEach((c, i) => {
+        if (c.b < bars[j] - 0.01 || c.b >= (bars[j + 1] ?? bars[j] + bpb) - 0.01) return;
+        const pl = pill(c, i);
+        pl.style.left = `${((c.b - bars[j]) / ((bars[j + 1] ?? bars[j] + bpb) - bars[j])) * 100}%`;
+        lane.append(pl);
+      });
+      cell.append(lane);
+    }
+    cell.append(stf);
+    row.append(cell);
+    nodes.bars[j] = cell;
+    nodes.tabCells[j] = [b0, b1];
+    const col = j - rowStart;
+    for (const w of words) {
+      if (w.t < b0 - 1e-6 || w.t >= b1) continue;
+      const sp = el('span', { className: 'tw', textContent: w.txt });
+      sp.dataset.at = String((col + (w.t - b0) / (b1 - b0)) / rows);
+      rowLane.append(sp);
+      nodes.tabWords.push({ el: sp, t: w.t, e: w.e });
+    }
+  }
+  box.append(el('div', { className: 'pad' }));
+  stage.append(box);
+  nodes.tabWords.sort((a, b) => a.t - b.t);
+  nodes.tabWordT = nodes.tabWords.map((w) => w.t);
+}
+
+// Words are placed at their time; push right the ones that would overlap the previous word.
+function fitTab() {
+  if (S.view !== 'tab') return;
+  document.querySelectorAll('.tly').forEach((lane) => {
+    const w = lane.clientWidth;
+    let edge = 0, level = 0;
+    for (const sp of lane.children) {
+      const sw = sp.offsetWidth;
+      let x = Math.max(+sp.dataset.at * w, edge);
+      if (x + sw > w && edge > 0) { level++; x = clamp(+sp.dataset.at * w, 0, Math.max(0, w - sw)); } // no room left on this line
+      sp.style.left = `${x}px`;
+      sp.style.top = `${level * 1.25}rem`;
+      edge = x + sw + 4;
+    }
+    lane.style.height = `${(level + 1) * 1.25 + 0.1}rem`;
+  });
 }
 
 // A bar is a row of chord slots sized by beats. A chord is labelled in the bar where it starts and only
@@ -535,13 +679,23 @@ function update() {
     }
     for (const k of [li - 1, li]) if (k >= 0) paintLine(nodes.lines[k], q);
     if (nodes.chords.length && last.ci !== ci) { nodes.chords.forEach((r) => r.el.classList.toggle('on', r.i === ci)); last.ci = ci; }
-  } else if (S.view === 'chords' && nodes.bars) {
+  } else if ((S.view === 'chords' || S.view === 'tab') && nodes.bars) {
     if (bi !== last.bi) {
       nodes.bars.forEach((n, j) => { n.classList.toggle('now', j === bi); n.classList.toggle('past', j < bi); });
       last.bi = bi;
-      if (bi >= 0) centre(nodes.bars[bi], 0.3);
+      if (bi >= 0 && nodes.bars[bi]) centre(nodes.bars[bi], 0.3);
     }
     if (last.ci !== ci) { nodes.chords.forEach((r) => r.el.classList.toggle('on', r.i === ci)); last.ci = ci; }
+    if (S.view === 'tab' && bi >= 0 && nodes.tabCells[bi]) {
+      const [b0, b1] = nodes.tabCells[bi];
+      const x = Math.round(clamp((p - b0) / (b1 - b0), 0, 1) * 500) / 5;
+      if (last.cx !== x || last.cb !== bi) { nodes.bars[bi].style.setProperty('--x', `${x}%`); last.cx = x; last.cb = bi; }
+      const wi = floorIndex(nodes.tabWordT, p + 0.05);
+      if (wi !== last.tw) {
+        nodes.tabWords.forEach((w, k) => { w.el.classList.toggle('done', k < wi); w.el.classList.toggle('cur', k === wi); });
+        last.tw = wi;
+      }
+    }
   }
 }
 ['touchstart', 'wheel', 'pointerdown'].forEach((ev) => $('stage').addEventListener(ev, () => { scrollLock.until = Date.now() + 4000; }, { passive: true }));
@@ -605,7 +759,24 @@ $('simple').onchange = (e) => {
   save();
   if (S.track?.structure) { buildChords(S.track); render(); }
 };
-$('with-chords').onchange = (e) => { S.withChords = store.chords = e.target.checked; save(); render(); };
+$('with-chords').onchange = (e) => {
+  if (S.view === 'tab') S.tabChords = store.tabChords = e.target.checked; else S.withChords = store.chords = e.target.checked;
+  save();
+  render();
+};
+$('tab-part').onclick = (e) => {
+  const v = e.target.dataset?.part;
+  if (!v || v === S.part) return;
+  S.part = store.part = v;
+  save();
+  render();
+};
+let tabCols = 0;
+addEventListener('resize', () => { // a rotated phone fits a different number of bars per row
+  if (S.view !== 'tab') return;
+  const c = Math.floor($('stage').clientWidth / (TAB_BAR_MIN * parseFloat(getComputedStyle(document.documentElement).fontSize)));
+  if (c !== tabCols) { tabCols = c; render(); }
+});
 
 // ── sheet ──
 const sheet = $('sheet');
