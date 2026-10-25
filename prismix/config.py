@@ -41,16 +41,16 @@ class ModelSpec:
 # Whitelist: the model id is used in file paths and passed to the loader.
 MODELS: dict[str, ModelSpec] = {
     "htdemucs_ft": ModelSpec(
-        "htdemucs_ft", "Best", "Highest quality, ~4x slower",
+        "htdemucs_ft", "4 stems", "Vocals, drums, bass and the rest. Good quality, faster",
         ("vocals", "drums", "bass", "other"),
     ),
     "bs_roformer_sw": ModelSpec(
-        "bs_roformer_sw", "Deep (6 stems)",
-        "BS-RoFormer: far fewer artifacts on loud mixes, slower, ~700 MB download on first use",
+        "bs_roformer_sw", "6 stems · Deep",
+        "Best quality: adds guitar and piano, far fewer artifacts on loud mixes. Slower, ~700 MB download on first use",
         ("vocals", "drums", "bass", "guitar", "piano", "other"),
     ),
     "htdemucs_6s": ModelSpec(
-        "htdemucs_6s", "6 stems (old)", "An older split kept for this track; Deep replaces it",
+        "htdemucs_6s", "6 stems (old)", "An older split kept for this track; 6 stems · Deep replaces it",
         ("vocals", "drums", "bass", "guitar", "piano", "other"), legacy=True,
     ),
     # no separation: the whole mix as one track, for bars and chords only

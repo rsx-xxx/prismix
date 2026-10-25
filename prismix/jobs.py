@@ -105,9 +105,9 @@ class JobManager:
                 await loop.run_in_executor(None, self._execute, job)
             except (pipeline.PipelineError, analysis.AnalysisError) as e:
                 job.error = str(e)
-            except Exception:
+            except Exception as e:
                 log.exception("job %s failed", job.id)
-                job.error = "Unexpected error while processing (see server log)"
+                job.error = f"Unexpected error: {type(e).__name__}: {str(e).splitlines()[0][:200] if str(e) else 'no details'}"
             job.version += 1
 
     @staticmethod

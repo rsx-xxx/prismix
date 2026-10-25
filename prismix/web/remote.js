@@ -36,7 +36,7 @@ window.fetch = (input, init = {}) => {
   return rawFetch(input, init);
 };
 const getJson = async (url) => {
-  const r = await fetch(url);
+  const r = await fetch(url, { cache: 'no-store' });
   if (!r.ok) throw new Error(`${r.status}`);
   return r.json();
 };
