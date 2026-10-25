@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import re
-import socket
 from contextlib import asynccontextmanager
 from typing import Literal
 from urllib.parse import quote, urlparse
@@ -21,6 +20,7 @@ from . import (
     __version__,
     analysis,
     export,
+    lan,
     library,
     lyrics,
     markers,
@@ -69,6 +69,7 @@ class PlaylistImport(BaseModel):
 
 
 class BandConfig(BaseModel):
+    name: str | None = Field(default=None, max_length=40)
     token: str | None = Field(default=None, max_length=32)
     locked: bool | None = None
 
@@ -184,11 +185,13 @@ def create_app() -> FastAPI:
     def band_status():
         # the app's own scheme makes the camera open Prismix Band directly; https opens any phone's browser
         app_url = re.sub(r"^https:", "prismix:", band.share_url)
-        return {**band.status(), "url": band.share_url, "qr": band_qr(band.share_url), "appQr": band_qr(app_url)}
+        return {**band.status(), "name": lan.display_name(), "url": band.share_url, "qr": band_qr(band.share_url), "appQr": band_qr(app_url)}
 
     @app.post("/api/band")
     def band_config(body: BandConfig):
         band.configure(token=body.token, locked=body.locked)
+        if body.name is not None:
+            lan.set_display_name(body.name)
         return band_status()
 
     @app.get("/favicon.ico", include_in_schema=False)
@@ -198,7 +201,7 @@ def create_app() -> FastAPI:
     @app.get("/remote/hello")
     def remote_hello():
         # Unauthenticated on purpose: lets the phone app tell a Prismix host from any other web server while scanning.
-        return {"app": "prismix", "version": __version__, "name": socket.gethostname().split(".")[0], "pin": bool(band.token)}
+        return {"app": "prismix", "version": __version__, "id": lan.host_id(), "name": lan.display_name(), "pin": bool(band.token)}
 
     @app.get("/remote")
     def remote():

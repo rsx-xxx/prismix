@@ -45,7 +45,22 @@ export function createMedia(ctl) {
     set('stop', () => act('pause'));
   }
 
+  let lock = null;
+  let wantAwake = false;
+  async function awake(on) {
+    wantAwake = on;
+    if (!('wakeLock' in navigator)) return;
+    if (on && !lock) {
+      try {
+        lock = await navigator.wakeLock.request('screen');
+        lock.addEventListener('release', () => { lock = null; });
+      } catch { /* denied or hidden: retried when the page is shown */ }
+    } else if (!on && lock) { lock.release().catch(() => {}); lock = null; }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wantAwake) awake(true); });
+
   function hold(playing) {
+    awake(playing);
     if (droid?.media) return;
     anchor ??= Object.assign(new Audio(silence()), { loop: true });
     if (playing && anchor.paused) anchor.play().catch(() => { /* needs a tap first; the next one will do */ });

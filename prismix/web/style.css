@@ -638,7 +638,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .band-qr svg { width: min(240px, 100%); height: auto; aspect-ratio: 1; background: #fff; border-radius: 10px; }
 .band-url { text-align: center; word-break: break-all; font-size: 13px; margin: 0 0 12px; user-select: all; }
 .band-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
-.band-row input[type=text] { width: 8em; }
+.band-row input[type=text] { width: 12em; }
 .band-clients { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 6px; }
 .band-clients li { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 

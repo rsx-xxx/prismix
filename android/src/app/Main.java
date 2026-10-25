@@ -13,6 +13,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.format.DateUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
@@ -31,6 +32,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.InputStream;
@@ -53,8 +55,9 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
 /**
- * Shell around the host's /remote page. On launch it finds the host on its own: the saved one first, then mDNS
- * (_prismix._tcp) and a /24 sweep in parallel. The WebView trusts the host's self-signed cert for that host only.
+ * Shell around the host's /remote page. On launch it finds hosts on its own with mDNS (_prismix._tcp) and a /24 sweep
+ * in parallel: one host is joined directly, several are listed with their connection history. The WebView trusts the
+ * host's self-signed cert for that host only. The screen stays on only while something plays.
  */
 public class Main extends Activity {
     private static final String BG = "#121110";
@@ -62,7 +65,8 @@ public class Main extends Activity {
     private static final String SERVICE = "_prismix._tcp.";
 
     private final Handler ui = new Handler(Looper.getMainLooper());
-    private final Map<String, String> found = new LinkedHashMap<>(); // address -> host name
+    private final Map<String, Host> found = new LinkedHashMap<>(); // address -> host
+    private boolean listing; // the host list is on screen: late arrivals refresh it
     private SharedPreferences prefs;
     private WebView web;
     private LinearLayout panel;
@@ -77,7 +81,6 @@ public class Main extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         current = this;
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         bars(BG, false);
         prefs = getSharedPreferences("band", MODE_PRIVATE);
 
@@ -132,11 +135,11 @@ public class Main extends Activity {
     private void open(Intent i) {
         Uri d = i == null ? null : i.getData();
         String h = d == null ? null : d.getHost();
-        if (h == null) { discover(true); return; }
+        if (h == null) { discover(); return; }
         // Android's resolver often cannot do mDNS: a `name.local` link carries the address in ?ip= for that case.
         String ip = d.getQueryParameter("ip");
         if (h.endsWith(".local") && ip != null && !ip.isEmpty()) connect(ip);
-        else if (h.endsWith(".local")) discover(true);
+        else if (h.endsWith(".local")) discover();
         else connect(h);
     }
 
@@ -162,6 +165,21 @@ public class Main extends Activity {
     static String hostName() {
         Main m = current;
         return m == null ? "" : m.host;
+    }
+
+    /** A Prismix computer on the network: stable id, the name its owner gave it, current address. */
+    private static class Host {
+        final String addr, id, name;
+        Host(String addr, String id, String name) { this.addr = addr; this.id = id; this.name = name; }
+    }
+
+    private void keepAwake(boolean on) {
+        if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    private JSONObject history() {
+        try { return new JSONObject(prefs.getString("history", "{}")); } catch (JSONException e) { return new JSONObject(); }
     }
 
     private int dp(int v) {
@@ -190,6 +208,7 @@ public class Main extends Activity {
             Intent i = new Intent(m, MediaService.class).putExtra("title", title).putExtra("artist", artist).putExtra("playing", playing)
                     .putExtra("pos", pos).putExtra("dur", dur).putExtra("rate", rate).putExtra("art", art);
             m.ui.post(m::ask);
+            m.ui.post(() -> m.keepAwake(playing));
             try {
                 if (Build.VERSION.SDK_INT >= 26) m.startForegroundService(i); else m.startService(i);
                 return true;
@@ -199,8 +218,8 @@ public class Main extends Activity {
             m.ui.post(() -> m.web.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP));
         }
         @JavascriptInterface public void download(String url, String folder) { Saver.save(m.getApplicationContext(), url, folder); }
-        @JavascriptInterface public void mediaStop() { m.stopService(new Intent(m, MediaService.class)); }
-        @JavascriptInterface public void switchHost() { m.ui.post(() -> m.discover(false)); }
+        @JavascriptInterface public void mediaStop() { m.stopService(new Intent(m, MediaService.class)); m.ui.post(() -> m.keepAwake(false)); }
+        @JavascriptInterface public void switchHost() { m.ui.post(() -> m.discover()); }
     }
 
     private static class Client extends WebViewClient {
@@ -215,30 +234,29 @@ public class Main extends Activity {
 
         @Override
         public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e) {
-            if (r.isForMainFrame()) m.discover(false); // host moved or went away: look again
+            if (r.isForMainFrame()) m.discover(); // host moved or went away: look again
         }
     }
 
     // ── discovery ──
 
-    private void discover(boolean trySaved) {
+    private void discover() {
         stopSearch();
         final int g = ++gen;
         found.clear();
+        listing = false;
         showSearching();
         pool = Executors.newFixedThreadPool(48);
         final ExecutorService p = pool;
-        final String saved = prefs.getString("host", "");
         p.execute(() -> {
-            if (trySaved && !saved.isEmpty() && hello(saved) != null) { ui.post(() -> { if (g == gen) connect(saved); }); return; }
             ui.post(() -> { if (g == gen) startNsd(g); });
             String base = subnet();
             if (base == null) return;
             for (int i = 1; i < 255; i++) {
                 final String ip = base + i;
                 p.execute(() -> {
-                    String n = hello(ip);
-                    if (n != null) ui.post(() -> add(g, ip, n));
+                    Host h = hello(ip);
+                    if (h != null) ui.post(() -> add(g, h));
                 });
             }
         });
@@ -253,21 +271,19 @@ public class Main extends Activity {
         nsdListener = null;
     }
 
-    private void add(int g, String addr, String name) {
-        if (g != gen || found.containsKey(addr)) return;
-        found.put(addr, name);
-        if (found.size() == 1) ui.postDelayed(() -> decide(g), 1200); // let a second host show up
+    private void add(int g, Host h) {
+        if (g != gen || found.containsKey(h.addr)) return;
+        found.put(h.addr, h);
+        if (listing) showList();
+        else if (found.size() == 1) ui.postDelayed(() -> decide(g), 2000); // give a second host time to answer
     }
 
+    /** One host: join it. Several: always ask, with the history shown. */
     private void decide(int g) {
         if (g != gen) return;
-        stopSearch();
-        // The same computer keeps its name when DHCP gives it a new address: reconnect to it without asking.
-        String name = prefs.getString("name", "");
-        String pick = null;
-        for (Map.Entry<String, String> e : found.entrySet()) if (!name.isEmpty() && name.equals(e.getValue())) pick = e.getKey();
-        if (pick == null && found.size() == 1) pick = found.keySet().iterator().next();
-        if (pick != null) connect(pick); else showList();
+        if (found.size() == 1) { connect(found.keySet().iterator().next()); return; }
+        listing = true;
+        showList();
     }
 
     private void startNsd(final int g) {
@@ -304,8 +320,8 @@ public class Main extends Activity {
         ExecutorService p = pool;
         if (p == null) return;
         p.execute(() -> {
-            String n = hello(ip);
-            if (n != null) ui.post(() -> add(g, ip, n));
+            Host h = hello(ip);
+            if (h != null) ui.post(() -> add(g, h));
         });
     }
 
@@ -333,8 +349,8 @@ public class Main extends Activity {
         public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
     } };
 
-    /** Host name if a Prismix host answers at this address, else null. Only used to discover, never to send data. */
-    private static String hello(String addr) {
+    /** The host answering at this address, else null. Only used to discover, never to send data. */
+    private static Host hello(String addr) {
         HttpsURLConnection c = null;
         try {
             SSLContext ctx = SSLContext.getInstance("TLS");
@@ -351,7 +367,8 @@ public class Main extends Activity {
             int n;
             while ((n = in.read(buf)) > 0 && o.size() < 4096) o.write(buf, 0, n);
             JSONObject j = new JSONObject(o.toString("UTF-8"));
-            return "prismix".equals(j.optString("app")) ? j.optString("name", addr) : null;
+            if (!"prismix".equals(j.optString("app"))) return null;
+            return new Host(addr, j.optString("id", addr), j.optString("name", addr));
         } catch (Exception e) {
             return null;
         } finally {
@@ -412,14 +429,24 @@ public class Main extends Activity {
     }
 
     private void showList() {
-        screen("Pick a host", null);
-        for (final Map.Entry<String, String> e : found.entrySet()) {
-            Button b = button(e.getValue() + "  ·  " + e.getKey(), true);
-            b.setOnClickListener(v -> connect(e.getKey()));
+        screen("Pick a host", found.size() + " computers are sharing on this network.");
+        final JSONObject hist = history();
+        java.util.List<Host> hosts = new java.util.ArrayList<>(found.values());
+        Collections.sort(hosts, (a, b) -> Long.compare(hist.optJSONObject(b.id) == null ? 0 : hist.optJSONObject(b.id).optLong("last"),
+                hist.optJSONObject(a.id) == null ? 0 : hist.optJSONObject(a.id).optLong("last")));
+        boolean first = true;
+        for (final Host h : hosts) {
+            JSONObject past = hist.optJSONObject(h.id);
+            String note = past == null ? "New" : "Connected before · " + DateUtils.getRelativeTimeSpanString(past.optLong("last"),
+                    System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
+            Button b = button(h.name + "\n" + h.addr + " · " + note, first && past != null);
+            b.getLayoutParams().height = dp(72);
+            b.setOnClickListener(v -> connect(h.addr));
             panel.addView(b);
+            first = false;
         }
         Button again = button("Search again", false);
-        again.setOnClickListener(v -> discover(false));
+        again.setOnClickListener(v -> discover());
         panel.addView(again);
         scanButton();
     }
@@ -427,7 +454,7 @@ public class Main extends Activity {
     private void showNone() {
         screen("No host found", "Phone and computer must be on the same Wi-Fi, and the host must be sharing.");
         Button retry = button("Search again", true);
-        retry.setOnClickListener(v -> discover(false));
+        retry.setOnClickListener(v -> discover());
         panel.addView(retry);
         scanButton();
         final EditText in = new EditText(this);
@@ -454,8 +481,17 @@ public class Main extends Activity {
         gen++;
         host = a;
         SharedPreferences.Editor ed = prefs.edit().putString("host", a);
-        if (found.containsKey(a)) ed.putString("name", found.get(a));
+        Host h = found.get(a);
+        if (h != null) {
+            ed.putString("name", h.name);
+            try {
+                JSONObject hist = history();
+                hist.put(h.id, new JSONObject().put("name", h.name).put("addr", a).put("last", System.currentTimeMillis()));
+                ed.putString("history", hist.toString());
+            } catch (JSONException e) { /* history is a nicety */ }
+        }
         ed.apply();
+        listing = false;
         panel.setVisibility(View.GONE);
         web.setVisibility(View.VISIBLE);
         web.loadUrl("https://" + a + ":" + PORT + "/remote");

@@ -2,6 +2,12 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.5
+
+- With several hosts on the network the Band app lists all of them, showing which ones it has joined before and when; a single host is still joined directly.
+- Each host has a name you can change in its Band panel, by default "User · computer", and phones see that name.
+- The screen stays on while music plays (the app and the phone browser) and is released when playback stops.
+
 ## 0.0.4
 
 - Phones open `https://prismix.local/` with nothing to add: the host also listens on 443 (and redirects plain http), keeping 8443 for the Android app.
