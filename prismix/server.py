@@ -11,7 +11,7 @@ from typing import Literal
 from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile, WebSocket
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.background import BackgroundTask
 from starlette.staticfiles import StaticFiles
@@ -158,6 +158,8 @@ def create_app() -> FastAPI:
         # Phones on the LAN may read the library and play it, never change or delete it.
         if not band_mod.is_loopback(request.client.host if request.client else None):
             path = request.url.path
+            if path == "/" and request.method == "GET":  # a bare https://prismix.local/ is the phone page
+                return RedirectResponse("/remote", status_code=307)
             if request.method not in ("GET", "HEAD", "OPTIONS") or path.startswith("/api/band"):
                 return Response("Read-only for remote clients", status_code=403)
             if band.token and (path.startswith("/api/") or path.startswith("/media/")):
@@ -165,6 +167,14 @@ def create_app() -> FastAPI:
                 if not band.token_ok(given):
                     return Response("PIN required", status_code=401)
         return await call_next(request)
+
+    @app.middleware("http")
+    async def fresh_api(request: Request, call_next):
+        # a phone browser or the app's WebView must never replay an old library list
+        response = await call_next(request)
+        if request.url.path.startswith("/api/") and "cache-control" not in response.headers:
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.websocket("/ws")
     async def band_ws(ws: WebSocket):

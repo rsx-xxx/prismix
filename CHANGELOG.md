@@ -2,6 +2,13 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.4
+
+- Phones open `https://prismix.local/` with nothing to add: the host also listens on 443 (and redirects plain http), keeping 8443 for the Android app.
+- Landscape on the phone gives the song more room: slimmer header and a one-row player.
+- The phone no longer reuses an old copy of the library list, so songs added in the browser show up in the app too.
+- Model names are clearer ("4 stems" and "6 stems · Deep"), and a failed job says what went wrong instead of a generic message.
+
 ## 0.0.3
 
 - Songs get a Tab view on the phone: the best matching guitar and bass tab from Songsterr, checked bar by bar against the recording and shown with lyrics and chords. Songs without a trustworthy match have no tab.
