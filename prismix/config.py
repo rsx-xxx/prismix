@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+import os
+import shutil
+from dataclasses import dataclass
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+WEB_DIR = Path(__file__).resolve().parent / "web"
+DATA_DIR = Path(os.environ.get("PRISMIX_DATA", ROOT / "data")).resolve()
+LIBRARY_DIR = DATA_DIR / "library"
+
+# Hard cap so a pasted 10-hour stream does not lock the worker for hours.
+MAX_DURATION_SEC = int(os.environ.get("PRISMIX_MAX_DURATION", 20 * 60))
+SAMPLE_RATE = 44100
+PEAK_BUCKETS = 1200
+
+
+@dataclass(frozen=True)
+class ModelSpec:
+    id: str
+    label: str
+    hint: str
+    stems: tuple[str, ...]
+
+
+# Whitelist: the model id is used in file paths and passed to the loader.
+MODELS: dict[str, ModelSpec] = {
+    "htdemucs_ft": ModelSpec(
+        "htdemucs_ft", "Best", "Highest quality, ~4x slower",
+        ("vocals", "drums", "bass", "other"),
+    ),
+    "htdemucs_6s": ModelSpec(
+        "htdemucs_6s", "6 stems", "Adds guitar and piano",
+        ("vocals", "drums", "bass", "guitar", "piano", "other"),
+    ),
+    # no separation: the whole mix as one track, for bars and chords only
+    "mix": ModelSpec("mix", "Chords only", "No separation, just bars, chords and key", ("mix",)),
+}
+DEFAULT_MODEL = "htdemucs_ft"
+MIX_MODEL = "mix"
+
+
+def cookies_file() -> Path | None:
+    """Optional YouTube cookies (Netscape format) for age-gated / bot-checked videos."""
+    explicit = os.environ.get("PRISMIX_COOKIES")
+    candidates = [Path(explicit)] if explicit else [
+        ROOT / "cookies.txt",
+        ROOT / "www.youtube.com_cookies.txt",
+    ]
+    return next((p for p in candidates if p.is_file()), None)
+
+
+def js_runtime() -> dict[str, dict]:
+    """yt-dlp needs a JS runtime to solve YouTube's signature challenges."""
+    for name in ("deno", "node", "bun"):
+        path = shutil.which(name)
+        if path:
+            return {name: {"path": path}}
+    # nvm installs are not on PATH for non-interactive shells
+    nvm = Path.home() / ".nvm" / "versions" / "node"
+    if nvm.is_dir():
+        for node in sorted(nvm.glob("*/bin/node"), reverse=True):
+            return {"node": {"path": str(node)}}
+    return {"deno": {}}
+
+
+def ffmpeg_exe() -> str:
+    """Bundled static ffmpeg: independent of whatever (possibly broken) system install exists."""
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return shutil.which("ffmpeg") or "ffmpeg"

@@ -1,0 +1,871 @@
+import { StemPlayer } from './player.js';
+import { createPlaylists } from './playlists.js';
+import { createVideo } from './video.js';
+import { createScore } from './studio-score.js';
+import { createLyrics } from './lyrics.js';
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => {
+  const n = Object.assign(document.createElement(tag), props);
+  n.append(...kids);
+  return n;
+};
+const fmt = (s) => {
+  s = Math.max(0, Math.floor(s || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+const thumb = (id) => `/media/${id}/thumb.jpg`;
+const isUpload = (id) => /^u-[0-9a-f]{9}$/.test(id);
+const ytThumb = (id) => (isUpload(id) ? thumb(id) : `https://i.ytimg.com/vi/${id}/mqdefault.jpg`);
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+const ICON = {
+  play: '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" width="14" height="14"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { msg = (await res.json()).detail || msg; } catch { /* not json */ }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+const state = {
+  models: [], defaultModel: 'htdemucs_ft', library: [], current: null, token: 0, es: null,
+};
+const player = new StemPlayer();
+window.stemPlayer = player; // debug handle
+const score = createScore({ player, api, notice: (m) => notice(m) });
+const lyrics = createLyrics({ player, api });
+const video = createVideo({ player, notice: (m) => notice(m) });
+
+createPlaylists({
+  api, library: () => state.library, notice: (m) => notice(m),
+  startProcess: (id) => startProcess(id, $('quality').value),
+  openTrack: (id) => { const it = state.library.find((i) => i.id === id); if (it) location.hash = `#/v/${id}/${it.models.find((m) => m !== 'mix') || it.models[0]}`; },
+});
+
+// ── notices ──
+function notice(msg) {
+  const n = $('notice');
+  n.textContent = msg || '';
+  n.hidden = !msg;
+}
+
+// ── omnibox ──
+$('task').addEventListener('change', () => { $('quality').hidden = $('task').value === 'chords'; try { localStorage.setItem('stems:task', $('task').value); } catch { /* ignore */ } });
+$('omni').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = $('q').value.trim();
+  if (!text) return;
+  notice('');
+  location.hash = '#/';
+  if (/^(https?:\/\/|www\.|(m\.|music\.)?youtu)/i.test(text) || /^[\w-]{11}$/.test(text)) {
+    $('results').hidden = true;
+    hidePreview();
+    await startProcess(text, $('quality').value);
+  } else {
+    await runSearch(text);
+  }
+});
+
+async function runSearch(q) {
+  const box = $('results');
+  hidePreview();
+  box.hidden = false;
+  box.replaceChildren(el('p', { className: 'muted', textContent: 'Searching…' }));
+  try {
+    const items = await api(`/api/search?q=${encodeURIComponent(q)}`);
+    if (!items.length) { box.replaceChildren(el('p', { className: 'muted', textContent: 'Nothing found.' })); return; }
+    box.replaceChildren(...items.map((it) => {
+      const pic = el('button', { className: 'pic', type: 'button', title: 'Preview', ariaLabel: `Preview ${it.title}` },
+        el('img', { src: ytThumb(it.id), alt: '', loading: 'lazy' }));
+      const info = el('div', { className: 'info' }, el('div', { className: 't', textContent: it.title }),
+        el('div', { className: 's', textContent: `${it.channel}${it.duration ? ' · ' + fmt(it.duration) : ''}` }));
+      const go = el('button', { className: 'btn small go', type: 'button', textContent: inLibrary(it.id) ? 'Open' : 'Split' });
+      const row = el('div', { className: 'result' }, pic, info, go);
+      pic.addEventListener('click', () => showPreview(it, true));
+      info.addEventListener('click', () => showPreview(it, true));
+      go.addEventListener('click', () => { box.hidden = true; hidePreview(); startProcess(it.id, $('quality').value); });
+      return row;
+    }));
+  } catch (err) {
+    box.hidden = true;
+    notice(err.message);
+  }
+}
+
+// ── YouTube preview ──
+const inLibrary = (id) => state.library.some((i) => i.id === id);
+
+function ytId(text) {
+  text = text.trim();
+  if (/^[\w-]{11}$/.test(text)) return text;
+  try {
+    const u = new URL(/^[a-z]+:\/\//i.test(text) ? text : `https://${text}`);
+    const host = u.hostname.replace(/^(www|m|music)\./, '');
+    let id = null;
+    if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
+    else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      id = u.pathname === '/watch' ? u.searchParams.get('v') : (u.pathname.match(/^\/(?:shorts|embed|live|v)\/([^/?]+)/) || [])[1];
+    }
+    return id && /^[\w-]{11}$/.test(id) ? id : null;
+  } catch { return null; }
+}
+
+function showPreview(it, autoplay) {
+  typedPreview = false;
+  $('pv-media').pause();
+  $('pv-media').hidden = true;
+  $('pv-frame').hidden = false;
+  const frame = $('pv-frame');
+  const src = `https://www.youtube-nocookie.com/embed/${it.id}?rel=0&modestbranding=1${autoplay ? '&autoplay=1' : ''}`;
+  if (frame.dataset.id !== it.id || autoplay) { frame.src = src; frame.dataset.id = it.id; }
+  $('pv-title').textContent = it.title || 'YouTube video';
+  $('pv-sub').textContent = it.channel ? `${it.channel}${it.duration ? ' · ' + fmt(it.duration) : ''}` : '';
+  const split = $('pv-split');
+  split.textContent = inLibrary(it.id) ? 'Open in studio' : 'Split into stems';
+  split.onclick = () => { hidePreview(); $('results').hidden = true; startProcess(it.id, $('quality').value); };
+  $('preview').hidden = false;
+}
+
+function hidePreview() {
+  const media = $('pv-media');
+  media.pause();
+  media.removeAttribute('src');
+  media.removeAttribute('poster');
+  media.hidden = true;
+  $('pv-frame').hidden = false;
+  const frame = $('pv-frame');
+  frame.removeAttribute('src');
+  delete frame.dataset.id;
+  $('preview').hidden = true;
+}
+
+$('pv-close').addEventListener('click', hidePreview);
+let previewTimer;
+let typedPreview = false; // preview opened by typing a link (vs. clicking a search result)
+$('q').addEventListener('input', () => {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => {
+    const id = ytId($('q').value);
+    if (id) {
+      if (location.hash !== '#/' && location.hash !== '') location.hash = '#/';
+      $('results').hidden = true;
+      const known = state.library.find((i) => i.id === id);
+      showPreview({ id, title: known?.title, channel: known?.channel, duration: known?.duration }, false);
+      typedPreview = true;
+    } else if (typedPreview) {
+      typedPreview = false;
+      hidePreview();
+    }
+  }, 250);
+});
+
+// ── local files ──
+function sendFile(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const body = new FormData();
+    body.append('file', file);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload');
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch { /* not json */ }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+      else reject(new Error(data.detail || `Upload failed (${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error('Upload failed: lost connection to the server'));
+    xhr.send(body);
+  });
+}
+
+function showUploadPreview(it) {
+  typedPreview = false;
+  const frame = $('pv-frame');
+  frame.removeAttribute('src');
+  frame.hidden = true;
+  const media = $('pv-media');
+  media.poster = thumb(it.id);
+  media.src = `/media/${it.id}/source${it.ext}`;
+  media.hidden = false;
+  $('pv-title').textContent = it.title;
+  $('pv-sub').textContent = `${it.channel}${it.duration ? ' · ' + fmt(it.duration) : ''}`;
+  const split = $('pv-split');
+  split.textContent = 'Split into stems';
+  split.onclick = () => { hidePreview(); startProcess(it.id, $('quality').value); };
+  $('preview').hidden = false;
+}
+
+async function uploadFile(file) {
+  if (!file) return;
+  notice('');
+  location.hash = '#/';
+  $('results').hidden = true;
+  hidePreview();
+  const box = $('job');
+  const msg = el('span', { textContent: 'Uploading' });
+  const pct = el('span', { textContent: '0%' });
+  const bar = el('i');
+  box.replaceChildren(el('div', { className: 'body' },
+    el('div', { className: 't', textContent: file.name }),
+    el('div', { className: 'bar' }, bar), el('div', { className: 'row' }, msg, pct)));
+  box.hidden = false;
+  try {
+    const it = await sendFile(file, (f) => {
+      bar.style.width = `${Math.round(f * 100)}%`;
+      pct.textContent = `${Math.round(f * 100)}%`;
+      if (f >= 1) msg.textContent = 'Reading tags and finding a cover';
+    });
+    box.hidden = true;
+    await loadLibrary();
+    const known = state.library.find((i) => i.id === it.id);
+    if (known?.models.length) { location.hash = `#/v/${it.id}/${known.models.find((m) => m !== 'mix') || known.models[0]}`; return; }
+    showUploadPreview(it);
+  } catch (err) {
+    box.hidden = true;
+    notice(err.message);
+  }
+}
+
+$('up-btn').addEventListener('click', () => $('up-file').click());
+$('up-file').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; uploadFile(f); });
+let dragDepth = 0;
+const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+window.addEventListener('dragenter', (e) => { if (hasFiles(e)) { dragDepth++; document.body.classList.add('dropping'); } });
+window.addEventListener('dragleave', (e) => { if (hasFiles(e) && --dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dropping'); } });
+window.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+window.addEventListener('drop', (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  document.body.classList.remove('dropping');
+  uploadFile(e.dataTransfer.files[0]);
+});
+
+async function startProcess(urlOrId, model, tasks = $('task').value) {
+  try {
+    const r = await api('/api/process', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: urlOrId, model, tasks }),
+    });
+    if (r.cached) { location.hash = `#/v/${r.videoId}/${r.model}`; return; }
+    trackJob(r.job);
+  } catch (err) {
+    notice(err.message);
+  }
+}
+
+function trackJob(job) {
+  state.es?.close();
+  const box = $('job');
+  const info = state.library.find((i) => i.id === job.videoId);
+  const title = el('div', { className: 't', textContent: info?.title || 'Preparing…' });
+  const msg = el('span', { textContent: 'Queued' });
+  const pct = el('span', { textContent: '0%' });
+  const bar = el('i');
+  box.replaceChildren(
+    el('img', { src: ytThumb(job.videoId), alt: '' }),
+    el('div', { className: 'body' }, title, el('div', { className: 'bar' }, bar), el('div', { className: 'row' }, msg, pct)),
+  );
+  box.hidden = false;
+  const es = new EventSource(`/api/jobs/${job.id}/events`);
+  state.es = es;
+  es.onmessage = async (ev) => {
+    const j = JSON.parse(ev.data);
+    bar.style.width = `${Math.round(j.progress * 100)}%`;
+    pct.textContent = `${Math.round(j.progress * 100)}%`;
+    msg.textContent = j.message || j.stage;
+    if (j.stage === 'error') {
+      es.close(); box.hidden = true; notice(j.message || 'Processing failed');
+    } else if (j.stage === 'done') {
+      es.close(); box.hidden = true;
+      await loadLibrary();
+      location.hash = `#/v/${j.videoId}/${j.model}`;
+    }
+  };
+  es.onerror = () => {
+    if (es.readyState === EventSource.CLOSED) { box.hidden = true; notice('Lost connection to the server'); }
+  };
+}
+
+// ── library ──
+async function loadLibrary() {
+  state.library = await api('/api/library');
+  renderLibrary();
+}
+
+function renderLibrary() {
+  const lib = $('library');
+  $('empty').hidden = state.library.length > 0;
+  $('lib-count').textContent = state.library.length ? `${state.library.length} track${state.library.length > 1 ? 's' : ''}` : '';
+  lib.replaceChildren(...state.library.map((it) => {
+    const open = it.models.includes(state.defaultModel) ? state.defaultModel : it.models[0];
+    const card = el('div', { className: 'card', role: 'link', tabIndex: 0, title: it.title },
+      el('img', { className: 'cover', src: thumb(it.id), alt: '', loading: 'lazy' }),
+      el('span', { className: 'dur', textContent: fmt(it.duration) }),
+      el('div', { className: 'meta' },
+        el('div', { className: 'title', textContent: it.title }),
+        el('div', { className: 'sub', textContent: it.channel }),
+        el('div', { className: 'badges' }, ...it.models.map((m) => el('span', { className: 'badge', textContent: modelLabel(m) })))));
+    const del = el('button', { className: 'del', type: 'button', innerHTML: ICON.trash, title: 'Remove from library', ariaLabel: 'Remove from library' });
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Remove "${it.title}" and its cached stems?`)) return;
+      try { await api(`/api/library/${it.id}`, { method: 'DELETE' }); await loadLibrary(); } catch (err) { notice(err.message); }
+    });
+    card.append(del);
+    const go = () => { location.hash = `#/v/${it.id}/${open}`; };
+    card.addEventListener('click', go);
+    card.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    return card;
+  }));
+}
+
+const modelLabel = (id) => state.models.find((m) => m.id === id)?.label || id;
+
+// ── router ──
+window.addEventListener('hashchange', route);
+
+async function route() {
+  const m = location.hash.match(/^#\/v\/([\w-]{11})\/(\w+)$/);
+  if (!m) { showHome(); return; }
+  await openStudio(m[1], m[2]);
+}
+
+function showHome() {
+  state.token++;
+  if (state.current) { savePrefs(); player.dispose(); state.current = null; }
+  score.close();
+  lyrics.close();
+  video.hide();
+  $('studio').hidden = true;
+  $('dock').hidden = true;
+  $('home').hidden = false;
+  document.title = 'Stems — split, mute, transpose';
+  loadLibrary().catch((e) => notice(e.message));
+}
+
+// ── studio ──
+const prefKey = (id) => `stems:${id}`;
+function savePrefs() {
+  const c = state.current;
+  if (!c || !player.stems.length) return;
+  const prefs = {
+    tempo: player.tempo, semitones: player.semitones, cents: player.cents, formants: player.formants,
+    mute: player.stems.filter((s) => s.muted).map((s) => s.name),
+    solo: player.stems.filter((s) => s.solo).map((s) => s.name),
+    vol: Object.fromEntries(player.stems.map((s) => [s.name, s.volume])),
+  };
+  try { localStorage.setItem(prefKey(c.id), JSON.stringify(prefs)); } catch { /* storage full or disabled */ }
+}
+function loadPrefs(id) {
+  try { return JSON.parse(localStorage.getItem(prefKey(id))) || {}; } catch { return {}; }
+}
+
+async function openStudio(id, model) {
+  const token = ++state.token;
+  if (state.current) { savePrefs(); player.dispose(); state.current = null; }
+  score.close();
+  lyrics.close();
+  video.hide();
+  state.es?.close();
+  $('home').hidden = true;
+  $('studio').hidden = false;
+  $('dock').hidden = true;
+  $('mixer').classList.add('busy');
+  $('loading').hidden = false;
+  $('loading-bar').style.width = '0%';
+  $('loading-text').textContent = 'Loading stems…';
+
+  let meta;
+  try {
+    meta = await api(`/api/library/${id}/${model}`);
+  } catch (err) {
+    if (token !== state.token) return;
+    location.hash = '#/';
+    notice(err.message);
+    return;
+  }
+  if (token !== state.token) return;
+
+  const entry = state.library.find((i) => i.id === id);
+  const available = entry?.models || [model];
+  $('th-cover').src = thumb(id);
+  $('th-title').textContent = meta.title;
+  $('th-sub').textContent = `${meta.channel || ''} · ${fmt(meta.duration)}`;
+  document.title = `${meta.title} — Stems`;
+  renderModelSwitch(id, model, available);
+  renderMixer(meta);
+
+  try {
+    await player.load(meta, `/media/${id}/${model}`, (f) => {
+      if (token === state.token) $('loading-bar').style.width = `${Math.round(f * 100)}%`;
+    });
+  } catch (err) {
+    if (token !== state.token) return;
+    location.hash = '#/';
+    notice(err.message);
+    return;
+  }
+  if (token !== state.token) { player.dispose(); return; }
+  state.current = { id, model, meta };
+  applyPrefs(loadPrefs(id));
+  $('loading').hidden = true;
+  $('mixer').classList.remove('busy');
+  $('dock').hidden = false;
+  syncDock();
+  syncMixer();
+  syncFrame();
+  if (isUpload(id)) video.hide(); else video.setTrack(id);
+  score.syncSeed();
+  score.open(id, model, meta, token, (t) => t === state.token);
+  lyrics.open(id);
+}
+
+function renderModelSwitch(id, current, available) {
+  const box = $('th-models');
+  box.replaceChildren(...state.models.filter((m) => m.id !== 'mix' || available.includes('mix')).map((m) => {
+    const have = available.includes(m.id);
+    const b = el('button', { type: 'button', className: have ? '' : 'todo', textContent: m.label, title: m.hint });
+    b.setAttribute('aria-pressed', String(m.id === current));
+    b.addEventListener('click', async () => {
+      if (m.id === current) return;
+      if (have) { location.hash = `#/v/${id}/${m.id}`; return; }
+      location.hash = '#/';
+      await startProcess(id, m.id, 'all');
+    });
+    return b;
+  }));
+}
+
+const PRESETS = [
+  { label: 'All', mute: () => [] },
+  { label: 'No vocals', mute: () => ['vocals'] },
+  { label: 'Vocals only', mute: (names) => names.filter((n) => n !== 'vocals') },
+  { label: 'No drums', mute: () => ['drums'] },
+  { label: 'No bass', mute: () => ['bass'] },
+  { label: 'Drums & bass', mute: (names) => names.filter((n) => !['drums', 'bass'].includes(n)) },
+];
+
+function renderMixer(meta) {
+  const names = meta.stems.map((s) => s.name);
+  // presets
+  $('presets').replaceChildren(...PRESETS.filter((p) => p.label === 'All' || names.includes('vocals')).map((p) => {
+    const b = el('button', { type: 'button', className: 'chip', textContent: p.label });
+    b.dataset.preset = p.label;
+    b.addEventListener('click', () => player.setMuteSet(p.mute(names)));
+    return b;
+  }));
+  // rows
+  const ctl = $('ctl-col');
+  const lanes = $('lane-col');
+  ctl.querySelectorAll('.stem').forEach((n) => n.remove());
+  lanes.querySelectorAll('.lane').forEach((n) => n.remove());
+  meta.stems.forEach((s, i) => {
+    const mute = el('button', { type: 'button', className: 'tog', textContent: 'M', title: 'Mute' });
+    mute.dataset.kind = 'mute';
+    const solo = el('button', { type: 'button', className: 'tog', textContent: 'S', title: 'Solo' });
+    solo.dataset.kind = 'solo';
+    const vol = el('input', { type: 'range', min: 0, max: 150, value: 100, ariaLabel: `${s.name} volume` });
+    const row = el('div', { className: 'stem' },
+      el('div', { className: 'name' }, s.name, i < 6 ? el('kbd', { textContent: String(i + 1) }) : ''),
+      el('div', { className: 'btns' }, mute, solo), vol);
+    row.dataset.stem = s.name;
+    mute.addEventListener('click', () => player.setMuted(s.name, !player._stem(s.name).muted));
+    solo.addEventListener('click', () => player.setSolo(s.name, !player._stem(s.name).solo));
+    vol.addEventListener('input', () => { setPct(vol); player.setVolume(s.name, vol.value / 100); });
+    setPct(vol);
+    ctl.append(row);
+
+    const base = el('canvas', { className: 'base' });
+    const lit = el('canvas', { className: 'lit' });
+    const lane = el('div', { className: 'lane' }, base, lit);
+    lane.dataset.stem = s.name;
+    lanes.insertBefore(lane, $('shade'));
+    requestAnimationFrame(() => { drawPeaks(base, s.peaks); drawPeaks(lit, s.peaks); });
+  });
+}
+
+function setPct(range) {
+  const pct = ((range.value - range.min) / (range.max - range.min)) * 100;
+  range.style.setProperty('--pct', `${pct}%`);
+}
+
+function drawPeaks(canvas, peaks) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  const g = canvas.getContext('2d');
+  g.scale(dpr, dpr);
+  g.fillStyle = getComputedStyle(canvas.parentElement).getPropertyValue('--c').trim() || '#8af';
+  const bar = 3, gap = 1.5, n = Math.floor(w / (bar + gap));
+  for (let i = 0; i < n; i++) {
+    const p = peaks[Math.min(peaks.length - 1, Math.floor((i / n) * peaks.length))] / 255;
+    const bh = Math.max(2, p * (h - 14));
+    g.beginPath();
+    g.roundRect(i * (bar + gap), (h - bh) / 2, bar, bh, 1.5);
+    g.fill();
+  }
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const meta = state.current?.meta;
+    if (!meta) return;
+    document.querySelectorAll('.lane').forEach((lane, i) => {
+      lane.querySelectorAll('canvas').forEach((c) => drawPeaks(c, meta.stems[i].peaks));
+    });
+  }, 150);
+});
+
+function applyPrefs(p) {
+  if (p.tempo) player.setTempo(p.tempo);
+  if (p.semitones != null) player.setSemitones(p.semitones);
+  if (p.cents != null) player.setCents(p.cents);
+  if (p.formants != null) player.setFormants(p.formants);
+  for (const s of player.stems) {
+    if (p.vol?.[s.name] != null) s.volume = p.vol[s.name];
+    s.muted = !!p.mute?.includes(s.name);
+    s.solo = !!p.solo?.includes(s.name);
+  }
+  player._applyGains();
+  player.setMaster(Number($('master').value) / 100);
+  player.stems.forEach((s) => {
+    const v = document.querySelector(`.stem[data-stem="${s.name}"] .vol`);
+    if (v) { v.value = Math.round(s.volume * 100); setPct(v); }
+  });
+}
+
+// ── reflect player state into the UI ──
+function syncMixer() {
+  const names = player.stems.map((s) => s.name);
+  for (const s of player.stems) {
+    const audible = player.isAudible(s);
+    const row = document.querySelector(`.stem[data-stem="${s.name}"]`);
+    const lane = document.querySelector(`.lane[data-stem="${s.name}"]`);
+    row?.classList.toggle('silent', !audible);
+    lane?.classList.toggle('silent', !audible);
+    row?.querySelector('[data-kind=mute]').setAttribute('aria-pressed', String(s.muted));
+    row?.querySelector('[data-kind=solo]').setAttribute('aria-pressed', String(s.solo));
+  }
+  const anySolo = player.stems.some((s) => s.solo);
+  const muted = player.stems.filter((s) => s.muted).map((s) => s.name);
+  document.querySelectorAll('#presets .chip').forEach((chip) => {
+    const p = PRESETS.find((x) => x.label === chip.dataset.preset);
+    const want = p.mute(names);
+    const on = !anySolo && want.length === muted.length && want.every((n) => muted.includes(n));
+    chip.setAttribute('aria-pressed', String(on));
+  });
+  savePrefs();
+}
+player.addEventListener('mix', syncMixer);
+
+function syncDock() {
+  $('play').innerHTML = player.playing ? ICON.pause : ICON.play;
+  $('play').setAttribute('aria-label', player.playing ? 'Pause' : 'Play');
+  $('t-total').textContent = fmt(player.duration);
+  $('tempo').value = Math.round(player.tempo * 100);
+  $('tempo-out').textContent = `${Math.round(player.tempo * 100)}%`;
+  $('tempo-out').classList.toggle('changed', Math.round(player.tempo * 100) !== 100);
+  $('tempo-reset').hidden = Math.round(player.tempo * 100) === 100;
+  $('key').value = player.semitones;
+  $('key-out').textContent = player.semitones > 0 ? `+${player.semitones}` : String(player.semitones);
+  $('key-out').classList.toggle('changed', player.semitones !== 0);
+  $('key-reset').hidden = player.semitones === 0;
+  $('cents').value = player.cents;
+  $('cents-out').textContent = `${player.cents > 0 ? '+' : ''}${player.cents} ct`;
+  $('formants').checked = player.formants;
+  const loop = player.loop;
+  $('loop-clear').hidden = !loop;
+  $('loop-a').classList.toggle('active', !!loop);
+  $('loop-b').classList.toggle('active', !!loop);
+  const lr = $('loop-region'), sl = $('seek-loop');
+  lr.hidden = sl.hidden = !loop;
+  if (loop) {
+    const a = (loop.a / player.duration) * 100, w = ((loop.b - loop.a) / player.duration) * 100;
+    lr.style.left = sl.style.left = `${a}%`;
+    lr.style.width = sl.style.width = `${w}%`;
+  }
+}
+['state', 'tune', 'loop'].forEach((t) => player.addEventListener(t, () => { syncDock(); if (t !== 'state') savePrefs(); }));
+player.addEventListener('frame', syncFrame);
+player.addEventListener('tune', () => score.tuned());
+
+function syncFrame() {
+  if (!player.duration) return;
+  const pos = player.position;
+  const pct = `${(pos / player.duration) * 100}%`;
+  $('lane-col').style.setProperty('--p', pct);
+  $('seek').style.setProperty('--sp', pct);
+  $('seek').setAttribute('aria-valuenow', String(Math.floor(pos)));
+  $('seek').setAttribute('aria-valuemax', String(Math.floor(player.duration)));
+  $('t-now').textContent = fmt(pos);
+  score.frame(pos);
+  lyrics.frame(pos);
+}
+
+// ── dock wiring ──
+$('play').addEventListener('click', () => player.toggle());
+$('rew').addEventListener('click', () => player.seek(player.position - 5));
+$('fwd').addEventListener('click', () => player.seek(player.position + 5));
+$('tempo').addEventListener('input', (e) => player.setTempo(e.target.value / 100));
+$('tempo-down').addEventListener('click', () => player.setTempo(Math.round(player.tempo * 20 - 1) / 20));
+$('tempo-up').addEventListener('click', () => player.setTempo(Math.round(player.tempo * 20 + 1) / 20));
+$('key').addEventListener('input', (e) => player.setSemitones(Number(e.target.value)));
+$('key-down').addEventListener('click', () => player.setSemitones(player.semitones - 1));
+$('key-up').addEventListener('click', () => player.setSemitones(player.semitones + 1));
+$('cents').addEventListener('input', (e) => player.setCents(Number(e.target.value)));
+$('formants').addEventListener('change', (e) => player.setFormants(e.target.checked));
+$('master').addEventListener('input', (e) => player.setMaster(e.target.value / 100));
+$('tempo-reset').addEventListener('click', () => player.setTempo(1));
+$('key-reset').addEventListener('click', () => player.setSemitones(0));
+$('tempo-out').addEventListener('dblclick', () => player.setTempo(1));
+$('key-out').addEventListener('dblclick', () => player.setSemitones(0));
+$('reset-tune').addEventListener('click', () => { player.setTempo(1); player.setSemitones(0); player.setCents(0); });
+$('back').addEventListener('click', () => { location.hash = '#/'; });
+
+let loopA = null;
+$('loop-a').addEventListener('click', () => { loopA = player.position; if (player.loop) player.setLoop(loopA, player.loop.b > loopA ? player.loop.b : null); });
+$('loop-b').addEventListener('click', () => {
+  const b = player.position;
+  player.setLoop(loopA ?? Math.max(0, b - 8), b);
+});
+$('loop-clear').addEventListener('click', () => { loopA = null; player.setLoop(null, null); });
+
+// seek bar
+function pointerSeek(el_, e) {
+  const r = el_.getBoundingClientRect();
+  player.seek(clamp((e.clientX - r.left) / r.width, 0, 1) * player.duration);
+}
+const seek = $('seek');
+seek.addEventListener('pointerdown', (e) => {
+  seek.setPointerCapture(e.pointerId);
+  pointerSeek(seek, e);
+  const move = (ev) => pointerSeek(seek, ev);
+  seek.addEventListener('pointermove', move);
+  seek.addEventListener('pointerup', () => seek.removeEventListener('pointermove', move), { once: true });
+});
+seek.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft') { player.seek(player.position - 5); e.preventDefault(); e.stopPropagation(); }
+  if (e.key === 'ArrowRight') { player.seek(player.position + 5); e.preventDefault(); e.stopPropagation(); }
+});
+
+// waveform: click seeks, shift-drag selects a loop
+const laneCol = $('lane-col');
+laneCol.addEventListener('pointerdown', (e) => {
+  if (!player.duration) return;
+  const r = laneCol.getBoundingClientRect();
+  const at = (ev) => clamp((ev.clientX - r.left) / r.width, 0, 1) * player.duration;
+  laneCol.setPointerCapture(e.pointerId);
+  if (!e.shiftKey) {
+    player.seek(at(e));
+    const move = (ev) => player.seek(at(ev));
+    laneCol.addEventListener('pointermove', move);
+    laneCol.addEventListener('pointerup', () => laneCol.removeEventListener('pointermove', move), { once: true });
+    return;
+  }
+  const start = at(e);
+  const move = (ev) => {
+    const cur = at(ev);
+    player.setLoop(Math.min(start, cur), Math.max(start, cur));
+  };
+  laneCol.addEventListener('pointermove', move);
+  laneCol.addEventListener('pointerup', () => {
+    laneCol.removeEventListener('pointermove', move);
+    if (player.loop) loopA = player.loop.a;
+  }, { once: true });
+});
+
+// ── export ──
+const FORMATS = [
+  { id: 'mp3', label: 'MP3', hint: 'Plays everywhere. High-quality VBR (~245 kbps).' },
+  { id: 'm4a', label: 'M4A', hint: 'AAC 256 kbps. Best for Apple devices.' },
+  { id: 'flac', label: 'FLAC', hint: 'Lossless, about half the size of WAV.' },
+  { id: 'wav', label: 'WAV', hint: 'Lossless 24-bit. Biggest files, for editing in a DAW.' },
+  { id: 'ogg', label: 'OGG', hint: 'Vorbis, good quality at small size.' },
+  { id: 'opus', label: 'Opus', hint: '160 kbps; the most efficient lossy codec.' },
+];
+const exportState = { format: localStorage.getItem('stems:format') || 'mp3', picked: new Set() };
+
+const pitchLabel = () => {
+  const p = player.pitch;
+  return `${p > 0 ? '+' : ''}${Number.isInteger(p) ? p : p.toFixed(2)} st`;
+};
+
+function openExport() {
+  if (!state.current) return;
+  const names = player.stems.map((s) => s.name);
+  const heard = player.stems.filter((s) => player.isAudible(s)).map((s) => s.name);
+  exportState.picked = new Set(heard.length ? heard : names);
+  const changes = [];
+  if (Math.round(player.tempo * 100) !== 100) changes.push(`tempo ${Math.round(player.tempo * 100)}%`);
+  if (player.pitch !== 0) changes.push(`key ${pitchLabel()}`);
+  $('ex-summary').textContent = changes.length
+    ? `Rendered with ${changes.join(' and ')}, same as you hear it.`
+    : 'Original tempo and key. Change them in the player first to download a modified version.';
+  $('ex-heard').textContent = heard.length === names.length ? 'All stems' : heard.length ? heard.join(' + ') : 'Nothing is audible';
+  document.querySelector('input[name=scope][value=heard]').checked = true;
+  $('ex-stems').replaceChildren(...names.map((n) => {
+    const b = el('button', { type: 'button', className: 'chip', textContent: n });
+    b.setAttribute('aria-pressed', String(exportState.picked.has(n)));
+    b.addEventListener('click', () => {
+      exportState.picked.has(n) ? exportState.picked.delete(n) : exportState.picked.add(n);
+      b.setAttribute('aria-pressed', String(exportState.picked.has(n)));
+      syncExport();
+    });
+    return b;
+  }));
+  renderFormats();
+  $('ex-error').hidden = true;
+  syncExport();
+  $('export').showModal();
+}
+
+function renderFormats() {
+  $('ex-formats').replaceChildren(...FORMATS.map((f) => {
+    const b = el('button', { type: 'button', textContent: f.label });
+    b.setAttribute('aria-pressed', String(f.id === exportState.format));
+    b.addEventListener('click', () => { exportState.format = f.id; renderFormats(); });
+    return b;
+  }));
+  $('ex-fmt-hint').textContent = FORMATS.find((f) => f.id === exportState.format).hint;
+}
+
+function exportSelection() {
+  const scope = document.querySelector('input[name=scope]:checked').value;
+  const all = player.stems.map((s) => s.name);
+  if (scope === 'all') return all;
+  if (scope === 'pick') return all.filter((n) => exportState.picked.has(n));
+  return player.stems.filter((s) => player.isAudible(s)).map((s) => s.name);
+}
+
+function syncExport() {
+  const scope = document.querySelector('input[name=scope]:checked').value;
+  $('ex-stems').hidden = scope !== 'pick';
+  const sel = exportSelection();
+  $('ex-sep').disabled = sel.length < 2;
+  if (sel.length < 2) $('ex-sep').checked = false;
+  $('ex-go').disabled = sel.length === 0;
+}
+document.querySelectorAll('input[name=scope]').forEach((r) => r.addEventListener('change', syncExport));
+$('export-btn').addEventListener('click', openExport);
+$('ex-cancel').addEventListener('click', () => $('export').close());
+
+$('export-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const c = state.current;
+  const stems = exportSelection();
+  if (!c || !stems.length) return;
+  const scope = document.querySelector('input[name=scope]:checked').value;
+  const go = $('ex-go');
+  go.disabled = true;
+  go.textContent = 'Rendering…';
+  $('ex-error').hidden = true;
+  try {
+    const res = await fetch('/api/export', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        videoId: c.id, model: c.model, stems, separate: $('ex-sep').checked,
+        tempo: player.tempo, semitones: player.pitch, format: exportState.format,
+        // "as you hear it" keeps the mixer levels; the other scopes are untouched stems
+        volumes: scope === 'heard' ? Object.fromEntries(player.stems.map((s) => [s.name, s.volume])) : {},
+      }),
+    });
+    if (!res.ok) {
+      let msg = res.statusText;
+      try { msg = (await res.json()).detail || msg; } catch { /* not json */ }
+      throw new Error(msg);
+    }
+    const name = decodeURIComponent((/filename\*=UTF-8''([^;]+)/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || 'audio');
+    const url = URL.createObjectURL(await res.blob());
+    el('a', { href: url, download: name }).click();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    try { localStorage.setItem('stems:format', exportState.format); } catch { /* ignore */ }
+    $('export').close();
+  } catch (err) {
+    $('ex-error').textContent = err.message;
+    $('ex-error').hidden = false;
+  } finally {
+    go.textContent = 'Download';
+    syncExport();
+  }
+});
+
+// ── keyboard ──
+window.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const tag = e.target.tagName;
+  if (tag === 'INPUT' && e.target.type === 'text') return;
+  if (tag === 'SELECT' || tag === 'TEXTAREA') return;
+  if ($('help').open || $('export').open) return;
+  if (e.key === '?') { $('help').showModal(); return; }
+  if (!state.current) return;
+  const step = e.shiftKey ? 15 : 5;
+  const digit = /^Digit([1-6])$/.exec(e.code);
+  const handlers = {
+    Space: () => player.toggle(),
+    ArrowLeft: () => player.seek(player.position - step),
+    ArrowRight: () => player.seek(player.position + step),
+    BracketLeft: () => $('tempo-down').click(),
+    BracketRight: () => $('tempo-up').click(),
+    Comma: () => $('key-down').click(),
+    Period: () => $('key-up').click(),
+    KeyA: () => $('loop-a').click(),
+    KeyB: () => $('loop-b').click(),
+    KeyC: () => $('loop-clear').click(),
+    Digit0: () => player.seek(0),
+    KeyD: () => openExport(),
+    KeyR: () => (e.shiftKey ? $('key-reset').click() : $('tempo-reset').click()),
+    KeyH: () => $('sc-show').click(),
+    KeyL: () => lyrics.toggle(),
+    KeyV: () => $('video-btn').click(),
+  };
+  if (digit) {
+    const s = player.stems[Number(digit[1]) - 1];
+    if (s) e.shiftKey ? player.setSolo(s.name, !s.solo) : player.setMuted(s.name, !s.muted);
+    e.preventDefault();
+    return;
+  }
+  const fn = handlers[e.code];
+  if (!fn) return;
+  e.preventDefault();
+  fn();
+});
+
+// buttons fire their click on Space keyup; swallow it so Space only ever toggles playback
+window.addEventListener('keyup', (e) => {
+  if (e.code !== 'Space' || e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target;
+  if ((t.tagName === 'INPUT' && t.type === 'text') || ['SELECT', 'TEXTAREA'].includes(t.tagName)) return;
+  e.preventDefault();
+});
+
+$('help-btn').addEventListener('click', () => $('help').showModal());
+window.addEventListener('beforeunload', savePrefs);
+
+// ── boot ──
+(async function init() {
+  try {
+    const m = await api('/api/models');
+    state.models = m.models;
+    try { $('task').value = localStorage.getItem('stems:task') || 'all'; } catch { /* ignore */ }
+    $('quality').hidden = $('task').value === 'chords';
+    state.defaultModel = m.default;
+    $('quality').replaceChildren(...m.models.filter((x) => x.id !== 'mix').map((x) => el('option', { value: x.id, textContent: x.label, title: x.hint, selected: x.id === m.default })));
+  } catch (err) {
+    notice(err.message);
+  }
+  await loadLibrary().catch(() => {});
+  route();
+})();

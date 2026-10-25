@@ -1,145 +1,70 @@
-[tool.poetry]
-name = "karaoke-studio"
-version = "2.0.0"
-description = "AI-powered karaoke generator from YouTube videos"
-authors = ["Your Name <your.email@example.com>"]
+[project]
+name = "prismix"
+version = "3.0.0"
+description = "YouTube to stems: split a song into vocals/drums/bass/other, mute any of them, change key and tempo"
 readme = "README.md"
-license = "MIT"
-packages = [{include = "backend"}]
+license = { text = "MIT" }
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "yt-dlp[default]>=2026.10.21",
+    "demucs==4.1.0",
+    "torch>=2.8",
+    "numpy>=2.0",
+    "imageio-ffmpeg>=0.6",
+    "pylibrb>=0.1.2",
+    "basic-pitch>=0.4",
+    "onnxruntime>=1.31.0",
+    "beat-this>=1.1.0",
+    "transformers>=4.45",
+    "librosa>=0.11.0",
+    "huggingface-hub>=2.3.0",
+    "httpx>=0.28",
+    "einops>=0.8",
+    "beartype>=0.19",
+    "rotary-embedding-torch>=0.8",
+    "python-multipart>=0.0.20",
+    "setuptools<81",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
+[dependency-groups]
+dev = ["pytest>=8", "httpx>=0.28", "ruff>=0.8"]
 
-# ASGI stack
-fastapi = "^0.115.0"
-uvicorn = {extras = ["standard"], version = "^0.32.0"}
-pydantic = "^2.10.0"
-pydantic-settings = "^2.6.0"
-python-multipart = "^0.0.17"
-aiofiles = "^24.1.0"
-
-# Media download / editing
-yt-dlp = ">=2024.12.6"
-moviepy = "^1.0.3"
-pydub = "^0.25.1"
-
-# ML models
-# Option 1: Standard Whisper (slower but stable)
-openai-whisper = "^20240930"
-# Option 2: Faster-whisper (4x faster, uses CTranslate2) - uncomment to use
-# faster-whisper = "^1.0.3"
-
-torch = "^2.5.0"
-demucs = "^4.0.1"
-
-# NLP / lyrics / fuzzy match
-rapidfuzz = "^3.10.0"
-lyricsgenius = "^3.0.1"
-
-# Audio analysis
-librosa = "^0.10.1"
-
-# HTTP client (async-ready)
-httpx = "^0.28.0"
-python-dotenv = "^1.0.1"
-
-[tool.poetry.group.dev.dependencies]
-# Testing
-pytest = "^8.3.0"
-pytest-asyncio = "^0.24.0"
-pytest-cov = "^6.0.0"
-
-# Linting & formatting
-ruff = "^0.8.0"
-mypy = "^1.13.0"
-
-# Type stubs
-types-aiofiles = "^24.1.0"
-
-# GPU group temporarily disabled for Mac compatibility
-# [tool.poetry.group.gpu]
-# optional = true
-#
-# [tool.poetry.group.gpu.dependencies]
-# # Override torch with CUDA version
-# torch = {version = "^2.5.0", source = "pytorch-gpu"}
-#
-# [[tool.poetry.source]]
-# name = "pytorch-gpu"
-# url = "https://download.pytorch.org/whl/cu124"
-# priority = "explicit"
-
-[tool.poetry.scripts]
-serve = "uvicorn:main"
+[project.scripts]
+prismix = "prismix.__main__:main"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-# ─── Ruff Configuration ───────────────────────────────────
+[tool.hatch.build.targets.wheel]
+packages = ["prismix"]
+
 [tool.ruff]
-target-version = "py310"
+extend-exclude = ["prismix/vendor"]
+target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
-select = [
-    "E",      # pycodestyle errors
-    "W",      # pycodestyle warnings
-    "F",      # Pyflakes
-    "I",      # isort
-    "B",      # flake8-bugbear
-    "C4",     # flake8-comprehensions
-    "UP",     # pyupgrade
-    "ARG",    # flake8-unused-arguments
-    "SIM",    # flake8-simplify
-]
-ignore = [
-    "E501",   # line too long (handled by formatter)
-    "B008",   # do not perform function calls in argument defaults
-    "B904",   # raise without from inside except
-]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501", "B008"]
 
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
-"tests/*" = ["ARG"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["backend"]
-
-# ─── MyPy Configuration ───────────────────────────────────
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = [
-    "whisper.*",
-    "demucs.*",
-    "moviepy.*",
-    "pydub.*",
-    "ffmpeg.*",
-    "yt_dlp.*",
-]
-ignore_missing_imports = true
-
-# ─── Pytest Configuration ─────────────────────────────────
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-asyncio_mode = "auto"
-addopts = "-v --cov=backend --cov-report=term-missing"
 
-# ─── Coverage Configuration ───────────────────────────────
-[tool.coverage.run]
-source = ["backend"]
-omit = ["*/tests/*", "*/__pycache__/*"]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "raise NotImplementedError",
-    "if TYPE_CHECKING:",
+[tool.uv]
+# demucs pins numpy<2 on Intel macOS; Apple Silicon, Linux and Windows are supported
+environments = [
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux'",
+    "sys_platform == 'win32'",
+]
+# basic-pitch lists TensorFlow/CoreML as hard deps, but it also ships an ONNX model that runs
+# on onnxruntime alone. Neutralise the heavy ones so the install stays light.
+override-dependencies = [
+    "tensorflow; sys_platform == 'never'",
+    "tensorflow-macos; sys_platform == 'never'",
+    "tflite-runtime; sys_platform == 'never'",
+    "coremltools; sys_platform == 'never'",
 ]

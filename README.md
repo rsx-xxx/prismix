@@ -1,8 +1,6 @@
-# YouTube Karaoke Generator 🎤
+# Prismix
 
-[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/)
-[![Framework](https://img.shields.io/badge/framework-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Take a YouTube video, split it into instrument tracks, and play only the ones you want. Mute or solo each stem, change tempo and transpose without the robotic sound. Every split is cached, so the same video is never processed twice.
 
 > **⚠️ DISCLAIMER: This software is provided for educational and personal use only.**
 >
@@ -17,178 +15,62 @@
 > - The developers are not responsible for any misuse of this software
 > - This software does not host, store, or distribute any copyrighted content
 >
-> **This project is not affiliated with, endorsed by, or connected to YouTube, Google, or any content creators.**
 
-Transform YouTube videos or search queries into karaoke-style videos with separated instrumental tracks and synchronized lyrics.
+## Quick start
 
-This project uses modern tools to download YouTube videos, separate audio stems (vocals, drums, bass, other), transcribe vocals, fetch lyrics from Genius, align them, and merge everything back into a final karaoke video with subtitles.
+```bash
+uv sync
+uv run prismix            # http://stems.localhost:8000
+```
 
-## ✨ Features
+Paste a YouTube link (or search by name) in the top bar and press Split. Press `?` in the app for keyboard shortcuts.
 
-* **YouTube Input:** Accepts direct YouTube video URLs or search terms.
-* **Audio Separation:** Uses Demucs (`htdemucs` by default) to separate audio into instrumental, vocals, drums, bass, and other stems.
-* **Transcription:** Uses OpenAI Whisper (`large-v2` by default) to transcribe the vocals.
-* **Lyrics Fetching:** Optionally fetches lyrics from Genius using song title and artist/uploader name.
-* **Lyrics Alignment:** Aligns the fetched Genius lyrics with the transcribed segments using fuzzy matching.
-* **Subtitle Generation:** Creates an SRT subtitle file from the aligned lyrics.
-* **Video Merging:** Combines the original video (without audio), the generated instrumental track, and the generated subtitles into a final MP4 karaoke video.
-* **Web Interface:** Modern UI built with HTML, CSS, and vanilla JavaScript (ESM modules).
-    * YouTube suggestions dropdown.
-    * Real-time progress tracking via WebSockets.
-    * Displays final karaoke video.
-    * Interactive stem players (using WaveSurfer.js) to listen to individual tracks.
-    * Theme switcher (Dark/Light).
-* **Docker Support:** Includes a `Dockerfile` for easy containerization of the backend.
+## How it works
 
-## 🛠️ Tech Stack
+- **Separation:** Demucs v4 on GPU (CUDA), Apple Silicon (MPS) or CPU. Models: `htdemucs_ft` (Best), `htdemucs_6s` (adds guitar and piano).
+- **Download:** yt-dlp with `yt-dlp-ejs` and a JS runtime (node, deno or bun) for YouTube's challenges. ffmpeg is bundled via `imageio-ffmpeg`.
+- **Playback:** Web Audio with one Signalsmith Stretch (WASM) node per stem, all scheduled identically so stems stay in sync. Tempo 50–150 %, key ±12 semitones plus fine tune, formant preservation, A-B loop.
+- **Download audio:** the Download button renders what you hear (or chosen stems, or one file per stem as a zip) with the current tempo and key, using Rubber Band R3 (`pylibrb`), as mp3, m4a, flac, wav, ogg or opus.
+- **Bars and chords:** [Beat This](https://github.com/CPJKU/beat_this) finds beats and downbeats, [BTC](https://huggingface.co/puar-playground/btc-chord) the chords, and the key comes from the chords. The ruler above the waveforms shows bars and chords (click to seek, Shift-click to loop bars), and the dock shows the current bar, beat and chord.
+- **Chords:** beats, bars, key and chords are detected once per track (Beat This + BTC). The chord chart, ruler and fingering diagrams follow the Key control, with an optional capo suggestion and a chart PDF. Chords are colour-coded: hue is the position on the circle of fifths (related chords get neighbouring hues), lightness separates major, minor and diminished. "Follow" scrolls with playback and pauses while you scroll by hand.
+- **Lyrics:** synced lyrics from [LRCLIB](https://lrclib.net) (free, no key), shown Spotify-style with the current line lit; click a line to jump to it. Only artist, title and length are sent, once per track, and the result is cached as `lyrics.json`. If a track is not found, search by hand. Press `L` to hide or show.
+- **Suggested playlists:** the Playlists dialog offers mixes from the artists in your library, plus a few starter searches.
+- **Cache:** `data/library/<video_id>/<model>/` holds FLAC stems and metadata. A track is only listed once all of its files are written. Delete a track from the library grid to free space.
 
-**Backend:**
+- **What to run:** the task select next to Split picks Everything, Stems only, or Chords only (no separation, the whole mix is analysed). Stems whose level is more than 24 dB below the mix (typically 6-stem piano or "other" on tracks without them) are dropped instead of added.
+- **Chords:** the current chord is highlighted in the ruler, chart and diagrams. Show/hide chords with `H`. Diagrams show finger numbers and barres, with an Easiest option, plain triads for 7ths and 6ths, a capo suggestion, and a click-to-cycle alternative fingering.
+- **Capo:** the Capo select (off, auto, or fret 1-7) shows chord shapes for a capo, with the sounding key unchanged. Each fret lists how much easier it makes the song; auto picks a fret only when it clearly beats open shapes, and when off a suggestion button appears if one would help.
+- **Online chords:** "Check against online chords" looks the song up on [Songsterr](https://www.songsterr.com), aligns its chord sheet with the detected chords (tolerating a different key or a repeated section), links to the sheet, underlines chords that agree and flags the ones that differ. "Use tab chords" swaps in the sheet's version of the differing chords. Songsterr has no official API, so this uses the same endpoints as its website, only on click, once per track (cached as `tabs.json`). Many songs only have tabs there, not chord sheets; paste a Songsterr chords link if the automatic match is wrong.
+- **Video:** `V` opens a YouTube panel (muted) that follows the studio's position and tempo, so you watch the original picture against your edited mix. Needs internet.
+- **Playlists:** the playlists button lists your YouTube playlists after Google sign-in, or any public playlist or mix URL pasted in. Reset tempo and key with `R` (`Shift+R` for key only) or the reset buttons.
 
-* **Python 3.10+**
-* **FastAPI:** Web framework for the API and WebSockets.
-* **Uvicorn:** ASGI server.
-* **yt-dlp:** Downloading YouTube videos and fetching metadata/suggestions.
-* **Demucs:** Audio source separation.
-* **OpenAI Whisper:** Audio transcription.
-* **ffmpeg-python:** Audio extraction and video/audio merging.
-* **lyricsgenius:** Fetching lyrics from Genius.com.
-* **python-dotenv:** Loading environment variables.
+- **Upload:** the Upload button (or dropping a file on the page) adds a local audio or video file (up to 500 MB). The same bytes are never stored twice. The preview picture is the embedded cover or a video frame, else album art from the free iTunes Search API (only artist and title text is sent, and only art from `mzstatic.com` is accepted), else a waveform image. Title and artist come from the file's tags, else the cleaned filename (junk like `(Official Audio)` and track numbers removed). The track is also looked up on YouTube (artist and title text only); a match with the same words and length fills in a missing title and artist and is stored as `match`, and nothing is changed when there is no confident match or no internet.
 
-**Frontend:**
+## Configuration
 
-* **HTML5**
-* **CSS3:** Modern styling with CSS variables, Flexbox, Grid.
-* **Vanilla JavaScript (ES Modules):** Frontend logic, API interaction, WebSocket handling, UI updates.
-* **WaveSurfer.js:** Displaying waveforms and controlling audio stems.
+| Variable | Default | Meaning |
+|---|---|---|
+| `PRISMIX_DATA` | `./data` | Cache location |
+| `PRISMIX_MAX_DURATION` | `1200` | Max video length in seconds |
+| `PRISMIX_MAX_UPLOAD_MB` | `500` | Max uploaded file size |
+| `PRISMIX_GOOGLE_CLIENT_ID` | unset | OAuth web client ID for "my playlists" (see below) |
+| `PRISMIX_COOKIES` | `cookies.txt` if present | Netscape cookies file for age-gated videos |
 
-## 🚀 Setup & Installation
+Google sign-in: in Google Cloud create an OAuth client of type Web application, enable YouTube Data API v3, add your app origin (e.g. `http://stems.localhost:8000`) as an authorised JavaScript origin, and set the client ID. Only the `youtube.readonly` scope is requested, and the token stays in the browser session.
 
-1.  **Clone the Repository:**
-    ```bash
-    git clone https://your-repository-url/yt-karaoke.git
-    cd yt-karaoke
-    ```
+For `http://stems.localhost` without the port (macOS), run `sudo scripts/stems-port80.sh install` once. It redirects loopback port 80 to 8000 and nothing else; `uninstall` removes it.
 
-2.  **Backend Setup:**
-    * Navigate to the `backend` directory: `cd backend`
-    * **Create Virtual Environment:** (Recommended)
-        ```bash
-        python -m venv .venv
-        source .venv/bin/activate # On Windows use `.venv\Scripts\activate`
-        ```
-    * **Install Python Dependencies:**
-        ```bash
-        pip install -r requirements.txt
-        # Ensure torch is installed correctly for your system (CPU/GPU)
-        # See: [https://pytorch.org/get-started/locally/](https://pytorch.org/get-started/locally/)
-        # Example CPU-only: pip install torch torchvision torchaudio
-        # Example CUDA 11.8: pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu118](https://download.pytorch.org/whl/cu118)
-        ```
-    * **Install Backend System Dependencies:**
-        * `ffmpeg`: Essential for audio/video processing. ([Installation Guide](https://ffmpeg.org/download.html))
-        * `git`: Required by some dependencies.
-        * `sox`: Optional, might be needed by some audio libraries indirectly.
-        (These are installed in the Dockerfile; ensure they are available on your host if running locally without Docker).
-    * **Environment Variables:**
-        * Create a `.env` file in the `backend` directory.
-        * Add your Genius API token (required for lyrics fetching):
-            ```dotenv
-            GENIUS_API_TOKEN="YOUR_GENIUS_API_TOKEN_HERE"
-            # Optional: Override default models or ports
-            # WHISPER_MODEL_TAG="base"
-            # DEMUCS_MODEL="mdx_extra_q"
-            # PORT=8001
-            ```
-        * Get a Genius API token from [http://genius.com/api-clients](http://genius.com/api-clients).
+`uv run prismix --host 0.0.0.0 --port 8000` to serve on the network. There is no authentication, so keep it on a trusted network.
 
-    * **(Optional) YouTube Cookies:**
-        If you encounter "Sign in to confirm you're not a bot" errors from YouTube, you can provide cookies:
-        ```dotenv
-        # Option 1: Extract cookies from your browser automatically
-        YTDLP_COOKIES_FROM_BROWSER="chrome"  # or: firefox, safari, edge, opera, brave, chromium
+First run downloads the Beat This checkpoint (~77 MB) and the BTC chord model from Hugging Face (its repo ships code, loaded with `trust_remote_code` at a pinned revision).
 
-        # Option 2: Use a cookies.txt file (Netscape format)
-        YTDLP_COOKIES_FILE="/path/to/your/cookies.txt"
-        ```
-        **Important:** Never commit cookies files to git - they contain session data!
+## Licences
 
-3.  **Running the Application (Locally):**
-    * **Start the Backend:** From the `backend` directory:
-        ```bash
-        # Ensure your virtual environment is active
-        uvicorn app:app --reload --host 0.0.0.0 --port 8000
-        ```
-        (`--reload` is for development, remove for production).
-    * **Access the Frontend:** Open your web browser and go to `http://localhost:8000` (or the port you configured).
+Rubber Band (GPL) for export, jsPDF (MIT), Signalsmith Stretch (MIT). Vendored browser libraries live in `prismix/web/vendor/`.
 
-## 🐳 Docker Instructions
+## Development
 
-1.  **Build the Docker Image:**
-    * From the **root** directory of the project:
-        ```bash
-        docker build -t youtube-karaoke-backend -f backend/Dockerfile .
-        ```
-
-2.  **Run the Docker Container:**
-    * Make sure to pass the `GENIUS_API_TOKEN` environment variable.
-    * Map the container port (8000) to a host port (e.g., 8000).
-    * Mount volumes for persistent downloads and processed files (optional but recommended).
-        ```bash
-        docker run -d --name karaoke-app \
-          -p 8000:8000 \
-          -e GENIUS_API_TOKEN="YOUR_GENIUS_API_TOKEN_HERE" \
-          -e PORT=8000 \
-          -e HOST="0.0.0.0" \
-          # Optional: Mount volumes for persistence
-          # -v $(pwd)/backend/downloads:/app/downloads \
-          # -v $(pwd)/backend/processed:/app/processed \
-          # Optional: Add --gpus all for GPU acceleration if Docker supports it
-          youtube-karaoke-backend
-        ```
-    * Access the application at `http://localhost:8000`.
-
-## 📖 Usage
-
-1.  Open the web interface in your browser.
-2.  Enter a YouTube video URL or a search query (e.g., "Song Title Artist").
-3.  Suggestions will appear below the input field. Click one or proceed with the entered text.
-4.  Select desired options (Add Lyrics, Language, Position). Subtitle options appear after selecting a video.
-5.  Click the "Process" button.
-6.  Monitor the progress bar and steps log.
-7.  Once complete, the karaoke video will appear.
-8.  You can play the video, download it, or copy the link.
-9.  If audio stems were generated, interactive players for each stem will appear below the video.
-
-## 📝 License
-
-This project is licensed under the MIT License.
-
-## 💡 Future Enhancements
-
-* [ ] Genius: Handle ambiguous search results (allow user selection).
-* [ ] Frontend: More robust stem player synchronization.
-* [ ] Frontend: Custom video player skin matching the theme.
-* [ ] Backend: Option to choose different Demucs/Whisper models via UI.
-* [ ] Backend: Asynchronous file cleanup mechanism.
-* [ ] Backend: More sophisticated error handling and reporting.
-* [ ] Testing: Add more comprehensive unit and integration tests.
-
-## ⚖️ Legal Notice
-
-### Intended Use
-This software is designed as an **educational project** demonstrating:
-- Modern Python web development with FastAPI
-- Machine learning integration (Whisper, Demucs)
-- Real-time WebSocket communication
-- Audio/video processing pipelines
-
-### User Responsibility
-- Users must ensure they have the legal right to process any content
-- This tool should only be used with content you own, have created, or have explicit permission to use
-- Users are responsible for compliance with their local laws and all applicable terms of service
-
-### No Warranty
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. THE AUTHORS ARE NOT LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THIS SOFTWARE.
-
-### DMCA
-If you believe any content processed using this tool infringes your copyright, please contact the user who processed the content, not the developers of this tool. This software does not host, store, or distribute any content.
+```bash
+uv run pytest
+uv run ruff check .
+```
