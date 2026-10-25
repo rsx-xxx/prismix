@@ -87,7 +87,7 @@ main { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; height:
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
 .dot.live { background: var(--ok); }
 .dot.bad { background: var(--bad); }
-.modes { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .3rem 1.1rem .5rem; }
+.modes { flex-wrap: wrap; display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .3rem 1.1rem .5rem; }
 
 .stage { position: relative; overflow-y: auto; overscroll-behavior: contain; padding: 0 1.1rem; scrollbar-width: none;
   mask-image: linear-gradient(transparent 0, #000 2.2rem, #000 calc(100% - 2.2rem), transparent 100%); }
@@ -220,3 +220,25 @@ button:active, .lib li:active, [role=tab]:active, [role=radio]:active { filter: 
 .mrow .mute { min-width: 4.4rem; min-height: 34px; padding: 0 .8rem; border-radius: 999px; background: var(--surface-2); font-weight: 650; font-size: .82rem; }
 .mrow.off .mute { background: var(--bad); color: #fff; }
 .saves { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: .6rem; }
+
+/* tab */
+.seg[hidden], .seg button[hidden] { display: none; }
+.tab { --row: 1.15rem; padding: .5rem 0 40dvh; }
+.tab-src { margin: 0 0 .6rem; font-size: .72rem; color: var(--ink-2); }
+.tab-src a { color: var(--accent); }
+.trow { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: .35rem; margin-top: .6rem; }
+.tab .bar { display: block; min-height: 0; padding: 1.1rem .45rem .35rem; }
+.tab.with-chords .bar { padding-top: 2.5rem; }
+.tab .bar.blank { opacity: .45; }
+.tab .bar.blank .stf { opacity: .35; height: calc(var(--row) * 2); }
+.stf { position: relative; height: calc(var(--strings) * var(--row)); margin: .15rem 0; background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--row) / 2 - .5px), color-mix(in oklch, var(--ink-2) 55%, transparent) calc(var(--row) / 2 - .5px) calc(var(--row) / 2 + .5px), transparent calc(var(--row) / 2 + .5px) var(--row)); }
+.stf .f { position: absolute; height: var(--row); display: grid; place-items: center; transform: translateX(-30%); padding: 0 1px; font-size: .78rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; background: var(--surface); }
+.bar.now .stf .f { background: color-mix(in oklch, var(--accent) 8%, var(--surface)); }
+.stf .cursor { position: absolute; top: 0; bottom: 0; left: var(--x, 0); width: 2px; border-radius: 2px; background: var(--accent); opacity: 0; }
+.bar.now .stf .cursor { opacity: .85; }
+.tchs { position: absolute; top: 1.15rem; left: .45rem; right: .45rem; height: 1.3rem; }
+.tchs .chord { position: absolute; top: 0; font-size: 1rem; white-space: nowrap; }
+.tly { position: relative; min-height: 1.3rem; margin-top: .15rem; }
+.tw { position: absolute; top: 0; white-space: nowrap; font-size: .9rem; color: var(--ink-2); transition: color .15s; }
+.tw.cur { color: var(--accent); font-weight: 700; }
+.tw.done { color: var(--ink); }

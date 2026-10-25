@@ -2,6 +2,11 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.3
+
+- Songs get a Tab view on the phone: the best matching guitar and bass tab from Songsterr, checked bar by bar against the recording and shown with lyrics and chords. Songs without a trustworthy match have no tab.
+- Chords sit on the letter where the strum starts, not just on the syllable.
+
 ## 0.0.2
 
 - The phone has a Stem volumes screen: a level and a mute per stem for the sound played on that phone.
