@@ -78,6 +78,7 @@ export function createBand({ player, current, open, $ }) {
     document.querySelectorAll('#band-tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.kind === kind)));
     $('band-url').textContent = status.url?.replace(/\?ip=.*$/, '') || 'No LAN address found. Connect this computer to the band Wi-Fi.';
     $('band-lock').checked = !!status.locked;
+    if (document.activeElement !== $('band-name')) $('band-name').value = status.name || '';
     const list = $('band-clients');
     list.replaceChildren(...status.clients.map((c) => {
       const li = document.createElement('li');
@@ -107,6 +108,7 @@ export function createBand({ player, current, open, $ }) {
     localStorage.setItem(LS, JSON.stringify({ ...saved(), token }));
     post({ token });
   });
+  $('band-name').addEventListener('change', (e) => post({ name: e.target.value.trim() }));
   $('band-pin').value = saved().token || '';
 
   ['state', 'seek', 'tune', 'loop', 'mix'].forEach((t) => player.addEventListener(t, publish));

@@ -107,3 +107,15 @@ def test_app_qr_uses_the_app_scheme(client):
     client.app.state.band.share_url = "https://prismix.local:8443/remote?ip=192.168.1.5"
     s = client.get("/api/band").json()
     assert s["qr"] and s["appQr"] and s["qr"] != s["appQr"]
+
+
+def test_host_name_is_editable_and_announced(client, tmp_path, monkeypatch):
+    from prismix import lan as lan_mod
+
+    monkeypatch.setattr(lan_mod, "_identity_path", lambda: tmp_path / "host.json")
+    first = client.get("/remote/hello").json()
+    assert first["app"] == "prismix" and first["id"] and first["name"]
+    assert client.post("/api/band", json={"name": "  Studio A "}).json()["name"] == "Studio A"
+    again = client.get("/remote/hello").json()
+    assert again["name"] == "Studio A" and again["id"] == first["id"]
+    assert client.post("/api/band", json={"name": ""}).json()["name"] == first["name"]

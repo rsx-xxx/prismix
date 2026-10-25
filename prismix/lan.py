@@ -7,12 +7,15 @@ does.
 from __future__ import annotations
 
 import datetime as dt
+import getpass
 import ipaddress
+import json
 import logging
 import os
 import re
 import socket
 import threading
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import uvicorn
@@ -209,3 +212,51 @@ def start(app, port: int = HTTPS_PORT) -> uvicorn.Server | None:
     advertise(ip, port)
     log.info("band: phones open %s", app.state.band.share_url)
     return server
+
+
+# ── who this host is, as phones list it ──
+
+def _identity_path():
+    return DATA_DIR / "band" / "host.json"
+
+
+def _identity() -> dict:
+    try:
+        return json.loads(_identity_path().read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def host_id() -> str:
+    """A stable id, so a phone recognises this host after its name or address changed."""
+    ident = _identity()
+    if not ident.get("id"):
+        ident["id"] = uuid.uuid4().hex[:12]
+        _write(ident)
+    return ident["id"]
+
+
+def default_name() -> str:
+    try:
+        user = getpass.getuser()
+    except Exception:  # noqa: BLE001 - no passwd entry in some containers
+        user = ""
+    machine = socket.gethostname().split(".")[0]
+    return f"{user.capitalize()} · {machine}" if user and user.lower() != machine.lower() else machine
+
+
+def display_name() -> str:
+    return _identity().get("name") or default_name()
+
+
+def set_display_name(name: str) -> str:
+    ident = {**_identity(), "id": host_id()}
+    ident["name"] = name.strip()[:40]
+    _write(ident)
+    return display_name()
+
+
+def _write(ident: dict) -> None:
+    path = _identity_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(ident))
