@@ -25,6 +25,12 @@ uv run prismix            # http://stems.localhost:8000
 
 Paste a YouTube link (or search by name) in the top bar and press Split. Press `?` in the app for keyboard shortcuts.
 
+## Desktop app
+
+Grab the installer from the [latest release](../../releases/latest): `Prismix-Setup.exe` for Windows, `Prismix.dmg` for Apple Silicon Macs. The app runs the same server in a native window and keeps your library in `%LOCALAPPDATA%\Prismix` (Windows) or `~/Library/Application Support/Prismix` (macOS). Builds are unsigned unless signing secrets are configured, so expect a SmartScreen or Gatekeeper prompt on first launch.
+
+Build locally with `uv run --group desktop python packaging/gen_icon.py && uv run --group desktop python packaging/build.py`, then `packaging/make_dmg.sh` on macOS or Inno Setup on `packaging/Prismix.iss` on Windows. Pushes to `master` refresh the rolling `latest` release and `v*` tags publish a versioned one.
+
 ## How it works
 
 - **Separation:** Demucs v4 on GPU (CUDA), Apple Silicon (MPS) or CPU. Models: `htdemucs_ft` (Best), `htdemucs_6s` (adds guitar and piano).

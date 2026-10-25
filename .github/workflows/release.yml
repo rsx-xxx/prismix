@@ -1,0 +1,136 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'          # versioned GitHub Release: git tag v1.0.0 && git push --tags
+    branches:
+      - master        # updates the rolling 'latest' release
+  workflow_dispatch:   # manual build
+
+permissions:
+  contents: write
+
+env:
+  PRISMIX_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('0.0.{0}', github.run_number) }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run pytest -q
+
+  build-windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Install
+        run: uv sync --group desktop
+      - name: Build app
+        run: |
+          uv run --group desktop python packaging/gen_icon.py
+          uv run --group desktop python packaging/build.py
+      - name: Smoke test the bundle
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist/Prismix/Prismix.exe" -ArgumentList "--selftest" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "bundled self-test failed with exit code $($p.ExitCode)" }
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress | Out-Null
+            $iscc = "${Env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          & $iscc "packaging\Prismix.iss" "/DAppVersion=$($Env:PRISMIX_VERSION.TrimStart('v'))"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed with exit code $LASTEXITCODE" }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: dist/Prismix-Setup.exe
+
+  build-mac:
+    needs: test
+    runs-on: macos-latest   # Apple Silicon
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Install
+        run: uv sync --group desktop
+      - name: Build app
+        run: |
+          uv run --group desktop python packaging/gen_icon.py
+          uv run --group desktop python packaging/build.py
+      - name: Smoke test the bundle
+        run: dist/Prismix.app/Contents/MacOS/Prismix --selftest
+      - name: Build DMG
+        env:
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: bash packaging/make_dmg.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mac
+          path: dist/Prismix.dmg
+
+  # Tag pushes get a versioned release; everything else updates a rolling 'latest' release.
+  release:
+    needs: [build-windows, build-mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Move rolling 'latest' tag to this commit
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f latest
+          git push origin -f latest
+      - uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+      - name: Create release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('Prismix {0}', github.ref_name) || 'Prismix (latest master build)' }}
+          body: |
+            ${{ startsWith(github.ref, 'refs/tags/') && 'Tagged release.' || format('Automatically built from commit {0} on master.', github.sha) }}
+
+            ## Download
+            | Platform | File |
+            |---|---|
+            | Windows 10/11 (64-bit) | `Prismix-Setup.exe` |
+            | macOS 12+ (Apple Silicon) | `Prismix.dmg`: open it and drag Prismix into Applications |
+
+            The first split downloads the separation models (about 1 GB), so it needs a connection and some patience. Your library is kept in `%LOCALAPPDATA%\Prismix` on Windows and `~/Library/Application Support/Prismix` on macOS.
+
+            ## Windows SmartScreen
+            The installer is not code-signed. If SmartScreen shows "Windows protected your PC", click **More info, then Run anyway**.
+
+            ## macOS Gatekeeper
+            The DMG is signed and notarized when the repository has Apple signing secrets, otherwise it is ad-hoc signed and macOS asks for **System Settings, Privacy & Security, Open Anyway**.
+          files: |
+            artifacts/windows/Prismix-Setup.exe
+            artifacts/mac/Prismix.dmg
+          draft: false
+          prerelease: false
+          make_latest: true

@@ -2,12 +2,25 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+FROZEN = bool(getattr(sys, "frozen", False))  # running from the PyInstaller desktop build
+ROOT = Path(sys._MEIPASS) if FROZEN else Path(__file__).resolve().parent.parent
 WEB_DIR = Path(__file__).resolve().parent / "web"
-DATA_DIR = Path(os.environ.get("PRISMIX_DATA", ROOT / "data")).resolve()
+
+
+def _user_data_dir() -> Path:
+    """The bundle is read-only, so the desktop build keeps its library in the user's profile."""
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Prismix"
+    if sys.platform == "win32":
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "Prismix"
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "prismix"
+
+
+DATA_DIR = Path(os.environ.get("PRISMIX_DATA", _user_data_dir() if FROZEN else ROOT / "data")).resolve()
 LIBRARY_DIR = DATA_DIR / "library"
 
 # Hard cap so a pasted 10-hour stream does not lock the worker for hours.
@@ -45,6 +58,7 @@ def cookies_file() -> Path | None:
     """Optional YouTube cookies (Netscape format) for age-gated / bot-checked videos."""
     explicit = os.environ.get("PRISMIX_COOKIES")
     candidates = [Path(explicit)] if explicit else [
+        DATA_DIR / "cookies.txt",
         ROOT / "cookies.txt",
         ROOT / "www.youtube.com_cookies.txt",
     ]
@@ -53,6 +67,9 @@ def cookies_file() -> Path | None:
 
 def js_runtime() -> dict[str, dict]:
     """yt-dlp needs a JS runtime to solve YouTube's signature challenges."""
+    bundled = ROOT / "bin" / ("deno.exe" if sys.platform == "win32" else "deno")
+    if bundled.is_file():
+        return {"deno": {"path": str(bundled)}}
     for name in ("deno", "node", "bun"):
         path = shutil.which(name)
         if path:
