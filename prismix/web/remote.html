@@ -27,6 +27,7 @@
     <symbol id="i-keys" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.8 5v14M15.2 5v14" stroke="currentColor" stroke-width="1.8"/><rect x="7" y="5" width="3.6" height="8" rx=".8" fill="currentColor"/><rect x="13.4" y="5" width="3.6" height="8" rx=".8" fill="currentColor"/></symbol>
     <symbol id="i-drums" viewBox="0 0 24 24"><ellipse cx="12" cy="13" rx="8.5" ry="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 13v4.5c0 1.9 3.8 3.5 8.5 3.5s8.5-1.6 8.5-3.5V13M8 16.5v3.7M16 16.5v3.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m6 3 5 6.5M18 3l-5 6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-other" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16.5" cy="16" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-mixer" viewBox="0 0 24 24"><path d="M6 4v16M12 4v16M18 4v16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="3.5" y="13" width="5" height="3.4" rx="1.2" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3.4" rx="1.2" fill="currentColor"/><rect x="15.5" y="11" width="5" height="3.4" rx="1.2" fill="currentColor"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></symbol>
   </svg>
 
@@ -55,6 +56,7 @@
     <header class="top">
       <div class="who" id="who"><b id="title">Waiting for the host…</b><span id="sub"></span></div>
       <span id="dot" class="dot" title="Connection"></span>
+      <button id="mix-btn" class="icon" type="button" aria-label="Stem volumes"><svg><use href="#i-mixer"/></svg></button>
       <button id="songs-btn" class="icon" type="button" aria-label="Songs"><svg><use href="#i-list"/></svg></button>
       <button id="more" class="icon" type="button" aria-label="Controls and settings"><svg><use href="#i-more"/></svg></button>
     </header>
@@ -106,6 +108,15 @@
     </div>
   </dialog>
 
+  <dialog id="mixer">
+    <div class="sheet-bar"><h2>Stem volumes</h2><button id="mixer-close" class="icon" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button></div>
+    <div class="sheet-body">
+      <p id="mix-note" class="hint"></p>
+      <div id="mix-list" class="mix"></div>
+      <button id="mix-reset" class="btn wide" type="button">Reset all</button>
+    </div>
+  </dialog>
+
   <dialog id="sheet">
     <div class="sheet-bar"><h2>Controls</h2><button id="sheet-close" class="icon" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button></div>
     <div class="sheet-body">
@@ -133,6 +144,15 @@
           <div class="s-head"><span>Sound delay</span><output id="lat-out">0 ms</output><button id="resync" class="link" type="button">Re-sync</button></div>
           <input id="lat" type="range" min="-300" max="500" step="5" value="0">
           <p class="hint">Later if this phone is ahead of the room, earlier if behind.</p>
+        </div>
+      </section>
+
+      <section class="group" id="save-group" hidden>
+        <h3>Save to this phone</h3>
+        <p class="hint">M4A (AAC) with cover and tags, in Music/Prismix.</p>
+        <div class="saves">
+          <button id="save-orig" class="btn" type="button">Original audio</button>
+          <button id="save-stems" class="btn" type="button">All stems</button>
         </div>
       </section>
 

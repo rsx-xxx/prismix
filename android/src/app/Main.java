@@ -195,6 +195,10 @@ public class Main extends Activity {
                 return true;
             } catch (RuntimeException e) { return false; /* started from the background: the page retries */ }
         }
+        @JavascriptInterface public void tap() {
+            m.ui.post(() -> m.web.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP));
+        }
+        @JavascriptInterface public void download(String url, String folder) { Saver.save(m.getApplicationContext(), url, folder); }
         @JavascriptInterface public void mediaStop() { m.stopService(new Intent(m, MediaService.class)); }
         @JavascriptInterface public void switchHost() { m.ui.post(() -> m.discover(false)); }
     }
