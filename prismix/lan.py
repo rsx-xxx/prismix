@@ -13,13 +13,15 @@ import os
 import re
 import socket
 import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import uvicorn
 
 from .config import DATA_DIR
 
 log = logging.getLogger(__name__)
-HTTPS_PORT = 8443
+HTTPS_PORT = 8443  # the Android app and old links use it
+STANDARD_HTTPS, STANDARD_HTTP = 443, 80  # so that a bare https://prismix.local/ works
 
 
 def _local_for(target: str) -> str:
@@ -141,6 +143,38 @@ def advertise(ip: str, port: int) -> None:
     threading.Thread(target=run, daemon=True, name="band-mdns").start()
 
 
+def _free(port: int) -> bool:
+    """True when this process may listen on `port` (ports below 1024 need rights on some systems)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(("0.0.0.0", port))
+            return True
+        except OSError:
+            return False
+
+
+def _redirect_http(name: str, port: int) -> None:
+    """Plain http://prismix.local goes to the https page; a browser tries http first when only a name is typed."""
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            host = (self.headers.get("Host") or name).split(":")[0]
+            self.send_response(308)
+            self.send_header("Location", f"https://{host}{'' if port == 443 else f':{port}'}{self.path}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        do_HEAD = do_GET
+
+        def log_message(self, *args):
+            pass
+
+    try:
+        srv = ThreadingHTTPServer(("0.0.0.0", STANDARD_HTTP), Handler)
+    except OSError:
+        return
+    threading.Thread(target=srv.serve_forever, daemon=True, name="band-http-redirect").start()
+
+
 def start(app, port: int = HTTPS_PORT) -> uvicorn.Server | None:
     """Serve `app` over HTTPS on all interfaces in a daemon thread and publish the phone link."""
     ip = lan_ip()
@@ -153,12 +187,25 @@ def start(app, port: int = HTTPS_PORT) -> uvicorn.Server | None:
     except ImportError:
         log.warning("band: the cryptography package is missing, sharing is off")
         return None
-    server = uvicorn.Server(uvicorn.Config(
-        app, host="0.0.0.0", port=port, ssl_certfile=str(crt), ssl_keyfile=str(key),
-        log_level="warning", log_config=None))
-    threading.Thread(target=server.run, daemon=True).start()
+
+    def serve(on: int) -> uvicorn.Server:
+        server = uvicorn.Server(uvicorn.Config(
+            app, host="0.0.0.0", port=on, ssl_certfile=str(crt), ssl_keyfile=str(key),
+            log_level="warning", log_config=None))
+        threading.Thread(target=server.run, daemon=True).start()
+        return server
+
+    server = serve(port)
+    clean = bool(name) and _free(STANDARD_HTTPS)
+    if clean:
+        serve(STANDARD_HTTPS)
+        _redirect_http(name, STANDARD_HTTPS)
     # the name survives a new DHCP lease; the address rides along for phones that cannot resolve .local
-    app.state.band.share_url = f"https://{name}:{port}/remote?ip={ip}" if name else f"https://{ip}:{port}/remote"
+    if name:
+        host = name if clean else f"{name}:{port}"
+        app.state.band.share_url = f"https://{host}/remote?ip={ip}"
+    else:
+        app.state.band.share_url = f"https://{ip}:{port}/remote"
     advertise(ip, port)
     log.info("band: phones open %s", app.state.band.share_url)
     return server

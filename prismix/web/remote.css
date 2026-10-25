@@ -190,9 +190,17 @@ dialog[open]::backdrop { opacity: 1; }
   dialog { margin: auto; border-radius: 24px; }
 }
 @media (max-height: 460px) {
-  .modes { padding-bottom: .2rem; }
-  .dock { padding-top: .3rem; } .play { width: 52px; height: 52px; }
-  .ly { padding-top: 12dvh; }
+  /* landscape: the song gets the screen, the controls fold into thin bars */
+  .top { padding-top: max(.25rem, env(safe-area-inset-top)); padding-bottom: 0; }
+  .who span { display: none; }
+  .modes { padding: .15rem 1.1rem .3rem; flex-wrap: nowrap; }
+  .dock { display: flex; align-items: center; gap: .9rem; padding: .3rem 1rem max(.35rem, env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; }
+  .dock .ctl { display: contents; }
+  .where { order: 1; } .xport { order: 2; gap: .4rem; } .seekrow { order: 3; flex: 1; } .tune { order: 4; }
+  .where, .tune { min-height: 40px; }
+  .play { width: 46px; height: 46px; } .play svg { width: 1.4rem; height: 1.4rem; }
+  .dock .note { order: 5; }
+  .ly { padding-top: 6dvh; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation-duration: 1ms !important; } }
 
