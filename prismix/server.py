@@ -27,6 +27,7 @@ from . import (
     original,
     pipeline,
     playlists,
+    tabdata,
     tabs,
     uploads,
 )
@@ -395,6 +396,16 @@ def create_app() -> FastAPI:
             raise HTTPException(404, "Not found") from None
         except tabs.TabsError as e:
             raise HTTPException(422, str(e)) from e
+
+    @app.get("/api/tabdata/{video_id}")
+    async def get_tabdata(video_id: str):
+        # Guitar and bass tab for the Tab view; {"found": false} when there is none. Looked up once, then cached.
+        try:
+            return await asyncio.to_thread(tabdata.lookup, video_id)
+        except ValueError:
+            raise HTTPException(404, "Not found") from None
+        except tabdata.TabDataError:
+            return {"found": False}
 
     @app.get("/api/lyrics/{video_id}")
     async def get_lyrics(video_id: str, q: str | None = Query(default=None, max_length=200), listen: bool = False):

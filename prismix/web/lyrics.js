@@ -56,6 +56,27 @@ export function timeLine(text, t, next, ws, we) {
   return { parts, syl, end: t + slot };
 }
 
+/**
+ * Cut a syllable in two where a chord starts inside it, at the letter the singer is on at that moment, so the chord
+ * hangs over that letter instead of the whole syllable. Mutates `tl` (parts and syl) and keeps letter-linear times.
+ */
+export function splitAt(tl, times) {
+  for (const t of times) {
+    for (const p of tl.parts) {
+      const i = p.pieces ? p.pieces.findIndex((o) => t > o.t + 0.03 && t < o.e - 0.03 && o.txt.length > 3) : -1;
+      if (i < 0) continue;
+      const o = p.pieces[i];
+      const cut = Math.round((o.txt.length * (t - o.t)) / (o.e - o.t));
+      if (cut < 2 || cut > o.txt.length - 2) break;
+      const mid = o.t + ((o.e - o.t) * cut) / o.txt.length;
+      p.pieces.splice(i, 1, { txt: o.txt.slice(0, cut), t: o.t, e: mid }, { txt: o.txt.slice(cut), t: mid, e: o.e });
+      break;
+    }
+  }
+  tl.syl = tl.parts.flatMap((p) => p.pieces || []);
+  return tl;
+}
+
 export function createLyrics({ player, api, chords = () => [] }) {
   let cur = null; // { id, data, nodes: HTMLElement[], active: number }
   let token = 0;
@@ -148,7 +169,6 @@ export function createLyrics({ player, api, chords = () => [] }) {
     lines.forEach((ln, i) => {
       const tl = cur.timed[i], n = nodes[i];
       if (!tl) return;
-      const pieces = tl.syl;
       const lastLine = !cur.timed.slice(i + 1).some(Boolean);
       const firstLine = !cur.timed.slice(0, i).some(Boolean);
       const lo = firstLine ? ln.t - 0.15 : ln.t, hi = lastLine ? tl.end + 0.5 : tl.end;
@@ -157,10 +177,12 @@ export function createLyrics({ player, api, chords = () => [] }) {
       const prev = ci > 0 ? cs[ci - 1] : null;
       while (ci < cs.length && cs[ci].t < hi) here.push(cs[ci++]);
       // a chord still ringing from before the line is shown (dimmed) on its first syllable
-      if (prev && (!here.length || here[0].t > pieces[0].t + 0.15)) here.unshift({ ...prev, carry: true });
+      if (prev && (!here.length || here[0].t > tl.syl[0].t + 0.15)) here.unshift({ ...prev, carry: true });
+      splitAt(tl, here.filter((c) => !c.carry).map((c) => c.t));
+      const pieces = tl.syl;
       pieces.forEach((o) => { o.ch = []; });
       for (const c of here) {
-        let k = c.carry ? 0 : pieces.findLastIndex((o) => o.t <= c.t + 0.15); // the syllable being sung when the chord changes
+        let k = c.carry ? 0 : pieces.findLastIndex((o) => o.t <= c.t + 0.08); // the syllable being sung when the chord changes
         if (k < 0) k = 0;
         pieces[k].ch.push(c);
       }
