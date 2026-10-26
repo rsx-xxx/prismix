@@ -1,4 +1,4 @@
-// Pick a song from your YouTube playlists (Google sign-in) or from any public playlist URL.
+// Pick a song from your YouTube playlists (Google sign-in) or from any public YouTube or Spotify playlist, album or artist link.
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -194,7 +194,7 @@ export function createPlaylists({ api, library, startProcess, openTrack, notice,
 
   function home() {
     const form = el('form', { className: 'pl-url' });
-    const input = el('input', { type: 'text', placeholder: 'Paste a playlist or mix link', 'aria-label': 'Playlist link', spellcheck: false });
+    const input = el('input', { type: 'text', placeholder: 'Paste a YouTube or Spotify playlist, album or mix link', 'aria-label': 'Playlist link', spellcheck: false });
     form.append(input, el('button', { className: 'btn primary', type: 'submit', textContent: 'Open' }));
     form.addEventListener('submit', (e) => { e.preventDefault(); if (input.value.trim()) byUrl(input.value.trim()); });
     const kids = [];
@@ -211,7 +211,7 @@ export function createPlaylists({ api, library, startProcess, openTrack, notice,
       go.addEventListener('click', async () => { go.disabled = true; try { await signIn(); home(); } catch (e) { notice(e.message); go.disabled = false; } });
       kids.push(el('div', { className: 'pl-signin' }, el('p', { className: 'muted', textContent: 'Read-only access to your playlists, so you can pick songs from them. Nothing is stored on the server.' }), go));
     } else {
-      kids.push(el('p', { className: 'muted', textContent: 'Paste any public playlist or mix link. To pick from your own playlists after signing in, set PRISMIX_GOOGLE_CLIENT_ID (see the README).' }));
+      kids.push(el('p', { className: 'muted', textContent: 'Paste any public YouTube or Spotify playlist, album or mix link. To pick from your own playlists after signing in, set PRISMIX_GOOGLE_CLIENT_ID (see the README).' }));
     }
     body.replaceChildren(suggested(), ...kids, form);
   }
@@ -222,4 +222,7 @@ export function createPlaylists({ api, library, startProcess, openTrack, notice,
     home();
   });
   $('pl-close').addEventListener('click', () => dlg.close());
+
+  /** Open the dialog straight on a pasted playlist, album or artist link. */
+  return { openUrl: (url) => { dlg.showModal(); byUrl(url); } };
 }

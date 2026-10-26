@@ -57,7 +57,7 @@ linkScroll(lyrics.pane(), score.pane());
 const followBoth = linkFollow(lyrics.pane(), score.pane(), player); // …and while playing, the lit line and the lit bar share one height // side by side: scrolling one box moves the other to the same moment
 const video = createVideo({ player, notice: (m) => notice(m) });
 
-createPlaylists({
+const plPicker = createPlaylists({
   api, library: () => state.library, notice: (m) => notice(m),
   startProcess: (id) => startProcess(id, $('quality').value),
   saveAll: (name, items) => plview.save(name, items),
@@ -91,7 +91,11 @@ $('omni').addEventListener('submit', async (e) => {
   if (!text) return;
   notice('');
   location.hash = '#/';
-  if (/^(https?:\/\/|www\.|(m\.|music\.)?youtu)/i.test(text) || /^[\w-]{11}$/.test(text)) {
+  if (/^(https?:\/\/open\.spotify\.com\/(intl-[a-z-]+\/)?(album|playlist|artist)\/|spotify:(album|playlist|artist):)/i.test(text)) {
+    $('results').hidden = true;
+    hidePreview();
+    plPicker.openUrl(text);
+  } else if (/^(https?:\/\/|www\.|(m\.|music\.)?youtu|spotify:)/i.test(text) || /^[\w-]{11}$/.test(text)) {
     $('results').hidden = true;
     hidePreview();
     await startProcess(text, $('quality').value);

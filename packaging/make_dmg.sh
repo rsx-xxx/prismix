@@ -42,6 +42,10 @@ for i in 1 2 3 4 5; do
 done
 rm -rf "$STAGE"
 
+if [[ "$IDENTITY" != "-" ]]; then
+  codesign --force --timestamp -s "$IDENTITY" "$DMG"
+fi
+
 if [[ -n "${APPLE_ID:-}" && -n "${APPLE_TEAM_ID:-}" && -n "${APPLE_APP_PASSWORD:-}" && "$IDENTITY" != "-" ]]; then
   xcrun notarytool submit "$DMG" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
   xcrun stapler staple "$DMG"

@@ -5,6 +5,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.Uri;
 import android.net.http.SslError;
 import android.net.nsd.NsdManager;
@@ -28,6 +32,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -58,6 +63,10 @@ import javax.net.ssl.X509TrustManager;
  * Shell around the host's /remote page. On launch it finds hosts on its own with mDNS (_prismix._tcp) and a /24 sweep
  * in parallel: one host is joined directly, several are listed with their connection history. The WebView trusts the
  * host's self-signed cert for that host only. The screen stays on only while something plays.
+ *
+ * The process is bound to the Wi-Fi network, so a VPN or per-app proxy on the phone (Cloudflare WARP and the like) does
+ * not swallow traffic to the local network. A host can be given by address or by name (prismix.local); connecting
+ * shows progress until the page is really there instead of a black screen.
  */
 public class Main extends Activity {
     private static final String BG = "#121110";
@@ -72,6 +81,13 @@ public class Main extends Activity {
     private LinearLayout panel;
     private String host = "";
     private int gen;
+    private ConnectivityManager cm;
+    private Network wifi;
+    private ConnectivityManager.NetworkCallback wifiCallback;
+    private boolean netReady; // Wi-Fi bound, or we gave up waiting for it
+    private Runnable afterNet;
+    private String wantName; // a name the user typed, looked for among the discovered hosts
+    private boolean connecting; // the page is loading behind the progress screen
     private NsdManager nsd;
     private NsdManager.DiscoveryListener nsdListener;
     private ExecutorService pool;
@@ -91,7 +107,7 @@ public class Main extends Activity {
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         if (Build.VERSION.SDK_INT >= 26) web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new Chrome(this));
         web.setWebViewClient(new Client(this));
         web.addJavascriptInterface(new Bridge(this), "Android");
 
@@ -101,11 +117,37 @@ public class Main extends Activity {
         panel.setPadding(dp(28), dp(96), dp(28), dp(28));
         panel.setBackgroundColor(Color.parseColor(BG));
 
-        LinearLayout root = new LinearLayout(this);
-        root.addView(web, new LinearLayout.LayoutParams(-1, -1));
-        root.addView(panel, new LinearLayout.LayoutParams(-1, -1));
+        FrameLayout root = new FrameLayout(this);
+        root.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(panel, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
+        bindWifi();
         open(getIntent());
+    }
+
+    /** Pins this process to the Wi-Fi network: a VPN owns the default route, but the host is on the local network. */
+    private void bindWifi() {
+        try {
+            cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            NetworkRequest req = new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build();
+            wifiCallback = new Wifi(this);
+            cm.requestNetwork(req, wifiCallback);
+        } catch (RuntimeException e) {
+            wifiCallback = null; // no Wi-Fi API: the default route has to do
+        }
+        ui.postDelayed(this::netUp, 1500); // mobile data only, or no answer: do not wait for it
+    }
+
+    private void netUp() {
+        netReady = true;
+        Runnable r = afterNet;
+        afterNet = null;
+        if (r != null) r.run();
+    }
+
+    /** Runs `r` once the Wi-Fi binding is in place (or given up on), so the first probes already take the right route. */
+    private void whenNet(Runnable r) {
+        if (netReady) r.run(); else afterNet = r;
     }
 
     /** Notifications need a grant on Android 13+; battery savers kill a silent background app, so ask once to be exempt. */
@@ -138,14 +180,16 @@ public class Main extends Activity {
         if (h == null) { discover(); return; }
         // Android's resolver often cannot do mDNS: a `name.local` link carries the address in ?ip= for that case.
         String ip = d.getQueryParameter("ip");
-        if (h.endsWith(".local") && ip != null && !ip.isEmpty()) connect(ip);
-        else if (h.endsWith(".local")) discover();
+        if (h.endsWith(".local") && ip != null && !ip.isEmpty()) go(ip);
         else connect(h);
     }
 
     @Override
     protected void onDestroy() {
         stopSearch();
+        if (cm != null && wifiCallback != null) {
+            try { cm.unregisterNetworkCallback(wifiCallback); cm.bindProcessToNetwork(null); } catch (RuntimeException e) { /* gone */ }
+        }
         stopService(new Intent(this, MediaService.class));
         if (current == this) current = null;
         super.onDestroy();
@@ -169,8 +213,8 @@ public class Main extends Activity {
 
     /** A Prismix computer on the network: stable id, the name its owner gave it, current address. */
     private static class Host {
-        final String addr, id, name;
-        Host(String addr, String id, String name) { this.addr = addr; this.id = id; this.name = name; }
+        final String addr, id, name, domain;
+        Host(String addr, String id, String name, String domain) { this.addr = addr; this.id = id; this.name = name; this.domain = domain; }
     }
 
     private void keepAwake(boolean on) {
@@ -222,6 +266,30 @@ public class Main extends Activity {
         @JavascriptInterface public void switchHost() { m.ui.post(() -> m.discover()); }
     }
 
+    private static class Chrome extends WebChromeClient {
+        private final Main m;
+        Chrome(Main m) { this.m = m; }
+        @Override
+        public void onProgressChanged(WebView v, int p) { if (p >= 70) m.reveal(); }
+    }
+
+    private static class Wifi extends ConnectivityManager.NetworkCallback {
+        private final Main m;
+        Wifi(Main m) { this.m = m; }
+        @Override
+        public void onAvailable(Network n) {
+            m.wifi = n;
+            try { m.cm.bindProcessToNetwork(n); } catch (RuntimeException e) { /* keep the default route */ }
+            m.ui.post(m::netUp);
+        }
+
+        @Override
+        public void onLost(Network n) {
+            if (n.equals(m.wifi)) m.wifi = null;
+            try { m.cm.bindProcessToNetwork(null); } catch (RuntimeException e) { /* nothing bound */ }
+        }
+    }
+
     private static class Client extends WebViewClient {
         private final Main m;
         Client(Main m) { this.m = m; }
@@ -233,6 +301,9 @@ public class Main extends Activity {
         }
 
         @Override
+        public void onPageFinished(WebView v, String url) { m.reveal(); }
+
+        @Override
         public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e) {
             if (r.isForMainFrame()) m.discover(); // host moved or went away: look again
         }
@@ -241,11 +312,24 @@ public class Main extends Activity {
     // ── discovery ──
 
     private void discover() {
+        discover(null);
+    }
+
+    /** Looks for hosts; with a name, joins the one that answers to it. */
+    private void discover(String want) {
+        wantName = want;
+        connecting = false;
         stopSearch();
         final int g = ++gen;
         found.clear();
         listing = false;
         showSearching();
+        whenNet(() -> sweep(g));
+        ui.postDelayed(() -> { if (g == gen && found.isEmpty()) { stopSearch(); showNone(); } }, 10500);
+    }
+
+    private void sweep(final int g) {
+        if (g != gen) return;
         pool = Executors.newFixedThreadPool(48);
         final ExecutorService p = pool;
         p.execute(() -> {
@@ -260,7 +344,6 @@ public class Main extends Activity {
                 });
             }
         });
-        ui.postDelayed(() -> { if (g == gen && found.isEmpty()) { stopSearch(); showNone(); } }, 9000);
     }
 
     private void stopSearch() {
@@ -274,6 +357,8 @@ public class Main extends Activity {
     private void add(int g, Host h) {
         if (g != gen || found.containsKey(h.addr)) return;
         found.put(h.addr, h);
+        if (wantName != null && wantName.equalsIgnoreCase(h.domain)) { go(h.addr); return; }
+        if (wantName != null) return; // looking for one particular host
         if (listing) showList();
         else if (found.size() == 1) ui.postDelayed(() -> decide(g), 2000); // give a second host time to answer
     }
@@ -281,7 +366,7 @@ public class Main extends Activity {
     /** One host: join it. Several: always ask, with the history shown. */
     private void decide(int g) {
         if (g != gen) return;
-        if (found.size() == 1) { connect(found.keySet().iterator().next()); return; }
+        if (found.size() == 1) { go(found.keySet().iterator().next()); return; }
         listing = true;
         showList();
     }
@@ -368,7 +453,7 @@ public class Main extends Activity {
             while ((n = in.read(buf)) > 0 && o.size() < 4096) o.write(buf, 0, n);
             JSONObject j = new JSONObject(o.toString("UTF-8"));
             if (!"prismix".equals(j.optString("app"))) return null;
-            return new Host(addr, j.optString("id", addr), j.optString("name", addr));
+            return new Host(addr, j.optString("id", addr), j.optString("name", addr), j.optString("domain", ""));
         } catch (Exception e) {
             return null;
         } finally {
@@ -423,7 +508,8 @@ public class Main extends Activity {
     }
 
     private void showSearching() {
-        screen("Looking for your band's host…", "Open Prismix on the computer and share to the network.");
+        screen(wantName != null ? "Looking for " + wantName + "…" : "Looking for your band's host…",
+                "Open Prismix on the computer and share to the network.");
         panel.addView(new ProgressBar(this));
         scanButton();
     }
@@ -441,7 +527,7 @@ public class Main extends Activity {
                     System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
             Button b = button(h.name + "\n" + h.addr + " · " + note, first && past != null);
             b.getLayoutParams().height = dp(72);
-            b.setOnClickListener(v -> connect(h.addr));
+            b.setOnClickListener(v -> go(h.addr));
             panel.addView(b);
             first = false;
         }
@@ -449,52 +535,114 @@ public class Main extends Activity {
         again.setOnClickListener(v -> discover());
         panel.addView(again);
         scanButton();
+        manualEntry();
     }
 
     private void showNone() {
-        screen("No host found", "Phone and computer must be on the same Wi-Fi, and the host must be sharing.");
+        String what = wantName != null ? "Could not find " + wantName : "No host found";
+        screen(what, "Phone and computer must be on the same Wi-Fi, and the host must be sharing. "
+                + "A VPN that blocks everything outside its tunnel has to allow the local network.");
         Button retry = button("Search again", true);
         retry.setOnClickListener(v -> discover());
         panel.addView(retry);
         scanButton();
+        manualEntry();
+    }
+
+    /** A host typed by name (prismix.local, or any domain that points at it) or by address. */
+    private void manualEntry() {
         final EditText in = new EditText(this);
-        in.setHint("Address, e.g. 192.168.1.20");
+        in.setHint("Name or address, e.g. prismix.local");
         in.setTextColor(Color.WHITE);
         in.setHintTextColor(Color.GRAY);
         in.setSingleLine(true);
         in.setImeOptions(EditorInfo.IME_ACTION_GO);
-        in.setText(prefs.getString("host", ""));
+        in.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
+        in.setText(prefs.getString("typed", prefs.getString("host", "")));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.topMargin = dp(24);
         panel.addView(in, lp);
-        Button go = button("Connect to this address", false);
+        Button go = button("Connect", false);
         go.setOnClickListener(v -> connect(in.getText().toString()));
         in.setOnEditorActionListener((v, a, ev) -> { connect(in.getText().toString()); return true; });
         panel.addView(go);
     }
 
+    private void showConnecting(String name) {
+        screen("Connecting to " + name + "…", "Opening the band page on your local network.");
+        panel.addView(new ProgressBar(this));
+        Button other = button("Pick another host", false);
+        other.setOnClickListener(v -> discover());
+        panel.addView(other);
+    }
+
+    private static boolean isAddress(String a) {
+        return a.matches("\\d{1,3}(\\.\\d{1,3}){3}");
+    }
+
+    /** An address, or a name that is looked up on the local network first. */
     private void connect(String raw) {
-        String a = raw.trim().replaceFirst("^[a-z]+://", "");
-        a = a.replaceFirst("/.*$", "").replaceFirst(":\\d+$", "");
+        String a = raw.trim().replaceFirst("^[a-zA-Z]+://", "");
+        a = a.replaceFirst("[/?#].*$", "").replaceFirst(":\\d+$", "").toLowerCase();
         if (a.isEmpty()) return;
+        if (!isAddress(a)) prefs.edit().putString("typed", a).apply();
+        if (isAddress(a)) go(a); else resolveName(a);
+    }
+
+    /** Name -> address through the Wi-Fi network (DNS, or mDNS where the system does it), else by asking the hosts. */
+    private void resolveName(final String name) {
         stopSearch();
-        gen++;
-        host = a;
-        SharedPreferences.Editor ed = prefs.edit().putString("host", a);
-        Host h = found.get(a);
-        if (h != null) {
-            ed.putString("name", h.name);
+        final int g = ++gen;
+        showConnecting(name);
+        whenNet(() -> new Thread(() -> {
+            String ip = null;
             try {
-                JSONObject hist = history();
-                hist.put(h.id, new JSONObject().put("name", h.name).put("addr", a).put("last", System.currentTimeMillis()));
-                ed.putString("history", hist.toString());
-            } catch (JSONException e) { /* history is a nicety */ }
-        }
-        ed.apply();
+                InetAddress[] all = wifi != null ? wifi.getAllByName(name) : InetAddress.getAllByName(name);
+                for (InetAddress a : all) if (a instanceof Inet4Address) { ip = a.getHostAddress(); break; }
+            } catch (Exception e) { /* mDNS names often do not resolve here: ask the hosts instead */ }
+            final String found4 = ip;
+            ui.post(() -> {
+                if (g != gen) return;
+                if (found4 != null) go(found4); else discover(name);
+            });
+        }, "resolve").start());
+    }
+
+    /** Opens the host's page. Progress stays on screen until the page really appears, so there is no black gap. */
+    private void go(final String a) {
+        stopSearch();
+        final int g = ++gen;
+        host = a;
+        wantName = null;
         listing = false;
+        connecting = true;
+        showConnecting(found.containsKey(a) ? found.get(a).name : a);
+        web.setVisibility(View.INVISIBLE);
+        whenNet(() -> new Thread(() -> {
+            Host h = null;
+            for (int i = 0; i < 3 && h == null; i++) h = hello(a);
+            final Host seen = h;
+            ui.post(() -> {
+                if (g != gen) return;
+                if (seen == null) { connecting = false; discover(); return; } // not there (any more): look again
+                SharedPreferences.Editor ed = prefs.edit().putString("host", a).putString("name", seen.name);
+                try {
+                    JSONObject hist = history();
+                    hist.put(seen.id, new JSONObject().put("name", seen.name).put("addr", a).put("last", System.currentTimeMillis()));
+                    ed.putString("history", hist.toString());
+                } catch (JSONException e) { /* history is a nicety */ }
+                ed.apply();
+                web.loadUrl("https://" + a + ":" + PORT + "/remote");
+                ui.postDelayed(() -> { if (g == gen && connecting) { connecting = false; discover(); } }, 15000);
+            });
+        }, "hello").start());
+    }
+
+    private void reveal() {
+        if (!connecting) return;
+        connecting = false;
         panel.setVisibility(View.GONE);
         web.setVisibility(View.VISIBLE);
-        web.loadUrl("https://" + a + ":" + PORT + "/remote");
     }
 
     @Override
