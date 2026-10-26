@@ -17,7 +17,7 @@ import time
 
 import httpx
 
-from . import align, genius, library, pipeline, transcribe, uploads
+from . import align, genius, library, mashup, pipeline, transcribe, uploads
 
 log = logging.getLogger(__name__)
 API = "https://lrclib.net/api"
@@ -237,6 +237,14 @@ def _search(query: str, duration: float) -> dict | None:
         return pick(query, duration, hits, slack=0.12) if isinstance(hits, list) else None
 
 
+def _fetch_source(src: tuple[str | None, str], duration: float) -> dict | None:
+    """The lyrics source a user named for a mashup: its times belong to another recording, so any length goes."""
+    artist, title = src
+    with httpx.Client(headers=HEADERS, timeout=TIMEOUT, follow_redirects=True) as client:
+        return _fetch(client, artist, title, duration, loose=True) or (
+            _fetch(client, None, title, duration, loose=True) if artist else None)
+
+
 def _guess_and_fetch(info: dict, duration: float) -> dict | None:
     loose = is_cover(info)
     with httpx.Client(headers=HEADERS, timeout=TIMEOUT, follow_redirects=True) as client:
@@ -321,6 +329,8 @@ def _web_text(info: dict, query: str | None) -> dict | None:
     """The song's words from Genius, trying the guessed (artist, title) pairs in order; never raises."""
     if query:
         pairs: list[tuple[str | None, str]] = [(None, query)]
+    elif src := mashup.source(info, "lyrics"):
+        pairs = [src]
     else:
         pairs = [(a, t) for a, t in candidates(info) if a][:4] or [(None, t) for _, t in candidates(info)[:1]]
     try:
@@ -379,6 +389,27 @@ def _store(video_id: str, result: dict) -> dict:
 _lock = threading.Lock()  # one lookup at a time: recognising a song is heavy and a second tab must not repeat it
 
 
+DRIFT = 0.4  # seconds: a published LRC that trails or leads the vocals by more than this belongs to another take
+
+
+def _drifted(video_id: str, lines: list[dict]) -> list[dict] | None:
+    """The words laid onto these vocals, when the published times sit off them by more than DRIFT (typically a
+    karaoke or re-recorded cut of the same song); None when the times fit or nothing could be aligned."""
+    spoken = [ln for ln in lines if ln.get("text") and ln.get("t") is not None]
+    try:
+        timing = align.align(video_id, [ln["text"] for ln in spoken])
+    except align.AlignError as e:
+        log.info("alignment failed for %s: %s", video_id, e)
+        return None
+    pairs = [(ln, tm) for ln, tm in zip(spoken, timing, strict=True) if tm]
+    if len(pairs) < 3:
+        return None
+    gaps = sorted(tm["t"] - ln["t"] for ln, tm in pairs)
+    if abs(gaps[len(gaps) // 2]) <= DRIFT:
+        return None
+    return [{**tm, "text": ln["text"], **({"sec": ln["sec"]} if ln.get("sec") else {})} for ln, tm in pairs]
+
+
 def lookup(video_id: str, query: str | None = None, *, refresh: bool = False, listen: bool = False) -> dict:
     """Lyrics for a library item. `query` overrides the guessed artist and title; `listen` skips the
     databases and recognises the words from the audio."""
@@ -396,11 +427,14 @@ def lookup(video_id: str, query: str | None = None, *, refresh: bool = False, li
             raise ValueError("unknown video")
         duration = float(info.get("duration") or 0)
         hit, heard, original = None, None, None
+        mash = None if query or listen else mashup.source(info, "lyrics")
         if not listen:
             if not query:
                 info = _enrich(video_id, info)
             try:
-                if query:
+                if mash:
+                    hit = _fetch_source(mash, duration)
+                elif query:
                     hit = _search(query, duration)
                 else:
                     if is_cover(info):  # the uploader is not the artist: check candidates against the sung words
@@ -418,13 +452,15 @@ def lookup(video_id: str, query: str | None = None, *, refresh: bool = False, li
                 log.warning("lyrics service unreachable: %s", e)  # fall through to recognising the audio
         entry = _entry(hit) if hit else None
         artist, title = guess(info)
-        if original:
+        if original and not mash:
             web = _web_text(info, f"{original['artist']} {original['title']}")
         else:
             web = None if listen else _web_text(info, query)
         # a cover or another cut: LRCLIB's times belong to the original recording, so lay the words onto these vocals
-        if entry and not query and (is_cover(info) or abs((hit.get("duration") or duration) - duration) > 1.5) and (
+        if entry and not query and (mash or is_cover(info) or abs((hit.get("duration") or duration) - duration) > 1.5) and (
                 timed := _timed_from_web(video_id, [{"text": ln["text"]} for ln in entry["lines"]])):
+            entry = {"synced": True, "lines": timed, "aligned": True}
+        if entry and entry["synced"] and not entry.get("aligned") and not query and (timed := _drifted(video_id, entry["lines"])):
             entry = {"synced": True, "lines": timed, "aligned": True}
         if entry and entry["synced"]:  # human-timed LRC wins on timing; Genius adds the section labels
             if web:

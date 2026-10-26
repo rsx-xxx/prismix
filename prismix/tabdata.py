@@ -1,9 +1,10 @@
-"""Guitar and bass tablature from Songsterr, aligned bar by bar with the recording.
+"""Guitar and bass tablature from Songsterr or a Soundslice link, aligned bar by bar with the recording.
 
 Nothing is transcribed here. The best matching song is looked up on Songsterr (its site API, no key),
 its best guitar and bass parts are downloaded, and the tab's bars are matched against the bars and chords
 we detected. A tab that does not fit the recording is dropped, so a song without a trustworthy tab has none.
-The result is cached in `library/<id>/tabdata.json`.
+A Soundslice slice the user links is read from the same notation data its public player loads, and goes through the
+same fit. The result is cached in `library/<id>/tabdata.json`.
 """
 from __future__ import annotations
 
@@ -30,6 +31,9 @@ MIN_TITLE = 0.6
 MIN_SCORE = 0.5  # mean bar similarity (0..1) of the matched bars
 MIN_COVERAGE = 0.6  # share of the tab's playing bars that found a bar in the recording
 CANDIDATES = 3
+SLICE_DATA = "https://www.soundslice.com/slices/{code}/scoredata/"
+SLICE_URL = re.compile(r"^(?:https?://)?(?:www\.)?soundslice\.com/slices/([A-Za-z0-9]{3,12})(?:[/?#]|$)")
+_SLICE_KINDS = {"guitar": "guitar", "bass-guitar": "bass"}
 
 
 class TabDataError(RuntimeError):
@@ -53,6 +57,101 @@ def _json(url: str):
         return json.loads(raw)
     except ValueError as e:
         raise TabDataError("Songsterr sent something unreadable") from e
+
+
+# ───────────────────────── soundslice ─────────────────────────
+
+def slice_code(url: str) -> str:
+    m = SLICE_URL.match((url or "").strip())
+    if not m:
+        raise TabDataError("That is not a Soundslice link (https://www.soundslice.com/slices/...)")
+    return m.group(1)
+
+
+def _slice_json(url: str):
+    try:
+        r = httpx.get(url, headers={"User-Agent": UA}, timeout=20, follow_redirects=True)
+        r.raise_for_status()
+        return r.json()
+    except httpx.HTTPError as e:
+        raise TabDataError(f"Could not read that Soundslice page (is the slice public?): {e}") from e
+    except ValueError as e:
+        raise TabDataError("Soundslice sent something unreadable") from e
+
+
+def _slice_kind(track: dict) -> str | None:
+    if track.get("smp") or track.get("midi", 0) >= 1000:  # drums and other sampled kits
+        return None
+    kind = _SLICE_KINDS.get(track.get("i") or "")
+    if kind:
+        return kind
+    name = (track.get("name") or "").casefold()
+    return "bass" if "bass" in name else "guitar" if "guitar" in name else None
+
+
+def compact_slice(data: dict, track: int) -> list[dict]:
+    """One Soundslice track -> the same bars as `compact`. A note's `string` 0 is the highest string, like Songsterr."""
+    rhythm = {r["id"]: r["val"] * (1.5 if r.get("dots") == 1 else 1.75 if r.get("dots") == 2 else 1) for r in data.get("rhythms", [])}
+    out, sig = [], [4, 4]
+    for m in data.get("bars", []):
+        sig = m.get("time") or sig
+        length = sig[0] / sig[1]
+        notes, voices = [], (m.get("tracks") or [])[track:track + 1]
+        for t in voices:
+            for v in t.get("voices", []):
+                at = 0.0
+                for b in v:
+                    dur = rhythm.get(b.get("r"), 0.0)
+                    frets = [[n["string"], n["fret"]] for n in b.get("notes", []) if "string" in n and "fret" in n]
+                    if frets:
+                        notes.append([round(at / length, 4), round(dur / length, 4), frets])
+                    at += dur
+        notes.sort(key=lambda x: x[0])
+        bar = {"len": round(length, 4), "n": notes}
+        if m.get("time"):
+            bar["sig"] = sig
+        if m.get("s"):
+            bar["mark"] = str(m["s"]).strip()
+        out.append(bar)
+    return out
+
+
+def slice_parts(data: dict) -> dict[str, dict]:
+    """The first guitar and the first bass part of a slice that have any notes."""
+    parts: dict[str, dict] = {}
+    for i, t in enumerate(data.get("tracks", [])):
+        kind = _slice_kind(t)
+        if not kind or kind in parts:
+            continue
+        bars = compact_slice(data, i)
+        if any(b["n"] for b in bars):
+            parts[kind] = {"name": " ".join((t.get("name") or kind).split()), "tuning": t["pitches"], "bars": bars}
+    return parts
+
+
+def import_soundslice(video_id: str, url: str) -> dict:
+    """Read the linked slice, fit it to the recording, cache and return it."""
+    code = slice_code(url)
+    info = library.read_info(video_id)
+    structure = analysis.read_structure(video_id)
+    if not info or not structure:
+        raise TabDataError("Analyse the track first")
+    head = _slice_json(SLICE_DATA.format(code=code))
+    if urllib.parse.urlsplit(head.get("d") or "").hostname != "files.soundslice.com":
+        raise TabDataError("That Soundslice slice has no notation to read")
+    parts = slice_parts(_slice_json(head["d"]))
+    if not parts:
+        raise TabDataError("That slice has no guitar or bass tab")
+    fitted = fit(parts, structure)
+    if not fitted:
+        raise TabDataError("That tab does not look like this recording")
+    result = {
+        "found": True, "source": "soundslice", "songId": code, "url": f"https://www.soundslice.com/slices/{code}/",
+        "artist": " ".join((head.get("a") or "").split()), "title": " ".join((head.get("name") or "").split()), **fitted,
+        "tracks": {k: {"name": p["name"], "tuning": p["tuning"], "bars": p["bars"]} for k, p in parts.items()},
+    }
+    _save(video_id, result)
+    return result
 
 
 # ───────────────────────── lookup ─────────────────────────
