@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.12
+
+- Library and player covers fall back to the YouTube thumbnail when the saved cover file is missing, instead of showing a broken image.
+
 ## 0.0.11
 
 - The lyrics layout button now names what a click does ("Chords above" / "Side by side") instead of the current state.
