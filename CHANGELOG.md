@@ -2,6 +2,11 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.19
+
+- Removed the "Chords aligned with … / agrees / differs / Use tab chords" strip under the chords. Online chords still apply in the background.
+- A chord that carries on from the previous line is no longer repeated at the start of the next one. Chords above the lyrics now take their own space, so chords never overlap each other or the words.
+
 ## 0.0.18
 
 - Instrumental stretches show a small ♪ in the lyrics instead of a tall empty gap: the lyrics wait on the note while the chords keep scrolling.

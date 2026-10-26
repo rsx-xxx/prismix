@@ -453,7 +453,7 @@ export function createScore({ player, api, notice }) {
       cells.forEach((c, i) => rows[rowOfBar(i)].append(c));
       grid = el('div', { className: 'chart aligned' }, ...rows);
     } else grid = el('div', { className: 'chart' }, ...cells);
-    body.replaceChildren(grid, el('div', { className: 'chart-extra' }, tabSource()));
+    body.replaceChildren(grid);
     $('fing').replaceChildren(fingerOpts(), diagrams());
     $('fing').hidden = false;
     if (aligned) alignRows();
@@ -511,26 +511,6 @@ export function createScore({ player, api, notice }) {
       use.addEventListener('click', () => { capoMode = String(info.capo); try { localStorage.setItem('stems:sc-capoMode', capoMode); } catch { /* ignore */ } renderAll(); });
       box.append(use);
     }
-    return box;
-  }
-
-  /** Online chord sheet (Songsterr), looked up automatically: shows how well it agrees and links to it. */
-  function tabSource() {
-    const box = el('div', { className: 'tab-src' });
-    const t = cur.tabs;
-    if (t) {
-      const link = el('a', { href: t.url, target: '_blank', rel: 'noopener noreferrer', textContent: `${t.artist} – ${t.title} on Songsterr ↗` });
-      const diff = t.marks.filter((m) => m && !m.ok).length;
-      const sw = el('input', { type: 'checkbox', checked: opts.useTab });
-      sw.addEventListener('change', () => { opts.useTab = sw.checked; remember('useTab'); applyTabs(); renderAll(); });
-      box.append(
-        el('span', {}, 'Chords aligned with ', link, ` · ${Math.round(t.similarity * 100)}% match`,
-          t.transpose ? ` · tab is ${Math.abs(t.transpose)} semitone${Math.abs(t.transpose) > 1 ? 's' : ''} ${t.transpose > 0 ? 'lower' : 'higher'}` : ''),
-        el('span', { className: 'tab-legend muted' }, el('i', { className: 'tab-ok' }, 'agrees'), el('i', { className: 'tab-diff' }, `differs (${diff})`)),
-        el('label', { className: 'switch', title: 'Replace chords that differ with the tab\'s' }, sw, el('span'), 'Use tab chords'));
-      return box;
-    }
-    // no sheet found online: the detected chords stand on their own
     return box;
   }
 
