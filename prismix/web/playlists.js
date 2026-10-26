@@ -61,9 +61,10 @@ export function createPlaylists({ api, library, startProcess, openTrack, notice,
   const status = (text) => body.replaceChildren(el('p', { className: 'muted', textContent: text }));
   const fail = (err) => { body.replaceChildren(el('p', { className: 'notice', textContent: err.message }), el('button', { className: 'btn', type: 'button', textContent: 'Back', onclick: home })); };
 
-  function row(item, thumb) {
+  function row(item, n, thumb) {
     const have = library().some((i) => i.id === item.id);
     const r = el('button', { type: 'button', className: 'pl-row' },
+      el('span', { className: 'pl-n', textContent: String(n) }),
       el('img', { src: thumb || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`, alt: '', loading: 'lazy' }),
       el('span', { className: 'pl-meta' }, el('b', { textContent: item.title }), el('small', { className: 'muted', textContent: item.channel || '' })),
       have ? el('span', { className: 'pl-tag', textContent: 'In library' }) : '');
@@ -72,7 +73,8 @@ export function createPlaylists({ api, library, startProcess, openTrack, notice,
   }
 
   function showItems(title, items, more, url) {
-    const list = el('div', { className: 'pl-list' }, ...items.map((i) => row(i)));
+    let count = 0;
+    const list = el('div', { className: 'pl-list' }, ...items.map((i) => row(i, ++count)));
     const back = el('button', { className: 'btn small ghost', type: 'button', textContent: '← Playlists', onclick: home });
     const save = el('button', { className: 'btn small primary', type: 'button', textContent: 'Save as playlist & process all' });
     save.addEventListener('click', async () => {
@@ -92,7 +94,7 @@ export function createPlaylists({ api, library, startProcess, openTrack, notice,
       const b = el('button', { className: 'btn', type: 'button', textContent: 'Load more' });
       b.addEventListener('click', async () => {
         b.disabled = true;
-        try { const next = await more(); next.items.forEach((i) => list.append(row(i))); next.more ? (b.disabled = false) : b.remove(); } catch (e) { notice(e.message); b.disabled = false; }
+        try { const next = await more(); next.items.forEach((i) => list.append(row(i, ++count))); next.more ? (b.disabled = false) : b.remove(); } catch (e) { notice(e.message); b.disabled = false; }
       });
       kids.push(b);
     }
