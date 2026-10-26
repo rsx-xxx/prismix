@@ -75,7 +75,7 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
         try { await api(`/api/playlists/${id}/items/${it.id}`, { method: 'DELETE' }); await load(); show(id); } catch (e) { notice(e.message); }
       });
       const grip = el('span', { className: 'pp-grip', role: 'button', tabIndex: 0, ariaLabel: 'Drag to reorder', title: 'Drag to move: reorder, or drop on another playlist or Library (Alt+↑/↓ from the keyboard)' }, el('i'), el('i'), el('i'));
-      grip.addEventListener('pointerdown', (e) => drag(e, row, p));
+      grip.addEventListener('pointerdown', (e) => { if (e.button === 0) { e.preventDefault(); drag(e, row, p); } });
       grip.addEventListener('keydown', (e) => {
         if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
         e.preventDefault();
@@ -88,7 +88,7 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
           if (Math.hypot(ev.clientX - x, ev.clientY - y) < 6) return;
           stop();
           addEventListener('click', (c) => { c.stopPropagation(); c.preventDefault(); }, { capture: true, once: true });
-          drag(ev, row, p, row);
+          drag(ev, row, p);
         };
         const stop = () => { removeEventListener('pointermove', probe); removeEventListener('pointerup', stop); };
         addEventListener('pointermove', probe);
@@ -124,52 +124,65 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
     show(p.id);
   }
 
-  /** Drag a row by its grip or anywhere on it: rows swap live under the pointer, the order is saved on release. */
-  function drag(e, row, p, handle = e.currentTarget) {
-    if (e.button > 0) return;
-    e.preventDefault();
+  /** Drag a song by its row: a copy follows the pointer, the others make room live, the order is saved on release. */
+  function drag(e, row, p) {
     const list = $('pp-list');
-    const grip = handle;
-    grip.setPointerCapture(e.pointerId);
+    const box = row.getBoundingClientRect();
+    const dy = e.clientY - box.top;
+    const ghost = row.cloneNode(true);
+    ghost.classList.add('pp-ghost');
+    Object.assign(ghost.style, { width: `${box.width}px`, left: `${box.left}px`, top: `${box.top}px` });
+    document.body.append(ghost);
     row.classList.add('drag');
+    document.body.classList.add('dragging');
     const bar = el('div', { className: 'pp-targets' },
       ...lists.filter((x) => x.id !== p.id).map((x) => el('span', { className: 'pp-target', textContent: x.name })),
       el('span', { className: 'pp-target', textContent: 'Library (take out)' }));
-    const ids_ = [...lists.filter((x) => x.id !== p.id).map((x) => x.id), 'lib'];
-    [...bar.children].forEach((c, i) => { c.dataset.target = ids_[i]; });
+    [...lists.filter((x) => x.id !== p.id).map((x) => x.id), 'lib'].forEach((id, i) => { bar.children[i].dataset.target = id; });
     document.body.append(bar);
     const hit = (ev) => document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.pp-target');
     const renumber = () => list.querySelectorAll('.pp-n').forEach((n, i) => { n.textContent = String(i + 1); });
-    const over = (ev) => {
-      const t = hit(ev);
-      bar.querySelectorAll('.pp-target').forEach((c) => c.classList.toggle('on', c === t));
-      if (t) return;
-      if (ev.clientY < 70) window.scrollBy(0, -14);
-      else if (ev.clientY > innerHeight - 150) window.scrollBy(0, 14);
+    let y = e.clientY, scroll = 0, raf = 0;
+    const settle = () => {
       for (const other of list.children) {
         if (other === row) continue;
         const r = other.getBoundingClientRect();
-        if (ev.clientY < r.top || ev.clientY > r.bottom) continue;
-        list.insertBefore(row, ev.clientY > r.top + r.height / 2 ? other.nextSibling : other);
+        if (y < r.top || y > r.bottom) continue;
+        list.insertBefore(row, y > r.top + r.height / 2 ? other.nextSibling : other);
         renumber();
         break;
       }
     };
+    const tick = () => {
+      if (scroll) { window.scrollBy(0, scroll); settle(); }
+      raf = requestAnimationFrame(tick);
+    };
+    const move = (ev) => {
+      y = ev.clientY;
+      ghost.style.top = `${y - dy}px`;
+      const t = hit(ev);
+      bar.querySelectorAll('.pp-target').forEach((c) => c.classList.toggle('on', c === t));
+      scroll = y < 90 ? -16 : y > innerHeight - 130 ? 16 : 0;
+      if (!t) settle();
+    };
     const end = (ev) => {
-      grip.removeEventListener('pointermove', over);
-      grip.removeEventListener('pointerup', end);
-      grip.removeEventListener('pointercancel', end);
-      row.classList.remove('drag');
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', end);
+      removeEventListener('pointercancel', end);
+      cancelAnimationFrame(raf);
       const t = ev.type === 'pointerup' ? hit(ev) : null;
-      bar.remove();
+      ghost.remove(); bar.remove();
+      row.classList.remove('drag');
+      document.body.classList.remove('dragging');
       if (t) { moveTo(p, row.dataset.id, t.dataset.target); return; }
       const ids = [...list.children].map((r) => r.dataset.id);
-      if (ids.every((id, i) => id === p.items[i].id)) return;
-      saveOrder(p, ids);
+      if (ids.every((id, i) => id === p.items[i].id)) renumber(); else saveOrder(p, ids);
     };
-    grip.addEventListener('pointermove', over);
-    grip.addEventListener('pointerup', end);
-    grip.addEventListener('pointercancel', end);
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', end);
+    addEventListener('pointercancel', end);
+    raf = requestAnimationFrame(tick);
+    move(e);
   }
 
   async function poll() {
@@ -181,11 +194,11 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
     if (st) {
       document.querySelectorAll('#pp-list .pp-row').forEach((row) => {
         const s = st[row.dataset.id];
-        const tag = row.querySelector('.pl-tag');
+        const tag = row.querySelector('.pl-tag, .pl-dot');
         if (!s || s.ready) { tag.className = 'pl-dot'; tag.title = 'Ready'; tag.textContent = ''; return; }
         busy = true;
         tag.className = 'pl-tag'; tag.title = '';
-        tag.textContent = s.job ? `${Math.round(s.job.progress * 100)}%` : 'Not split yet';
+        tag.textContent = s.job ? (s.job.stage === 'queued' ? 'Queued' : `${Math.round(s.job.progress * 100)}%`) : 'Not split yet';
       });
       $('pp-status').textContent = busy ? 'Processing…' : '';
     }
