@@ -2,6 +2,12 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.10
+
+- Tabs now share the Chords column beside the lyrics: a Chords | Tabs switch swaps them, bars align with the lyrics, each bar shows its chord, and strings are labelled with note names.
+- New "Follow playback" button (key F) appears when the lyrics, chords or tabs are scrolled away from the playing position; manual scrolling now holds until you press it, seek or play.
+- Calmer player: chord pills no longer overlap the lyric line and the dock is tighter.
+
 ## 0.0.9
 
 - Playlist songs move freely: drag a row by its grip to any position (the page scrolls at the edges), drop it on another playlist or on "Library" shown while dragging, or use the new ⇄ button to move it to the top, bottom, another playlist or back to the library.
