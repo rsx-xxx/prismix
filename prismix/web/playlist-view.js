@@ -198,6 +198,8 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
         if (!s || s.ready) { tag.className = 'pl-dot'; tag.title = 'Ready'; tag.textContent = ''; return; }
         busy = true;
         tag.className = 'pl-tag'; tag.title = '';
+        const queued = s.job?.stage === 'queued';
+        tag.classList.add(s.job ? (queued ? 'q' : 'p') : 'n');
         tag.textContent = s.job ? (s.job.stage === 'queued' ? 'Queued' : `${Math.round(s.job.progress * 100)}%`) : 'Not split yet';
       });
       $('pp-status').textContent = busy ? 'Processing…' : '';
