@@ -27,6 +27,7 @@ from . import (
     original,
     pipeline,
     playlists,
+    spotify,
     tabdata,
     tabs,
     uploads,
@@ -201,7 +202,7 @@ def create_app() -> FastAPI:
     @app.get("/remote/hello")
     def remote_hello():
         # Unauthenticated on purpose: lets the phone app tell a Prismix host from any other web server while scanning.
-        return {"app": "prismix", "version": __version__, "id": lan.host_id(), "name": lan.display_name(), "pin": bool(band.token)}
+        return {"app": "prismix", "version": __version__, "id": lan.host_id(), "name": lan.display_name(), "domain": lan.host_name(), "pin": bool(band.token)}
 
     @app.get("/remote")
     def remote():
@@ -257,9 +258,11 @@ def create_app() -> FastAPI:
     @app.get("/api/playlist")
     async def playlist(url: str = Query(min_length=8, max_length=400)):
         host = (urlparse(url if "://" in url else f"https://{url}").hostname or "").lower()
-        if host not in library.YT_HOSTS:
-            raise HTTPException(400, "That does not look like a YouTube playlist link")
+        if host not in library.YT_HOSTS and not spotify.is_spotify(url):
+            raise HTTPException(400, "That does not look like a YouTube or Spotify playlist link")
         try:
+            if spotify.is_spotify(url):
+                return await asyncio.to_thread(spotify.resolve, url)
             return await asyncio.to_thread(pipeline.playlist, url if "://" in url else f"https://{url}")
         except pipeline.PipelineError as e:
             raise HTTPException(502, str(e)) from e
@@ -278,8 +281,13 @@ def create_app() -> FastAPI:
         if req.model not in MODELS:
             raise HTTPException(400, "Unknown model")
         video_id = library.parse_video_id(req.url)
+        if not video_id and spotify.is_spotify(req.url):
+            try:
+                video_id = spotify.video_id(req.url)
+            except pipeline.PipelineError as e:
+                raise HTTPException(400, str(e)) from e
         if not video_id:
-            raise HTTPException(400, "That does not look like a YouTube link")
+            raise HTTPException(400, "That does not look like a YouTube or Spotify link")
         model = MIX_MODEL if req.tasks == "chords" else req.model
         if model == MIX_MODEL and req.tasks != "chords":
             raise HTTPException(400, "Unknown model")
@@ -313,15 +321,16 @@ def create_app() -> FastAPI:
         if req.model not in MODELS or req.model == MIX_MODEL:
             raise HTTPException(400, "Unknown model")
         url = req.url if "://" in req.url else f"https://{req.url}"
-        if (urlparse(url).hostname or "").lower() not in library.YT_HOSTS:
-            raise HTTPException(400, "That does not look like a YouTube playlist link")
+        is_sp = spotify.is_spotify(url)
+        if (urlparse(url).hostname or "").lower() not in library.YT_HOSTS and not is_sp:
+            raise HTTPException(400, "That does not look like a YouTube or Spotify playlist link")
         try:
-            data = await asyncio.to_thread(pipeline.playlist, url)
+            data = await asyncio.to_thread(spotify.resolve if is_sp else pipeline.playlist, url)
         except pipeline.PipelineError as e:
             raise HTTPException(502, str(e)) from e
         if not data["items"]:
             raise HTTPException(404, "That playlist is empty or private")
-        pl = playlists.create(data["title"] or "YouTube playlist", data["items"], source=url)
+        pl = playlists.create(data["title"] or "Playlist", data["items"], source=url)
         for it in pl["items"]:
             _start(it["id"], req.model, req.tasks)
         return pl
