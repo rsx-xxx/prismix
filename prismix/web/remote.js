@@ -396,12 +396,10 @@ function renderLyrics(stage, t) {
       const gap = [];
       while (ci < cs.length && cs[ci].t < lo) gap.push(cs[ci++]);
       instr(i === 0 ? 'Intro' : '', gap.length >= 1 && (i === 0 || ln.t - (lines[i - 1].e ?? lines[i - 1].t) > 2) ? gap : []);
-      const prev = ci > 0 ? cs[ci - 1] : null;
       const here = [];
       while (ci < cs.length && cs[ci].t < tl.end) here.push(cs[ci++]);
       splitAt(tl, here.map((k) => k.t));
       const slots = tl.syl.map(() => []);
-      if (prev && (!here.length || here[0].t > tl.syl[0].t + 0.15)) slots[0].push({ ...prev, carry: true });
       for (const k of here) slots[Math.max(0, tl.syl.findLastIndex((o) => o.t <= k.t + 0.08))].push(k);
       let si = 0;
       for (const p of tl.parts) {
