@@ -418,6 +418,9 @@ export function createScore({ player, api, notice }) {
       if (!r) return;
       r.hidden = k.offsetParent === null;
       if (r.hidden || !k.classList.contains('ly-line') || k.classList.contains('gap')) return; // intro, ♪ breaks and outro keep their own height
+      // a line whose bars run far longer than its words (a long instrumental) is not stretched: the chords scroll on alone
+      r.dataset.free = r.offsetHeight > Math.max(k.offsetHeight * 2.5, 150) ? '1' : '';
+      if (r.dataset.free) return;
       const h = Math.max(k.offsetHeight, r.offsetHeight);
       k.style.minHeight = r.style.minHeight = `${h}px`;
     });
