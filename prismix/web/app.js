@@ -52,13 +52,20 @@ const stemIcon = (name) => STEM_ICONS.find(([re]) => re.test(name.toLowerCase())
 const player = new StemPlayer();
 window.stemPlayer = player; // debug handle
 const score = createScore({ player, api, notice: (m) => notice(m) });
-const tabView = createTab();
+const tabView = createTab({ player, chordsIn: (j) => score.chordsIn(j) });
 document.addEventListener('tab:seek', (e) => player.seek(e.detail));
 const lyrics = createLyrics({ player, api, chords: () => score.timeline() });
 const blocks = createBlocks();
 const markers = createMarkers({ player, api, bars: () => score.barChords() });
-linkScroll(lyrics.pane(), score.pane());
-const followBoth = linkFollow(lyrics.pane(), score.pane(), player); // …and while playing, the lit line and the lit bar share one height // side by side: scrolling one box moves the other to the same moment
+// The box beside the lyrics is either Chords or Tabs; one proxy follows whichever is showing.
+const sidePane = () => (blocks.side() === 'tabs' && !$('tabview').hidden ? tabView.pane() : score.pane());
+const right = {
+  root: $('panes'), anchor: 0.4,
+  box: () => sidePane().box(), active: () => sidePane().active(), hold: () => sidePane().hold(),
+  following: () => sidePane().following(), track: () => sidePane().track(),
+};
+linkScroll(lyrics.pane(), right); // scrolling one box moves the other to the same moment
+const followBoth = linkFollow(lyrics.pane(), right, player); // …and while playing, the lit line and the lit bar share one height
 const video = createVideo({ player, notice: (m) => notice(m) });
 
 const plPicker = createPlaylists({
@@ -694,6 +701,32 @@ function syncDock() {
 player.addEventListener('frame', syncFrame);
 player.addEventListener('tune', () => score.tuned());
 
+// "Follow playback": appears once the playing position has scrolled out of view in lyrics, chords or tabs, or off the page.
+const followBtn = (() => {
+  const btn = $('follow');
+  const panes = () => [lyrics.pane(), sidePane()].filter((p) => p.active());
+  let next = 0;
+  const away = () => {
+    const r = $('panes').getBoundingClientRect();
+    return panes().some((p) => p.away()) || (!!panes().length && r.bottom < 80);
+  };
+  const go = () => {
+    panes().forEach((p) => p.resume());
+    const r = $('panes').getBoundingClientRect(), bottom = innerHeight - ($('dock').hidden ? 0 : $('dock').offsetHeight);
+    if (r.bottom < 120 || r.top > bottom - 120) $('panes').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    btn.hidden = true;
+  };
+  btn.addEventListener('click', go);
+  return {
+    go,
+    frame() {
+      if (performance.now() < next) return;
+      next = performance.now() + 250;
+      btn.hidden = !(away() && !!state.current);
+    },
+  };
+})();
+
 function syncFrame() {
   if (!player.duration) return;
   const pos = player.position;
@@ -709,6 +742,7 @@ function syncFrame() {
   tabView.frame(heard);
   markers.frame(heard);
   followBoth(heard);
+  followBtn.frame();
 }
 
 // ── dock wiring ──
@@ -1016,6 +1050,8 @@ function dispatch(e) {
     KeyR: () => (e.shiftKey ? $('key-reset').click() : $('tempo-reset').click()),
     KeyH: () => blocks.toggle('chords'),
     KeyL: () => blocks.toggle('lyrics'),
+    KeyF: () => followBtn.go(),
+    KeyT: () => blocks.toggle('tabs'),
     KeyV: () => $('video-btn').click(),
     KeyN: () => plStep(1),
     KeyP: () => plStep(-1),

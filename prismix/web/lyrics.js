@@ -10,7 +10,7 @@ const el = (tag, props = {}, ...kids) => {
   return n;
 };
 const LEAD = 0.25; // light a line slightly early: reading is faster than singing
-const PAUSE_MS = 4000; // after the user scrolls by hand, leave the view alone this long
+const PAUSE_MS = Infinity; // after the user scrolls by hand, leave the view alone until play, a seek or the Follow button
 
 const VOWELS = 'aeiouyаеёиоуыэюяіїєäöüéèêàâîôû';
 const SYL = new RegExp(`[^${VOWELS}]*[${VOWELS}]+(?:[^${VOWELS}]+$)?`, 'gi');
@@ -281,6 +281,8 @@ export function createLyrics({ player, api, chords = () => [] }) {
 
   ['wheel', 'touchmove'].forEach((t) => body.addEventListener(t, () => { manualUntil = Date.now() + PAUSE_MS; cancelGlide(body); }, { passive: true }));
   player.addEventListener('seek', () => { manualUntil = 0; });
+  let wasPlaying = false;
+  player.addEventListener('state', () => { if (player.playing && !wasPlaying) manualUntil = 0; wasPlaying = player.playing; });
   document.addEventListener('blocks:change', () => { if (cur) { cur.active = -2; frame(player.position); } });
   document.addEventListener('chords:change', () => { if (cur?.data.synced && cur.nodes.length) { annotate(); cur.active = -2; frame(player.position); } });
 
@@ -318,6 +320,17 @@ export function createLyrics({ player, api, chords = () => [] }) {
       active: () => !!cur?.data.synced && !$('lyrics').hidden && !$('lyrics').classList.contains('off') && body.offsetParent !== null,
       hold: () => { holdUntil = Date.now() + 4000; cancelGlide(body); },
       following: () => Date.now() >= manualUntil && Date.now() >= holdUntil,
+      resume: () => {
+        manualUntil = 0; holdUntil = 0;
+        const n = cur?.nodes[cur.active];
+        if (n) glide(body, body.scrollTop + offsetIn(body, n) + n.offsetHeight / 2 - body.clientHeight * 0.4);
+      },
+      away: () => {
+        const n = cur?.nodes[cur.active];
+        if (!n || body.offsetParent === null) return false;
+        const m = offsetIn(body, n) + n.offsetHeight / 2;
+        return m < 0 || m > body.clientHeight;
+      },
       track: () => (cur?.timed ?? []).flatMap((tl, i) => (tl ? [{ y: offsetIn(body, cur.nodes[i]) + body.scrollTop + cur.nodes[i].offsetHeight / 2, t: cur.data.lines[i].t }] : [])),
     }),
   };
