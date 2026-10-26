@@ -13,7 +13,7 @@
 - **Chords and bars:** beats, bars, key and chords are detected once per track. Chord chart, fingering diagrams, capo suggestions, PDF export, and a check against Songsterr chord sheets.
 - **Lyrics:** synced lyrics from Genius and LRCLIB, timed to the vocals word by word.
 - **Band mode:** phones scan a QR code and follow the host's player. Each picks a part (vocals, guitar, bass, keys, drums), sees the current bar, chord and lyric line, and can control playback. No outside server.  Phones can simplify chords for themselves, and the song shows in the system media controls.
-- **Sources:** a YouTube link, a search, a playlist, or a local audio or video file (up to 500 MB). Every split is cached, so nothing is processed twice.
+- **Sources:** a YouTube or Spotify link (track, album, playlist, artist), a search, a playlist, or a local audio or video file (up to 500 MB). Every split is cached, so nothing is processed twice.
 
 ## Install
 
@@ -25,7 +25,7 @@
 | macOS (Apple Silicon) | `Prismix.dmg` |
 | Android (band phone) | `Prismix-Band.apk` |
 
-Builds are unsigned, so expect a SmartScreen or Gatekeeper prompt on first launch. The library lives in `%LOCALAPPDATA%\Prismix` (Windows) or `~/Library/Application Support/Prismix` (macOS).
+Builds are signed when the repository has signing secrets (`packaging/SIGNING.md`); otherwise expect a SmartScreen or Gatekeeper prompt on first launch. The library lives in `%LOCALAPPDATA%\Prismix` (Windows) or `~/Library/Application Support/Prismix` (macOS).
 
 **From source** (Python 3.11–3.13, [uv](https://docs.astral.sh/uv/)):
 
@@ -42,7 +42,7 @@ Paste a YouTube link or search by name, then press **Split**. Press `?` in the a
 2. Scan the QR code with a phone on the same Wi-Fi (the Prismix Band app opens by itself, or tap Scan in the app) and, in a browser, accept the one-time certificate warning (the host serves HTTPS with a self-signed certificate).
 3. Pick your part. The phone follows the host's position, or plays the song itself in step with the room.
 
-The link uses `prismix.local` (or `prismix-<computer>.local` if another host has it, or your own via `PRISMIX_HOST_NAME`), with the IP address as a fallback. The Android app finds the host on its own (mDNS, then a Wi-Fi sweep) and reconnects by name if the address changes. Use `prismix --share` to offer band mode from the CLI. You can lock playback and set a PIN in the Band panel.
+The link uses `prismix.local` (or `prismix-<computer>.local` if another host has it, or your own via `PRISMIX_HOST_NAME`), with the IP address as a fallback. The Android app finds the host on its own (mDNS, then a Wi-Fi sweep) and reconnects by name if the address changes. You can also type a name or address in the app. It pins its traffic to Wi-Fi, so a VPN on the phone does not get in the way (unless the VPN blocks all non-VPN traffic). Use `prismix --share` to offer band mode from the CLI. You can lock playback and set a PIN in the Band panel.
 
 ## Configuration
 
@@ -61,7 +61,7 @@ To serve on the network, run `uv run prismix --host 0.0.0.0`. There is no authen
 
 ## Privacy
 
-Only artist, title and length leave your machine, to look up lyrics, cover art, chords and a YouTube match. Audio never does. Lookups are cached, and nothing changes when you are offline.
+Only artist, title and length leave your machine, to look up lyrics, cover art, chords and a YouTube match. A Spotify link is read from Spotify's public embed page (no account). Audio never does. Lookups are cached, and nothing changes when you are offline.
 
 ## Development
 
