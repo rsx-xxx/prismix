@@ -293,7 +293,7 @@ export function createLyrics({ player, api, chords = () => [] }) {
     $('score').classList.toggle('merged', layout === 'merged');
     $('lyrics').classList.toggle('merged', layout === 'merged');
     const b = $('ly-layout');
-    b.textContent = layout === 'merged' ? 'Chords above' : 'Side by side';
+    b.textContent = layout === 'merged' ? 'Side by side' : 'Chords above';
     b.setAttribute('aria-pressed', String(layout === 'merged'));
     document.dispatchEvent(new Event('layout:change'));
   };
