@@ -182,8 +182,9 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
       document.querySelectorAll('#pp-list .pp-row').forEach((row) => {
         const s = st[row.dataset.id];
         const tag = row.querySelector('.pl-tag');
-        if (!s || s.ready) { tag.textContent = 'Ready'; return; }
+        if (!s || s.ready) { tag.className = 'pl-dot'; tag.title = 'Ready'; tag.textContent = ''; return; }
         busy = true;
+        tag.className = 'pl-tag'; tag.title = '';
         tag.textContent = s.job ? `${Math.round(s.job.progress * 100)}%` : 'Not split yet';
       });
       $('pp-status').textContent = busy ? 'Processing…' : '';
