@@ -1,3 +1,5 @@
+import pytest
+
 from prismix import tabdata
 
 TUNING = [64, 59, 55, 50, 45, 40]  # string 0 is the highest
@@ -72,3 +74,31 @@ def test_network_failure_is_not_cached(monkeypatch, tmp_path):
     monkeypatch.setattr(tabdata, "_download", boom)
     assert tabdata.lookup("x") == {"found": False}
     assert saved == []
+
+
+def test_slice_code_accepts_only_slice_links():
+    assert tabdata.slice_code("https://www.soundslice.com/slices/PtNBc/?x=1") == "PtNBc"
+    assert tabdata.slice_code("soundslice.com/slices/PtNBc") == "PtNBc"
+    for bad in ("https://example.com/slices/PtNBc/", "https://www.soundslice.com/courses/1/", ""):
+        with pytest.raises(tabdata.TabDataError):
+            tabdata.slice_code(bad)
+
+
+def test_slice_parts_converts_notes_and_skips_drums():
+    data = {
+        "tracks": [
+            {"name": "\n Distortion Guitar\n", "midi": 30, "pitches": TUNING, "i": "guitar"},
+            {"name": "Drums", "midi": 1000, "smp": 1, "pitches": [0] * 6},
+        ],
+        "rhythms": [{"id": 0, "val": 0.5, "dots": 1}, {"id": 1, "val": 0.25}],
+        "bars": [
+            {"time": [4, 4], "s": "Intro", "tracks": [
+                {"voices": [[{"notes": [], "r": 0}, {"notes": [{"string": 5, "fret": 3}], "r": 1}]]},
+                {"voices": [[{"notes": [{"string": 1, "fret": 42}], "r": 1}]]},
+            ]},
+        ],
+    }
+    parts = tabdata.slice_parts(data)
+    assert list(parts) == ["guitar"] and parts["guitar"]["name"] == "Distortion Guitar"
+    bar = parts["guitar"]["bars"][0]
+    assert bar["mark"] == "Intro" and bar["n"] == [[0.75, 0.25, [[5, 3]]]]

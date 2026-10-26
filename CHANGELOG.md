@@ -2,6 +2,11 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.21
+
+- Mashup covers: the new Sources button in the lyrics header names the song the words come from and the song the chords come from. Lyrics are fetched for the first and laid onto these vocals, online chords for the second are matched in any key, and wherever the recording goes its own way the detected chords stay.
+- Tabs from Soundslice: paste the link of a public slice in the Sources dialog and its guitar and bass tab is matched to the recording's bars like a Songsterr one; a slice that is not this recording is refused.
+
 ## 0.0.20
 
 - Lyrics and chords stay level on songs whose synced words stretch across an instrumental: a line is no longer held for tens of seconds, and a long run of bars next to one line scrolls on its own instead of pushing the text out of view.
