@@ -738,3 +738,17 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .follow[hidden] { display: none; }
 .follow:hover { filter: brightness(1.08); }
 [data-ico=locate] { --ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%223%22/%3E%3Cpath d=%22M12 2v4M12 18v4M2 12h4M18 12h4%22/%3E%3C/svg%3E"); }
+.pl-n { width: 22px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; flex: none; }
+.pp-grip { display: grid; align-content: center; gap: 4px; width: 28px; height: 40px; padding: 0 7px; flex: none; cursor: grab; touch-action: none; border-radius: 8px; user-select: none; }
+.pp-grip i { display: block; height: 2px; border-radius: 2px; background: var(--muted); }
+.pp-grip:hover i, .pp-grip:focus-visible i { background: var(--text); }
+.pp-row.drag { background: var(--surface-2); box-shadow: 0 0 0 1px var(--accent); }
+.pp-row.drag .pp-grip { cursor: grabbing; }
+.plcard.drop { border-color: var(--accent); background: var(--surface-2); box-shadow: 0 0 0 1px var(--accent); }
+.pp-targets { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 50; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: min(92vw, 720px); padding: 10px; border-radius: 16px; border: 1px solid var(--line-strong); background: var(--surface); box-shadow: 0 8px 30px rgb(0 0 0 / .35); }
+.pp-target { padding: 10px 16px; border-radius: 12px; border: 1px dashed var(--line-strong); font-size: 13px; font-weight: 600; }
+.pp-target.on { border-style: solid; border-color: var(--accent); background: var(--surface-2); color: var(--accent); }
+.pp-row.drag { position: relative; z-index: 5; transform: scale(1.01); box-shadow: 0 10px 30px rgb(0 0 0 / .3), 0 0 0 2px var(--accent); background: var(--surface); }
+.pp-row { user-select: none; }
+.pp-go { cursor: grab; }
+.pl-dot { width: 10px; height: 10px; border-radius: 50%; background: oklch(0.72 0.17 150); box-shadow: 0 0 8px oklch(0.72 0.17 150 / .6); flex: none; }
