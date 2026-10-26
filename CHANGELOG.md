@@ -2,6 +2,11 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.17
+
+- Playlist tags have their own colors: amber for queued, blue for processing, gray for not split yet.
+- Chord fingerings now sit in the same row as the chords. A divider between lyrics and chords resizes both (double-click for automatic), and by default the lyrics column widens so long lines fit. The Music and Lyrics jump buttons are gone from the player.
+
 ## 0.0.16
 
 - Playlist dragging rebuilt: a copy of the song follows the pointer, the others make room live, and dropping on another playlist or Library works from anywhere on the row. Fixes songs not moving at all.
