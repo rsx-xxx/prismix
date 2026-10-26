@@ -189,6 +189,10 @@ dialog legend { font-size: 12px; text-transform: uppercase; letter-spacing: .08e
 
 /* ── job progress ── */
 .job { display: flex; gap: 16px; align-items: center; padding: 16px; margin-bottom: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.job { position: sticky; top: 12px; z-index: 20; box-shadow: 0 8px 28px rgb(0 0 0 / .18); }
+.job.fresh { animation: jobIn .9s ease; }
+@keyframes jobIn { 0% { transform: translateY(-14px); opacity: 0; box-shadow: 0 0 0 0 var(--accent); } 40% { opacity: 1; box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent) 45%, transparent); } 100% { box-shadow: 0 8px 28px rgb(0 0 0 / .18); } }
+.pp-row .pl-tag { white-space: nowrap; }
 .job img { width: 120px; aspect-ratio: 16/9; border-radius: 10px; object-fit: cover; background: var(--surface-2); }
 .job .body { flex: 1; display: grid; gap: 8px; min-width: 0; }
 .job .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

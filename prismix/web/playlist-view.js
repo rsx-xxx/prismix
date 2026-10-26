@@ -65,7 +65,7 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
       row.dataset.id = it.id;
       const go = el('button', { type: 'button', className: 'pp-go' },
         el('span', { className: 'pp-n', textContent: String(n + 1) }),
-        el('img', { src: art(it.id), alt: '', loading: 'lazy' }),
+        el('img', { src: art(it.id), alt: '', loading: 'lazy', draggable: false }),
         el('span', { className: 'pl-meta' }, el('b', { textContent: it.title || it.id }),
           el('small', { className: 'muted', textContent: [it.channel, it.duration ? fmt(it.duration) : ''].filter(Boolean).join(' · ') })),
         el('span', { className: 'pl-tag', textContent: '' }));
@@ -74,16 +74,27 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
       rm.addEventListener('click', async () => {
         try { await api(`/api/playlists/${id}/items/${it.id}`, { method: 'DELETE' }); await load(); show(id); } catch (e) { notice(e.message); }
       });
-      const grip = el('span', { className: 'pp-grip', role: 'button', tabIndex: 0, ariaLabel: 'Drag to reorder', title: 'Drag to reorder (or Alt+↑/↓)' }, el('i'), el('i'), el('i'));
+      const grip = el('span', { className: 'pp-grip', role: 'button', tabIndex: 0, ariaLabel: 'Drag to reorder', title: 'Drag to move: reorder, or drop on another playlist or Library (Alt+↑/↓ from the keyboard)' }, el('i'), el('i'), el('i'));
       grip.addEventListener('pointerdown', (e) => drag(e, row, p));
       grip.addEventListener('keydown', (e) => {
         if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
         e.preventDefault();
         move(p, n, e.key === 'ArrowUp' ? -1 : 1);
       });
-      const mv = el('button', { type: 'button', className: 'icon-btn', ariaLabel: 'Move to…', title: 'Move to… (top, bottom, another playlist, library)', textContent: '⇄' });
-      mv.addEventListener('click', () => pickMove(p, it, n));
-      row.append(grip, go, mv, rm);
+      row.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'mouse' || e.button !== 0 || !e.target.closest('.pp-go')) return;
+        const x = e.clientX, y = e.clientY;
+        const probe = (ev) => {
+          if (Math.hypot(ev.clientX - x, ev.clientY - y) < 6) return;
+          stop();
+          addEventListener('click', (c) => { c.stopPropagation(); c.preventDefault(); }, { capture: true, once: true });
+          drag(ev, row, p, row);
+        };
+        const stop = () => { removeEventListener('pointermove', probe); removeEventListener('pointerup', stop); };
+        addEventListener('pointermove', probe);
+        addEventListener('pointerup', stop);
+      });
+      row.append(grip, go, rm);
       return row;
     }));
     poll();
@@ -113,34 +124,12 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
     show(p.id);
   }
 
-  function pickMove(p, it, n) {
-    const last = p.items.length - 1;
-    const choose = (label, hint, fn, off) => {
-      const b = el('button', { type: 'button', className: 'pl-row', disabled: !!off },
-        el('span', { className: 'pl-meta' }, el('b', { textContent: label }), hint ? el('small', { className: 'muted', textContent: hint }) : ''));
-      b.addEventListener('click', async () => { dlg.close(); await fn(); });
-      return b;
-    };
-    const to = (pos) => () => {
-      const ids = p.items.map((i) => i.id).filter((i) => i !== it.id);
-      ids.splice(pos, 0, it.id);
-      return saveOrder(p, ids);
-    };
-    $('addpl-title').textContent = `Move "${it.title || it.id}"`;
-    $('addpl-body').replaceChildren(
-      choose('To the top', '', to(0), n === 0),
-      choose('To the bottom', '', to(last), n === last),
-      ...lists.filter((x) => x.id !== p.id).map((x) => choose(x.name, `${x.items.length} songs`, () => moveTo(p, it.id, x.id), x.items.some((i) => i.id === it.id))),
-      choose('Library', 'take out of this playlist, keep the song', () => moveTo(p, it.id, 'lib')));
-    dlg.showModal();
-  }
-
-  /** Drag a row by its grip: rows swap live under the pointer, the order is saved on release. */
-  function drag(e, row, p) {
+  /** Drag a row by its grip or anywhere on it: rows swap live under the pointer, the order is saved on release. */
+  function drag(e, row, p, handle = e.currentTarget) {
     if (e.button > 0) return;
     e.preventDefault();
     const list = $('pp-list');
-    const grip = e.currentTarget;
+    const grip = handle;
     grip.setPointerCapture(e.pointerId);
     row.classList.add('drag');
     const bar = el('div', { className: 'pp-targets' },
@@ -275,5 +264,5 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
     return pl;
   }
 
-  return { load, show, stop, pick, save, importUrl, find, all: () => lists, lib };
+  return { refresh: () => { clearTimeout(timer); poll(); }, load, show, stop, pick, save, importUrl, find, all: () => lists, lib };
 }
