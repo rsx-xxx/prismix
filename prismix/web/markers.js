@@ -37,12 +37,6 @@ export function createMarkers({ player, api, bars = () => [] }) {
     const band = $('secband');
     band.replaceChildren();
     band.hidden = !live || !st.sections.length;
-    $('go-music').hidden = !live || st.start < MIN;
-    $('go-lyrics').hidden = !live || st.lyricsStart == null || st.lyricsStart < MIN || Math.abs(st.lyricsStart - st.start) < MIN;
-    if (live) {
-      $('go-music').title = `Jump to where the music starts (${fmt(st.start)})`;
-      $('go-lyrics').title = `Jump to where the lyrics start (${fmt(st.lyricsStart ?? 0)})`;
-    }
     if (!live) return;
     const quiet = [...(st.start >= MIN ? [{ s: 0, e: st.start }] : []), ...st.bad];
     for (const q of quiet) {
@@ -117,8 +111,6 @@ export function createMarkers({ player, api, bars = () => [] }) {
   document.addEventListener('lyrics:data', (e) => { if (st) { st.lines = e.detail?.synced ? e.detail.lines : []; recompute(); } });
   player.addEventListener('state', () => { if (st && player.duration && !st.laidOut) { st.laidOut = true; draw(); } });
   new ResizeObserver(fit).observe($('secband'));
-  $('go-music').addEventListener('click', () => st && player.seek(st.start));
-  $('go-lyrics').addEventListener('click', () => st && player.seek(st.lyricsStart));
 
   async function open(id) {
     close();

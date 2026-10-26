@@ -8,6 +8,7 @@ import { createTab } from './studio-tab.js';
 import { createBlocks } from './blocks.js';
 import { linkScroll, linkFollow } from './scroll.js';
 import { createMarkers } from './markers.js';
+import { createSplit } from './split.js';
 import { initCheatsheet } from './cheatsheet.js';
 import { createBand } from './band.js';
 import { createMedia } from './media.js';
@@ -62,6 +63,7 @@ const tabView = createTab({ player, chordsIn: (j) => score.chordsIn(j) });
 document.addEventListener('tab:seek', (e) => player.seek(e.detail));
 const lyrics = createLyrics({ player, api, chords: () => score.timeline() });
 const blocks = createBlocks();
+createSplit();
 const markers = createMarkers({ player, api, bars: () => score.barChords() });
 // The box beside the lyrics is either Chords or Tabs; one proxy follows whichever is showing.
 const sidePane = () => (blocks.side() === 'tabs' && !$('tabview').hidden ? tabView.pane() : score.pane());
@@ -91,7 +93,7 @@ function openFrom(id, plId) {
   state.plist = plId || null;
   if (!it) {
     const tag = document.querySelector(`#pp-list .pp-row[data-id="${id}"] .pl-tag`);
-    if (tag) tag.textContent = 'Starting…';
+    if (tag) { tag.textContent = 'Starting…'; tag.className = 'pl-tag p'; }
     startProcess(id, $('quality').value).then(() => plview.refresh());
     return;
   }
