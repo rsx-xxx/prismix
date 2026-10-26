@@ -2,6 +2,11 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.9
+
+- Playlist songs move freely: drag a row by its grip to any position (the page scrolls at the edges), drop it on another playlist or on "Library" shown while dragging, or use the new ⇄ button to move it to the top, bottom, another playlist or back to the library.
+- Library cards can be dragged onto a playlist card to add the song there.
+
 ## 0.0.8
 
 - Chord fingerings moved to a page side bar outside the Chords block, so the chord grid keeps its width.
