@@ -242,10 +242,10 @@ dialog legend { font-size: 12px; text-transform: uppercase; letter-spacing: .08e
 .tog.wide { width: auto; padding: 0 10px; }
 .tog[hidden] { display: none; }
 .sing { max-width: 1180px; width: 100%; margin: 0 auto; text-align: center; font-size: clamp(17px, 2.4vw, 24px); font-weight: 700; line-height: 1.3; padding-top: 30px; overflow: hidden; text-wrap: balance; pointer-events: none; }
-.sing .sy { position: relative; display: inline-block; color: var(--muted); transition: color .15s; }
+.sing .sy { position: relative; display: inline-flex; flex-direction: column; align-items: flex-start; vertical-align: bottom; color: var(--muted); transition: color .15s; }
 .sing .sy.sung { color: var(--text); }
 .sing .w { white-space: nowrap; }
-.sing .chs { display: flex; position: absolute; left: 0; bottom: calc(100% + 2px); white-space: nowrap; font-size: 14px; line-height: 1; gap: 4px; }
+.sing .chs { display: flex; white-space: nowrap; margin-bottom: 2px; font-size: 14px; line-height: 1; gap: 4px; }
 .sing .ch { padding: 2px 6px; border-radius: 6px; font-weight: 700; }
 .sing .ch.on { outline: 2px solid var(--text); }
 .sing .ch.carry, .ly-line .ch.carry { opacity: .6; }
@@ -497,9 +497,8 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .sy.sounding .tx { color: transparent; -webkit-background-clip: text; background-clip: text; background-image: linear-gradient(90deg, var(--text) calc(var(--p) * 1%), var(--dim, color-mix(in srgb, var(--text) 55%, transparent)) calc(var(--p) * 1%)); }
 .sing .sy.sounding .tx { --dim: var(--muted); }
 .ly-line .w { white-space: nowrap; }
-.ly-line .chs { display: none; position: absolute; left: 0; bottom: 100%; white-space: nowrap; font-size: 14px; line-height: 1; gap: 4px; }
-.lyrics.merged .ly-line .sy.has-ch { padding-top: 24px; }
-.lyrics.merged .ly-line .sy.has-ch > .chs { bottom: auto; top: 0; }
+.ly-line .chs { display: none; white-space: nowrap; margin-bottom: 2px; font-size: 14px; line-height: 1; gap: 4px; }
+.lyrics.merged .ly-line .sy { display: inline-flex; flex-direction: column; align-items: flex-start; vertical-align: bottom; }
 .ly-instr:empty { display: none; }
 .ly-brk { padding: 4px 0; font-size: 22px; line-height: 1; color: var(--muted); opacity: .5; transition: color .25s, opacity .25s; }
 .ly-brk.now { color: var(--text); opacity: 1; }

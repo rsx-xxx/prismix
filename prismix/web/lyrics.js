@@ -170,10 +170,7 @@ export function createLyrics({ player, api, chords = () => [] }) {
       const lo = firstLine ? ln.t - 0.15 : ln.t, hi = lastLine ? tl.end + 0.5 : tl.end;
       while (ci < cs.length && cs[ci].t < lo) ci++; // chords in an earlier gap belong to no lyric
       const here = [];
-      const prev = ci > 0 ? cs[ci - 1] : null;
       while (ci < cs.length && cs[ci].t < hi) here.push(cs[ci++]);
-      // a chord still ringing from before the line is shown (dimmed) on its first syllable
-      if (prev && (!here.length || here[0].t > tl.syl[0].t + 0.15)) here.unshift({ ...prev, carry: true });
       splitAt(tl, here.filter((c) => !c.carry).map((c) => c.t));
       const pieces = tl.syl;
       pieces.forEach((o) => { o.ch = []; });
