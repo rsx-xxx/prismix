@@ -9,6 +9,8 @@ const el = (tag, props = {}, ...kids) => {
 };
 const JSON_POST = (method, body) => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const SONG = 'application/x-prismix-song';
+const itemOf = (s) => ({ id: s.id, title: s.title, channel: s.channel, duration: s.duration });
 const art = (id) => (/^u-[0-9a-f]{9}$/.test(id) ? `/media/${id}/thumb.jpg` : `https://i.ytimg.com/vi/${id}/mqdefault.jpg`);
 
 export function createPlaylistView({ api, library, open, notice, quality }) {
@@ -31,6 +33,16 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
         first ? el('img', { src: art(first.id), alt: '', loading: 'lazy' }) : el('div', { className: 'pl-ph' }),
         el('b', { textContent: p.name }), el('small', { className: 'muted', textContent: `${p.items.length} song${p.items.length === 1 ? '' : 's'}` }));
       card.addEventListener('click', () => { location.hash = `#/p/${p.id}`; });
+      card.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes(SONG)) { e.preventDefault(); card.classList.add('drop'); } });
+      card.addEventListener('dragleave', () => card.classList.remove('drop'));
+      card.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        card.classList.remove('drop');
+        const song = lib(e.dataTransfer.getData(SONG));
+        if (!song) return;
+        if (p.items.some((i) => i.id === song.id)) { notice(`Already in "${p.name}"`); return; }
+        try { await api(`/api/playlists/${p.id}/items`, JSON_POST('POST', [itemOf(song)])); await load(); notice(`Added to "${p.name}"`); } catch (err) { notice(err.message); }
+      });
       return card;
     }));
   }
@@ -69,7 +81,9 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
         e.preventDefault();
         move(p, n, e.key === 'ArrowUp' ? -1 : 1);
       });
-      row.append(grip, go, rm);
+      const mv = el('button', { type: 'button', className: 'icon-btn', ariaLabel: 'Move to…', title: 'Move to… (top, bottom, another playlist, library)', textContent: '⇄' });
+      mv.addEventListener('click', () => pickMove(p, it, n));
+      row.append(grip, go, mv, rm);
       return row;
     }));
     poll();
@@ -87,6 +101,40 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
     show(p.id);
   }
 
+  /** Move a song out of this playlist: into another one, or back to the library alone. */
+  async function moveTo(p, vid, target) {
+    const it = p.items.find((i) => i.id === vid);
+    try {
+      if (target !== 'lib') await api(`/api/playlists/${target}/items`, JSON_POST('POST', [it]));
+      await api(`/api/playlists/${p.id}/items/${vid}`, { method: 'DELETE' });
+      await load();
+      notice(target === 'lib' ? 'Taken out of the playlist; it stays in the library' : `Moved to "${find(target)?.name}"`);
+    } catch (e) { notice(e.message); }
+    show(p.id);
+  }
+
+  function pickMove(p, it, n) {
+    const last = p.items.length - 1;
+    const choose = (label, hint, fn, off) => {
+      const b = el('button', { type: 'button', className: 'pl-row', disabled: !!off },
+        el('span', { className: 'pl-meta' }, el('b', { textContent: label }), hint ? el('small', { className: 'muted', textContent: hint }) : ''));
+      b.addEventListener('click', async () => { dlg.close(); await fn(); });
+      return b;
+    };
+    const to = (pos) => () => {
+      const ids = p.items.map((i) => i.id).filter((i) => i !== it.id);
+      ids.splice(pos, 0, it.id);
+      return saveOrder(p, ids);
+    };
+    $('addpl-title').textContent = `Move "${it.title || it.id}"`;
+    $('addpl-body').replaceChildren(
+      choose('To the top', '', to(0), n === 0),
+      choose('To the bottom', '', to(last), n === last),
+      ...lists.filter((x) => x.id !== p.id).map((x) => choose(x.name, `${x.items.length} songs`, () => moveTo(p, it.id, x.id), x.items.some((i) => i.id === it.id))),
+      choose('Library', 'take out of this playlist, keep the song', () => moveTo(p, it.id, 'lib')));
+    dlg.showModal();
+  }
+
   /** Drag a row by its grip: rows swap live under the pointer, the order is saved on release. */
   function drag(e, row, p) {
     if (e.button > 0) return;
@@ -95,8 +143,20 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
     const grip = e.currentTarget;
     grip.setPointerCapture(e.pointerId);
     row.classList.add('drag');
+    const bar = el('div', { className: 'pp-targets' },
+      ...lists.filter((x) => x.id !== p.id).map((x) => el('span', { className: 'pp-target', textContent: x.name })),
+      el('span', { className: 'pp-target', textContent: 'Library (take out)' }));
+    const ids_ = [...lists.filter((x) => x.id !== p.id).map((x) => x.id), 'lib'];
+    [...bar.children].forEach((c, i) => { c.dataset.target = ids_[i]; });
+    document.body.append(bar);
+    const hit = (ev) => document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.pp-target');
     const renumber = () => list.querySelectorAll('.pp-n').forEach((n, i) => { n.textContent = String(i + 1); });
     const over = (ev) => {
+      const t = hit(ev);
+      bar.querySelectorAll('.pp-target').forEach((c) => c.classList.toggle('on', c === t));
+      if (t) return;
+      if (ev.clientY < 70) window.scrollBy(0, -14);
+      else if (ev.clientY > innerHeight - 150) window.scrollBy(0, 14);
       for (const other of list.children) {
         if (other === row) continue;
         const r = other.getBoundingClientRect();
@@ -111,6 +171,9 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
       grip.removeEventListener('pointerup', end);
       grip.removeEventListener('pointercancel', end);
       row.classList.remove('drag');
+      const t = ev.type === 'pointerup' ? hit(ev) : null;
+      bar.remove();
+      if (t) { moveTo(p, row.dataset.id, t.dataset.target); return; }
       const ids = [...list.children].map((r) => r.dataset.id);
       if (ids.every((id, i) => id === p.items[i].id)) return;
       saveOrder(p, ids);
@@ -172,7 +235,7 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
   function pick(song) {
     const body = $('addpl-body');
     const done = async (fn) => { try { await fn(); await load(); dlg.close(); } catch (e) { dlg.close(); notice(e.message); } };
-    const item = { id: song.id, title: song.title, channel: song.channel, duration: song.duration };
+    const item = itemOf(song);
     const nw = el('form', { className: 'pl-url' });
     const input = el('input', { type: 'text', placeholder: 'New playlist name', 'aria-label': 'New playlist name', maxLength: 80 });
     nw.append(input, el('button', { className: 'btn primary', type: 'submit', textContent: 'Create' }));

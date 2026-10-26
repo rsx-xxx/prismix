@@ -387,6 +387,8 @@ function renderLibrary() {
     const add = el('button', { className: 'add', type: 'button', textContent: '+', title: 'Add to playlist', ariaLabel: 'Add to playlist' });
     add.addEventListener('click', async (e) => { e.stopPropagation(); await plview.load(); plview.pick(it); });
     card.append(add, del);
+    card.draggable = true;
+    card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('application/x-prismix-song', it.id); e.dataTransfer.effectAllowed = 'copy'; });
     const go = () => { state.plist = null; location.hash = `#/v/${it.id}/${open}`; };
     card.addEventListener('click', go);
     card.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
