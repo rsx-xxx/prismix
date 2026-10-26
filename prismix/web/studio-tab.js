@@ -1,4 +1,4 @@
-// Guitar and bass tab (Songsterr, matched to the recording's bars on the server): bar by bar, with the chord above each bar,
+// Guitar and bass tab (Songsterr or a Soundslice link, matched to the recording's bars on the server): bar by bar, with the chord above each bar,
 // taking the place of the Chords box beside the lyrics and scrolling in step with them.
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -62,7 +62,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     if (!cur) return;
     const { tab, st, secs } = cur;
     const p = tab.tracks[part];
-    credit.replaceChildren(`${p.name.split('|').at(-1).trim() || part} · tab by `, el('a', { href: tab.url, target: '_blank', rel: 'noopener', textContent: 'Songsterr' }));
+    credit.replaceChildren(`${p.name.split('|').at(-1).trim() || part} · tab by `, el('a', { href: tab.url, target: '_blank', rel: 'noopener', textContent: tab.source === 'soundslice' ? 'Soundslice' : 'Songsterr' }));
     pick.replaceChildren(...Object.keys(tab.tracks).map((k) => {
       const b = el('button', { type: 'button', className: 'btn small ghost', textContent: k[0].toUpperCase() + k.slice(1) });
       b.setAttribute('aria-pressed', String(k === part));

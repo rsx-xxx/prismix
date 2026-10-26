@@ -6,6 +6,7 @@ import { createScore } from './studio-score.js';
 import { createLyrics } from './lyrics.js';
 import { createTab } from './studio-tab.js';
 import { createBlocks } from './blocks.js';
+import { createSources } from './sources.js';
 import { linkScroll, linkFollow } from './scroll.js';
 import { createMarkers } from './markers.js';
 import { createSplit } from './split.js';
@@ -62,6 +63,11 @@ const score = createScore({ player, api, notice: (m) => notice(m) });
 const tabView = createTab({ player, chordsIn: (j) => score.chordsIn(j) });
 document.addEventListener('tab:seek', (e) => player.seek(e.detail));
 const lyrics = createLyrics({ player, api, chords: () => score.timeline() });
+const sources = createSources({
+  api,
+  onChange: (id) => { if (state.current?.id === id) { lyrics.open(id); score.retab(id); } },
+  onTab: (id) => { if (state.current?.id === id) tabView.open(id); },
+});
 const blocks = createBlocks();
 createSplit();
 const markers = createMarkers({ player, api, bars: () => score.barChords() });
@@ -530,6 +536,7 @@ async function openStudio(id, model) {
   score.syncSeed();
   score.open(id, model, meta, token, (t) => t === state.token);
   lyrics.open(id);
+  sources.setTrack(id);
   tabView.open(id);
   markers.open(id);
 }
