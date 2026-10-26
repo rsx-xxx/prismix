@@ -25,7 +25,7 @@
 | macOS (Apple Silicon) | `Prismix.dmg` |
 | Android (band phone) | `Prismix-Band.apk` |
 
-Builds are signed when the repository has signing secrets (`packaging/SIGNING.md`); otherwise expect a SmartScreen or Gatekeeper prompt on first launch. The library lives in `%LOCALAPPDATA%\Prismix` (Windows) or `~/Library/Application Support/Prismix` (macOS).
+Desktop builds are unsigned (signing is paid; see `packaging/SIGNING.md`), so expect a SmartScreen or Gatekeeper prompt on first launch. The Android APK is signed with a fixed key and updates in place. The library lives in `%LOCALAPPDATA%\Prismix` (Windows) or `~/Library/Application Support/Prismix` (macOS).
 
 **From source** (Python 3.11–3.13, [uv](https://docs.astral.sh/uv/)):
 

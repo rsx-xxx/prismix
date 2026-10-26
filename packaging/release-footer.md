@@ -11,4 +11,4 @@ The first split downloads the separation models (about 1 GB), so it needs a conn
 The installer is not code-signed. If SmartScreen shows "Windows protected your PC", click **More info, then Run anyway**.
 
 ## macOS Gatekeeper
-The DMG is signed and notarized when the repository has Apple signing secrets, otherwise it is ad-hoc signed and macOS asks for **System Settings, Privacy & Security, Open Anyway**.
+The DMG is ad-hoc signed, not notarized. On first launch macOS asks for **System Settings, Privacy & Security, Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Prismix.app` once.

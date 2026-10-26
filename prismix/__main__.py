@@ -3,7 +3,6 @@ import logging
 import socket
 import threading
 import time
-import webbrowser
 
 import uvicorn
 
@@ -20,7 +19,9 @@ def _open_when_up(url: str, host: str, port: int) -> None:
             time.sleep(0.5)
     else:
         return
-    webbrowser.open(url)
+    from .browser import open_url
+
+    open_url(url)
 
 
 def main() -> None:

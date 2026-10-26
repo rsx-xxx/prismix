@@ -10,6 +10,7 @@ import contextlib
 import json
 import logging
 import re
+import ssl
 import threading
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -54,11 +55,20 @@ def parse(text: str) -> tuple[str, str] | None:
     return (m["kind"], m["id"]) if m else None
 
 
+def _context() -> ssl.SSLContext:
+    """TLS with certifi's CA bundle when present: python.org and frozen builds ship no system roots."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
 def _page(kind: str, sid: str) -> dict:
     req = urllib.request.Request(f"https://open.spotify.com/embed/{kind}/{sid}",
                                  headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en"})
     try:
-        with urllib.request.urlopen(req, timeout=20) as r:
+        with urllib.request.urlopen(req, timeout=20, context=_context()) as r:
             html = r.read().decode("utf-8", "replace")
         data = json.loads(_NEXT_RE.search(html).group(1))
         return data["props"]["pageProps"]["state"]["data"]["entity"]

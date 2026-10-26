@@ -130,13 +130,8 @@ export function createLyrics({ player, api, chords = () => [] }) {
     });
     cur = { id, data, nodes, active: -2, timed: [], intro: el('div', { className: 'ly-instr' }), outro: el('div', { className: 'ly-instr' }) };
     const credit = $('ly-credit');
-    credit.replaceChildren(`${data.artist} – ${data.title} · `);
-    if (data.source === 'audio') credit.append(`recognised from audio (${data.language}), may contain mistakes`);
-    else {
-      const via = data.web ? 'Genius' : 'LRCLIB';
-      credit.append(`${data.synced ? 'synced' : 'not synced'} · `, data.web ? el('a', { href: data.web, target: '_blank', rel: 'noopener', textContent: via }) : via);
-      if (data.source === 'genius') credit.append(' · timed from audio');
-    }
+    if (data.source === 'audio') credit.replaceChildren(`recognised from audio (${data.language}), may contain mistakes`);
+    else credit.replaceChildren(data.web ? el('a', { href: data.web, target: '_blank', rel: 'noopener', textContent: 'Genius' }) : 'LRCLIB');
     body.replaceChildren(el('div', { className: `ly-lines${data.synced ? '' : ' plain'}` }, ...(data.synced ? [cur.intro] : []), ...nodes, ...(data.synced ? [cur.outro] : [])));
     body.scrollTop = 0;
     document.dispatchEvent(new CustomEvent('lyrics:data', { detail: data }));
