@@ -26,6 +26,12 @@ const fmt = (s) => {
 const thumb = (id) => `/media/${id}/thumb.jpg`;
 const isUpload = (id) => /^u-[0-9a-f]{9}$/.test(id);
 const ytThumb = (id) => (isUpload(id) ? thumb(id) : `https://i.ytimg.com/vi/${id}/mqdefault.jpg`);
+/** Cover that falls back to the YouTube thumbnail when the saved file is missing. */
+const cover = (img, id) => {
+  img.addEventListener('error', () => { if (!isUpload(id) && !img.src.includes('ytimg')) img.src = ytThumb(id); }, { once: true });
+  img.src = thumb(id);
+  return img;
+};
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 const ICON = {
@@ -379,7 +385,7 @@ function renderLibrary() {
   lib.replaceChildren(...state.library.map((it) => {
     const open = it.models.includes(state.defaultModel) ? state.defaultModel : it.models[0];
     const card = el('div', { className: 'card', role: 'link', tabIndex: 0, title: it.title },
-      el('img', { className: 'cover', src: thumb(it.id), alt: '', loading: 'lazy' }),
+      cover(el('img', { className: 'cover', alt: '', loading: 'lazy' }), it.id),
       el('span', { className: 'dur', textContent: fmt(it.duration) }),
       el('div', { className: 'meta' },
         el('div', { className: 'title', textContent: it.title }),
@@ -483,7 +489,7 @@ async function openStudio(id, model) {
 
   const entry = state.library.find((i) => i.id === id);
   const available = entry?.models || [model];
-  $('th-cover').src = thumb(id);
+  cover($('th-cover'), id);
   $('th-title').textContent = meta.title;
   $('th-sub').textContent = `${meta.channel || ''} · ${fmt(meta.duration)}${plNow() ? ` · ${plNow().name}` : ''}`;
   document.title = `${meta.title} — Stems`;
