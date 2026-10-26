@@ -2,6 +2,13 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.8
+
+- Chord fingerings moved to a page side bar outside the Chords block, so the chord grid keeps its width.
+- Chords found online (Songsterr) are looked up automatically and used by default; the detected chords remain the fallback.
+- Guitar and bass tablature has its own Tabs block in the desktop UI, following playback and seekable by bar.
+- Playlist previews (Spotify and YouTube) are numbered, and saved playlists have a three-stripe grip to drag songs into a new order (Alt+Up/Down from the keyboard).
+
 ## 0.0.7
 
 - Pasting a Spotify playlist works on machines without system root certificates (the desktop builds), and matching a playlist's songs to YouTube no longer fails when several searches run at once.
