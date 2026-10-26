@@ -80,9 +80,9 @@ def main() -> None:
         webview.start()
     except Exception:
         logging.getLogger(__name__).exception("native window unavailable, opening the browser")
-        import webbrowser
+        from .browser import open_url
 
-        webbrowser.open(url)
+        open_url(url)
         try:
             while server.started and not server.should_exit:
                 time.sleep(1)

@@ -10,6 +10,7 @@ import { createMarkers } from './markers.js';
 import { initCheatsheet } from './cheatsheet.js';
 import { createBand } from './band.js';
 import { createMedia } from './media.js';
+import { initLinks } from './links.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -1041,6 +1042,7 @@ function syncMedia() {
 }
 ['state', 'seek', 'tune'].forEach((t) => player.addEventListener(t, syncMedia));
 setInterval(syncMedia, 1000);
+initLinks();
 const cheats = initCheatsheet($('cheats'), () => $('export').open || $('playlists').open);
 
 window.addEventListener('keydown', (e) => {
