@@ -1,10 +1,10 @@
-// The studio is four blocks (video, stems, lyrics, chords): hide any of them and see which one is being followed.
+// The studio is five blocks (video, stems, lyrics, chords, tabs): hide any of them and see which one is being followed.
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'stems:blocks-hidden';
-const NAMES = { video: 'Video', stems: 'Stems', lyrics: 'Lyrics', chords: 'Chords' };
-const nodes = { video: $('video'), stems: $('stems'), lyrics: $('lyrics'), chords: $('score') };
-const own = ['stems', 'lyrics', 'chords']; // video visibility belongs to video.js
+const NAMES = { video: 'Video', stems: 'Stems', lyrics: 'Lyrics', chords: 'Chords', tabs: 'Tabs' };
+const nodes = { video: $('video'), stems: $('stems'), lyrics: $('lyrics'), chords: $('score'), tabs: $('tabview') };
+const own = ['stems', 'lyrics', 'chords', 'tabs']; // video visibility belongs to video.js
 
 export function createBlocks() {
   let hidden = new Set();
@@ -36,7 +36,7 @@ export function createBlocks() {
   function leader() {
     const top = 0, bottom = innerHeight - ($('dock').hidden ? 0 : $('dock').offsetHeight);
     let best = null, area = 0;
-    for (const id of ['stems', 'lyrics', 'chords']) {
+    for (const id of ['stems', 'lyrics', 'chords', 'tabs']) {
       const n = nodes[id];
       if (n.hidden || n.offsetParent === null) continue;
       const r = n.getBoundingClientRect();

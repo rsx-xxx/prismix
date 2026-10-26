@@ -4,6 +4,7 @@ import { createPlaylistView } from './playlist-view.js';
 import { createVideo } from './video.js';
 import { createScore } from './studio-score.js';
 import { createLyrics } from './lyrics.js';
+import { createTab } from './studio-tab.js';
 import { createBlocks } from './blocks.js';
 import { linkScroll, linkFollow } from './scroll.js';
 import { createMarkers } from './markers.js';
@@ -51,6 +52,8 @@ const stemIcon = (name) => STEM_ICONS.find(([re]) => re.test(name.toLowerCase())
 const player = new StemPlayer();
 window.stemPlayer = player; // debug handle
 const score = createScore({ player, api, notice: (m) => notice(m) });
+const tabView = createTab();
+document.addEventListener('tab:seek', (e) => player.seek(e.detail));
 const lyrics = createLyrics({ player, api, chords: () => score.timeline() });
 const blocks = createBlocks();
 const markers = createMarkers({ player, api, bars: () => score.barChords() });
@@ -411,6 +414,7 @@ function showHome(inPlaylist = false) {
   video.hide(); // gives the stems back if the video's sound was on, so saved prefs are the real mix
   if (state.current) { savePrefs(); player.dispose(); state.current = null; }
   score.close();
+  tabView.close();
   lyrics.close();
   markers.close();
   video.hide();
@@ -444,6 +448,7 @@ async function openStudio(id, model) {
   video.hide(); // gives the stems back if the video's sound was on, so saved prefs are the real mix
   if (state.current) { savePrefs(); player.dispose(); state.current = null; }
   score.close();
+  tabView.close();
   lyrics.close();
   markers.close();
   video.hide();
@@ -501,6 +506,7 @@ async function openStudio(id, model) {
   score.syncSeed();
   score.open(id, model, meta, token, (t) => t === state.token);
   lyrics.open(id);
+  tabView.open(id);
   markers.open(id);
 }
 
@@ -698,6 +704,7 @@ function syncFrame() {
   const heard = Math.max(0, pos - player.outLatency * player.tempo); // what is audible now, not what was just handed to the speakers
   score.frame(heard);
   lyrics.frame(heard);
+  tabView.frame(heard);
   markers.frame(heard);
   followBoth(heard);
 }

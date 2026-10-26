@@ -368,14 +368,6 @@ kbd { font: 12px var(--font); background: var(--surface-2); border: 1px solid va
 .sc-cta h3 { margin: 0; }
 .sc-cta p { margin: 0; max-width: 56ch; }
 .sc-cta .bar { width: min(420px, 100%); }
-.chart-wrap { display: flex; gap: 12px; align-items: flex-start; }
-.chart-wrap > .chart { flex: 1 1 auto; min-width: 0; }
-.chart-side { flex: 0 0 168px; max-height: var(--pane-h); overflow-y: auto; overscroll-behavior: contain; padding: 2px; }
-.chart-side .fing-opts { flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 10px; font-size: 12px; }
-.chart-side .diagrams { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 0; }
-.chart-side .diagrams figure { padding: 6px 4px 4px; }
-.chart-side .diagrams svg { width: 100%; height: auto; }
-@media (max-width: 760px) { .chart-wrap { flex-direction: column; } .chart-wrap > .chart { width: 100%; } .chart-side { flex-basis: auto; max-height: none; width: 100%; } .chart-side .diagrams { display: flex; flex-wrap: wrap; } }
 .diagrams { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
 .diagrams figure { margin: 0; display: grid; justify-items: center; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px 6px; }
 .diagrams figcaption { font-weight: 650; font-size: 14px; }
@@ -692,3 +684,43 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
   :root:not([data-theme]) .ly-line { opacity: .8; }
   :root:not([data-theme]) .ly-line.past { opacity: .6; }
 }
+
+/* studio: chord fingerings live in a side bar beside every block, tabs get a block of their own */
+@media (min-width: 1180px) {
+  main:has(#studio:not([hidden])) { width: min(1480px, 100% - 40px); }
+  #studio:not([hidden]) { display: grid; grid-template-columns: minmax(0, 1fr) 208px; column-gap: 16px; align-items: start; }
+  #studio > * { grid-column: 1; min-width: 0; }
+  #studio > .fing-side { grid-column: 2; grid-row: 1 / span 12; position: sticky; top: 12px; max-height: calc(100dvh - var(--dock-h) - 24px); }
+}
+.fing-side { overflow-y: auto; overscroll-behavior: contain; margin-top: 16px; padding: 12px; border: 1px solid var(--line); border-radius: 20px; }
+.fing-side[hidden], #studio:has(#score.off) > .fing-side { display: none; }
+.fing-side .fing-opts { flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 12px; font-size: 12px; }
+.fing-side .capo-pick { flex-direction: column; align-items: flex-start; }
+.fing-side .capo-pick select { max-width: 100%; }
+.fing-side .diagrams { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 0; }
+.fing-side .diagrams figure { padding: 6px 4px 4px; }
+.fing-side .diagrams svg { width: 100%; height: auto; }
+
+.tabview .seg-btns { display: inline-flex; gap: 6px; }
+.tabview .seg-btns[hidden] { display: none; }
+.tabview .seg-btns button[aria-pressed=true] { background: var(--text); color: var(--bg); }
+.tab-body { --row: 1.15rem; max-height: min(60vh, 520px); overflow-y: auto; overscroll-behavior: contain; padding: 4px 2px 40px; }
+.tabview #tab-credit a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.trow { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.tbar { position: relative; padding: 18px 8px 6px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--surface); }
+.tbar.now { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.tbar.blank { opacity: .45; }
+.tbar .n { position: absolute; top: 3px; left: 8px; font-size: 10px; color: var(--muted); }
+.tbar .tag { position: absolute; top: 3px; right: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.tbar .stf { position: relative; height: calc(var(--strings) * var(--row)); background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--row) / 2 - .5px), color-mix(in srgb, var(--muted) 60%, transparent) calc(var(--row) / 2 - .5px) calc(var(--row) / 2 + .5px), transparent calc(var(--row) / 2 + .5px) var(--row)); }
+.tbar.blank .stf { height: calc(var(--row) * 2); opacity: .4; }
+.tbar .f { position: absolute; height: var(--row); display: grid; place-items: center; transform: translateX(-30%); padding: 0 1px; font-size: 12px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; background: var(--surface); }
+.tbar .cursor { position: absolute; top: 0; bottom: 0; left: var(--x, 0); width: 2px; border-radius: 2px; background: var(--accent); opacity: 0; }
+.tbar.now .cursor { opacity: .85; }
+
+.pl-n { width: 22px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; flex: none; }
+.pp-grip { display: grid; align-content: center; gap: 4px; width: 28px; height: 40px; padding: 0 7px; flex: none; cursor: grab; touch-action: none; border-radius: 8px; user-select: none; }
+.pp-grip i { display: block; height: 2px; border-radius: 2px; background: var(--muted); }
+.pp-grip:hover i, .pp-grip:focus-visible i { background: var(--text); }
+.pp-row.drag { background: var(--surface-2); box-shadow: 0 0 0 1px var(--accent); }
+.pp-row.drag .pp-grip { cursor: grabbing; }
