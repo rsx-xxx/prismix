@@ -25,6 +25,12 @@ jobs:
   build-windows:
     needs: test
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write   # OIDC login to Azure for code signing, no stored password
+    env:
+      # Signing turns on by itself once the Azure secrets exist (see packaging/SIGNING.md); without them the build stays unsigned.
+      SIGN: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_SUBSCRIPTION_ID != '' }}
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -37,6 +43,22 @@ jobs:
         run: |
           uv run --group desktop python packaging/gen_icon.py
           uv run --group desktop python packaging/build.py
+      - name: Azure login (code signing)
+        if: env.SIGN == 'true'
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign Prismix.exe
+        if: env.SIGN == 'true'
+        uses: Azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_PROFILE }}
+          files-folder: dist/Prismix
+          files-folder-filter: exe
       - name: Smoke test the bundle
         shell: pwsh
         run: |
@@ -52,6 +74,15 @@ jobs:
           }
           & $iscc "packaging\Prismix.iss" "/DAppVersion=$($Env:PRISMIX_VERSION.TrimStart('v'))"
           if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed with exit code $LASTEXITCODE" }
+      - name: Sign the installer
+        if: env.SIGN == 'true'
+        uses: Azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_PROFILE }}
+          files-folder: dist
+          files-folder-filter: exe
       - uses: actions/upload-artifact@v7
         with:
           name: windows
