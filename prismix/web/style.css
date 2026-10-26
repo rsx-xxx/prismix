@@ -724,3 +724,8 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .pp-grip:hover i, .pp-grip:focus-visible i { background: var(--text); }
 .pp-row.drag { background: var(--surface-2); box-shadow: 0 0 0 1px var(--accent); }
 .pp-row.drag .pp-grip { cursor: grabbing; }
+
+.plcard.drop { border-color: var(--accent); background: var(--surface-2); box-shadow: 0 0 0 1px var(--accent); }
+.pp-targets { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 50; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: min(92vw, 720px); padding: 10px; border-radius: 16px; border: 1px solid var(--line-strong); background: var(--surface); box-shadow: 0 8px 30px rgb(0 0 0 / .35); }
+.pp-target { padding: 10px 16px; border-radius: 12px; border: 1px dashed var(--line-strong); font-size: 13px; font-weight: 600; }
+.pp-target.on { border-style: solid; border-color: var(--accent); background: var(--surface-2); color: var(--accent); }
