@@ -2,6 +2,11 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.14
+
+- Playlist songs move only by dragging, and you can grab a song anywhere on its row (not just the grip); the ⇄ move button is gone.
+- Starting a song from a playlist is now obvious: the row says "Starting…" then shows progress, and the progress card stays pinned at the top with a short highlight.
+
 ## 0.0.13
 
 - Clicking a not-yet-processed song in a playlist now processes just that song, instead of asking you to use Process all.

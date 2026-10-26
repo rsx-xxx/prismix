@@ -89,7 +89,12 @@ const plview = createPlaylistView({
 function openFrom(id, plId) {
   const it = state.library.find((i) => i.id === id);
   state.plist = plId || null;
-  if (!it) { startProcess(id, $('quality').value); return; }
+  if (!it) {
+    const tag = document.querySelector(`#pp-list .pp-row[data-id="${id}"] .pl-tag`);
+    if (tag) tag.textContent = 'Starting…';
+    startProcess(id, $('quality').value).then(() => plview.refresh());
+    return;
+  }
   location.hash = `#/v/${id}/${it.models.includes(state.defaultModel) ? state.defaultModel : it.models[0]}`;
 }
 
@@ -352,6 +357,8 @@ function trackJob(job) {
     el('div', { className: 'body' }, title, el('div', { className: 'bar' }, bar), el('div', { className: 'row' }, msg, pct)),
   );
   box.hidden = false;
+  box.classList.remove('fresh'); void box.offsetWidth; box.classList.add('fresh');
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   const es = new EventSource(`/api/jobs/${job.id}/events`);
   state.es = es;
   es.onmessage = async (ev) => {
