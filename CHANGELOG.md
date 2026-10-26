@@ -2,6 +2,11 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.16
+
+- Playlist dragging rebuilt: a copy of the song follows the pointer, the others make room live, and dropping on another playlist or Library works from anywhere on the row. Fixes songs not moving at all.
+- Fix: the playlist status refresh crashed once a song turned ready, so progress stopped updating. Songs waiting in the queue now say "Queued".
+
 ## 0.0.15
 
 - Fix: the playlist drag styles (grip, dragged row, drop targets, song numbers) had been lost from the stylesheet in 0.0.10, so dragging looked broken. Restored, and the dragged row now lifts with a shadow while the cover no longer drags on its own.

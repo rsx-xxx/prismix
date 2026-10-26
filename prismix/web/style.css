@@ -752,3 +752,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .pp-row { user-select: none; }
 .pp-go { cursor: grab; }
 .pl-dot { width: 10px; height: 10px; border-radius: 50%; background: oklch(0.72 0.17 150); box-shadow: 0 0 8px oklch(0.72 0.17 150 / .6); flex: none; }
+.pp-row.drag { opacity: .35; transform: none; box-shadow: none; background: color-mix(in oklab, var(--accent) 14%, transparent); outline: 2px dashed var(--accent); outline-offset: -2px; }
+.pp-ghost { position: fixed; z-index: 60; pointer-events: none; display: flex; align-items: center; gap: 6px; border-radius: 12px; background: var(--surface); box-shadow: 0 14px 36px rgb(0 0 0 / .35), 0 0 0 2px var(--accent); transform: scale(1.015); }
+body.dragging { cursor: grabbing; user-select: none; }
+body.dragging * { cursor: grabbing !important; }
