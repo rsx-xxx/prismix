@@ -15,7 +15,7 @@ from difflib import SequenceMatcher
 
 import httpx
 
-from . import analysis, library
+from . import analysis, library, mashup
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ PAGE = "https://www.songsterr.com/a/wsa/x-chords-s{id}"
 UA = "Mozilla/5.0 (compatible; prismix)"
 MIN_TITLE_MATCH = 0.55
 MIN_SIMILARITY = 0.35
+MASH_REACH = 2
 
 _ROOTS = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
 _TRIAD = {
@@ -81,6 +82,9 @@ def guess_query(info: dict) -> list[tuple[str, str]]:
     """Possible (artist, title) readings of a YouTube title, best first."""
     title = re.sub(r"\s*\|.*$", "", info.get("title") or "")
     channel = re.sub(r"\s*-\s*Topic$|VEVO$", "", info.get("channel") or "").strip()
+    if src := mashup.source(info, "chords"):  # the user named the song whose chords this cover plays
+        artist, name = src
+        return [(_norm(artist or ""), _norm(name))] if _norm(name) else []
     out = []
     parts = re.split(r"\s+[-–—]\s+", title, maxsplit=1)
     if len(parts) == 2:
@@ -177,7 +181,14 @@ def _fit(d: list[tuple[int, str]], ref: list[tuple[int, str]], t: int) -> tuple[
     return exact, pair
 
 
-def align(detected: list[dict], names: list[str]) -> dict | None:
+def trusted(marks: list[dict | None], reach: int = MASH_REACH) -> list[dict | None]:
+    """Keep a mark only if a chord within `reach` neighbours on either side agrees exactly: where the sheet's song
+    and the recording part ways (another structure, another arrangement) the detected chords stand."""
+    return [m if m and any(n and n["ok"] for n in marks[max(0, i - reach):i + reach + 1]) else None
+            for i, m in enumerate(marks)]
+
+
+def align(detected: list[dict], names: list[str], *, strict: bool = False) -> dict | None:
     """Match detected chords ({r, q}) against a sheet's chord names.
 
     Returns {similarity, transpose, marks} where marks has one entry per detected chord:
@@ -202,7 +213,7 @@ def align(detected: list[dict], names: list[str]) -> dict | None:
         r, q = parsed[p]
         r = (r + t) % 12
         marks.append({"ok": (r, triad(q)) == (c["r"], triad(c["q"])), "name": names[p] if parse_chord(names[p]) else "", "r": r, "q": q})
-    return {"similarity": round(sim, 3), "transpose": t if t <= 6 else t - 12, "marks": marks}
+    return {"similarity": round(sim, 3), "transpose": t if t <= 6 else t - 12, "marks": trusted(marks) if strict else marks}
 
 
 # ───────────────────────── entry points ─────────────────────────
@@ -226,7 +237,7 @@ def lookup(video_id: str, url: str | None = None) -> dict:
         raise TabsError("Analyse the track first")
     song_id = song_id_from_url(url) if url else find_song(info)["songId"]
     sheet = fetch_sheet(song_id)
-    result = align(structure["chords"], sheet["chords"])
+    result = align(structure["chords"], sheet["chords"], strict=bool(mashup.source(info, "chords")))
     if result is None or result["marks"] is None:
         raise TabsError(
             "That sheet does not look like this recording"

@@ -95,6 +95,16 @@ export function createScore({ player, api, notice }) {
     } catch { /* no chord sheet online: the detected chords stay */ }
   }
 
+  /** The chords source changed: drop the sheet in use and look the new one up. */
+  function retab(id) {
+    if (!cur || cur.id !== id) return;
+    cur.tabs = null;
+    applyTabs();
+    renderAll();
+    lookedUp.delete(id);
+    autoTabs(id);
+  }
+
   function close() {
     renderToken++;
     cur = null;
@@ -611,7 +621,7 @@ export function createScore({ player, api, notice }) {
   new ResizeObserver(() => { if (cur?.data) requestAnimationFrame(renderRuler); }).observe($('lane-col'));
 
   return {
-    open, close, frame, tuned, timeline, barChords, chordsIn, refreshRuler: renderRuler,
+    open, close, retab, frame, tuned, timeline, barChords, chordsIn, refreshRuler: renderRuler,
     // scroll-link adapter: chart rows keyed by song time
     pane: () => ({
       root: $('score'), anchor: 0.4,

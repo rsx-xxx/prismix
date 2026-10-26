@@ -25,6 +25,7 @@ from . import (
     library,
     lyrics,
     markers,
+    mashup,
     original,
     pipeline,
     playlists,
@@ -96,6 +97,11 @@ def band_qr(url: str) -> str:
 class TabsRequest(BaseModel):
     video_id: str = Field(alias="videoId")
     url: str | None = Field(default=None, max_length=300)
+
+
+class MashupRequest(BaseModel):
+    lyrics: str | None = Field(default=None, max_length=200)
+    chords: str | None = Field(default=None, max_length=200)
 
 
 class AnalyzeRequest(BaseModel):
@@ -428,6 +434,16 @@ def create_app() -> FastAPI:
         except tabs.TabsError as e:
             raise HTTPException(422, str(e)) from e
 
+    @app.post("/api/tabdata")
+    async def import_tabdata(req: TabsRequest):
+        # Tab from a Soundslice link the user pasted; it replaces whatever tab the track had
+        try:
+            return await asyncio.to_thread(tabdata.import_soundslice, req.video_id, req.url or "")
+        except ValueError:
+            raise HTTPException(404, "Not found") from None
+        except tabdata.TabDataError as e:
+            raise HTTPException(422, str(e)) from e
+
     @app.get("/api/tabdata/{video_id}")
     async def get_tabdata(video_id: str):
         # Guitar and bass tab for the Tab view; {"found": false} when there is none. Looked up once, then cached.
@@ -446,6 +462,22 @@ def create_app() -> FastAPI:
             raise HTTPException(404, "Not found") from None
         except lyrics.LyricsError as e:
             raise HTTPException(404, str(e)) from e
+
+    @app.get("/api/mashup/{video_id}")
+    def get_mashup(video_id: str):
+        if not library.VIDEO_ID_RE.match(video_id) or not (info := library.read_info(video_id)):
+            raise HTTPException(404, "Not found")
+        return mashup.get(info)
+
+    @app.put("/api/mashup/{video_id}")
+    def put_mashup(video_id: str, req: MashupRequest):
+        # Name the song the words come from and the song the chords come from; an empty value clears that source.
+        if not library.VIDEO_ID_RE.match(video_id):
+            raise HTTPException(404, "Not found")
+        try:
+            return mashup.save(video_id, req.model_dump(exclude_unset=True))
+        except ValueError:
+            raise HTTPException(404, "Not found") from None
 
     @app.get("/api/markers/{video_id}")
     async def get_markers(video_id: str):

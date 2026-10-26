@@ -129,6 +129,7 @@
           <div class="score-head block-head">
             <h2>Lyrics</h2>
             <span id="ly-credit" class="muted"></span>
+            <button class="btn small ghost" id="ly-sources" type="button" data-ico="layers" title="A cover with the words of one song and the chords of another: name them here">Sources</button>
             <button class="btn small ghost" id="ly-layout" type="button" data-ico="layers" aria-pressed="false" title="Show chords above the words, or in their own box beside the lyrics">Chords above</button>
           </div>
         </div>
@@ -297,6 +298,22 @@
   <dialog id="addpl">
     <div class="pl-head"><h3 id="addpl-title">Add to playlist</h3><button class="icon-btn" id="addpl-close" type="button" aria-label="Close">×</button></div>
     <div id="addpl-body" class="pl-body"></div>
+  </dialog>
+
+  <dialog id="sources">
+    <form id="sources-form" method="dialog">
+      <div class="pl-head"><h3>Song sources</h3><button class="icon-btn" id="sources-close" type="button" aria-label="Close">×</button></div>
+      <p class="muted">For a cover that mixes two songs. Name each as “Artist - Title”; leave empty to guess from the title. Chords from another key are shifted, and where the recording goes its own way the detected chords stay.</p>
+      <label class="band-row">Lyrics from <input id="src-lyrics" type="text" maxlength="200" placeholder="Валерий Меладзе - Салют, Вера"></label>
+      <label class="band-row">Chords from <input id="src-chords" type="text" maxlength="200" placeholder="Linkin Park - Faint"></label>
+      <p class="muted" id="sources-msg" role="status"></p>
+      <button class="btn" id="sources-save" type="submit">Apply</button>
+      <hr>
+      <p class="muted">Or take the guitar and bass tab from a public Soundslice slice. It must be this recording; otherwise it is refused.</p>
+      <label class="band-row">Tab from Soundslice <input id="src-slice" type="url" maxlength="300" placeholder="https://www.soundslice.com/slices/PtNBc/"></label>
+      <p class="muted" id="slice-msg" role="status"></p>
+      <button class="btn" id="slice-import" type="button">Import tab</button>
+    </form>
   </dialog>
 
   <dialog id="band">
