@@ -138,6 +138,22 @@ export function createScore({ player, api, notice }) {
     });
   }
 
+  /** Chord names sounding in bar j with where each starts (0..1 of the bar), as shown (transposed, capo applied). */
+  function chordsIn(j) {
+    if (!cur?.data) return [];
+    const { chords, bars } = cur.data.structure;
+    if (j < 0 || j >= bars.length) return [];
+    const b0 = bars[j], b1 = j + 1 < bars.length ? bars[j + 1] : b0 + (j ? b0 - bars[j - 1] : 4);
+    const k = chords.findLastIndex((c) => c.b <= b0);
+    const out = k >= 0 ? [{ f: 0, name: name(chords[k]) }] : [];
+    for (const c of chords) {
+      if (c.b <= b0 || c.b >= b1) continue;
+      const n = name(c);
+      if (n !== out.at(-1)?.name) out.push({ f: (c.b - b0) / (b1 - b0), name: n });
+    }
+    return out;
+  }
+
   /** Effective structure: detected chords, with the tab's chords swapped in where they differ when asked. */
   function applyTabs() {
     const { raw } = cur.data, marks = cur.tabs?.marks;
@@ -628,7 +644,7 @@ export function createScore({ player, api, notice }) {
   new ResizeObserver(() => { if (cur?.data) requestAnimationFrame(renderRuler); }).observe($('lane-col'));
 
   return {
-    open, close, frame, tuned, timeline, barChords, refreshRuler: renderRuler,
+    open, close, frame, tuned, timeline, barChords, chordsIn, refreshRuler: renderRuler,
     // scroll-link adapter: chart rows keyed by song time
     pane: () => ({
       root: $('score'), anchor: 0.4,
@@ -636,6 +652,17 @@ export function createScore({ player, api, notice }) {
       active: () => !!cur?.data && !$('score').classList.contains('off') && $('sc-body').querySelector('.chart')?.offsetParent !== null,
       hold: () => { holdUntil = Date.now() + 4000; setFollow(false); },
       following: () => follow && Date.now() >= holdUntil,
+      resume: () => {
+        setFollow(true); holdUntil = 0;
+        const now = $('sc-body').querySelector('.cell.now'), chart = now?.closest('.chart');
+        if (now && chart.offsetParent !== null) glide(chart, chart.scrollTop + offsetIn(chart, now) + now.offsetHeight / 2 - chart.clientHeight * 0.4);
+      },
+      away: () => {
+        const now = $('sc-body').querySelector('.cell.now'), chart = now?.closest('.chart');
+        if (!now || chart.offsetParent === null) return false;
+        const m = offsetIn(chart, now) + now.offsetHeight / 2;
+        return m < 0 || m > chart.clientHeight;
+      },
       track: () => $('sc-body').querySelector('.chart.aligned')
         ? [...$('sc-body').querySelectorAll('.arow[data-t]')].map((r) => ({ y: r.offsetTop + r.offsetHeight / 2, t: Number(r.dataset.t) }))
         : [...$('sc-body').querySelectorAll('.cell')].map((c) => ({ y: c.offsetTop + c.offsetHeight / 2, t: cur.bars[Number(c.dataset.bar)] })).filter((p) => p.t != null),

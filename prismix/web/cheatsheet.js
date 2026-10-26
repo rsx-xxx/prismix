@@ -25,6 +25,8 @@ export const GROUPS = [
     [['V'], 'Video'],
     [['H'], 'Chords'],
     [['L'], 'Lyrics'],
+    [['T'], 'Tabs'],
+    [['F'], 'Follow playback'],
   ]],
   ['Other', [
     [['D'], 'Download'],
