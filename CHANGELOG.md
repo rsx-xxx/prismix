@@ -2,6 +2,11 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.18
+
+- Instrumental stretches show a small ♪ in the lyrics instead of a tall empty gap: the lyrics wait on the note while the chords keep scrolling.
+- Removed the Reanalyze button, the bar count and the "Check against online chords" button; online chords are matched automatically. The Follow playback button is now a small icon.
+
 ## 0.0.17
 
 - Playlist tags have their own colors: amber for queued, blue for processing, gray for not split yet.

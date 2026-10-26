@@ -365,12 +365,10 @@ export function createScore({ player, api, notice }) {
     const parts = [
       k && `${keyName(k, 0)}${s ? ` → ${keyName(k, s)}` : ''}`,
       capoFret() > 0 && `Capo ${capoFret()}`,
-      `${Math.round(structure.bpm * player.tempo)} BPM`, `${structure.timeSig[0]}/${structure.timeSig[1]}`, `${structure.bars.length} bars`,
+      `${Math.round(structure.bpm * player.tempo)} BPM`, `${structure.timeSig[0]}/${structure.timeSig[1]}`,
     ].filter(Boolean);
     metaText = parts.join(' · ');
-    const redo = el('button', { className: 'pill redo', type: 'button', textContent: 'Reanalyze', title: 'Detect bars and chords again with the current version' });
-    redo.addEventListener('click', () => analyze(true));
-    $('sc-meta').replaceChildren(...parts.map((t, i) => el('span', { className: i === 0 && k ? 'pill key' : 'pill', textContent: t })), redo);
+    $('sc-meta').replaceChildren(...parts.map((t, i) => el('span', { className: i === 0 && k ? 'pill key' : 'pill', textContent: t })));
     renderChart(body);
   }
 
@@ -397,17 +395,16 @@ export function createScore({ player, api, notice }) {
   let lyricLines = null;
   const wideLayout = () => matchMedia('(min-width: 900px)').matches && !$('lyrics').hidden && !$('lyrics').classList.contains('off');
   const lyricKids = () => [...document.querySelectorAll('#lyrics .ly-lines > *')];
-  const alignedMode = () => !!lyricLines?.synced && wideLayout() && lyricKids().length === lyricLines.lines.length + 2;
+  const alignedMode = () => !!lyricLines?.synced && wideLayout() && lyricKids().length >= lyricLines.lines.length + 2;
 
-  /** Row index per bar: intro, one per lyric line, outro (children order of `.ly-lines`). */
+  /** Row index per bar: the last row (intro, sung line, ♪ break, outro) that has started by the middle of the bar. */
   function rowOfBar(i) {
-    const bars = cur.bars, n = lyricLines.lines.length;
+    const bars = cur.bars;
     const a = bars[i], b = bars[i + 1] ?? a + 2;
     if (a == null) return 0;
     const mid = (a + b) / 2;
     let row = 0; // intro
-    const lines = lyricLines.lines;
-    for (let k = 0; k < n; k++) if (lines[k].t != null && lines[k].t <= mid) row = k + 1;
+    lyricKids().forEach((k, r) => { if (k.dataset.t != null && Number(k.dataset.t) <= mid) row = r; });
     return row;
   }
 
@@ -420,7 +417,7 @@ export function createScore({ player, api, notice }) {
       const r = rows[i];
       if (!r) return;
       r.hidden = k.offsetParent === null;
-      if (r.hidden) return;
+      if (r.hidden || !k.classList.contains('ly-line') || k.classList.contains('gap')) return; // intro, ♪ breaks and outro keep their own height
       const h = Math.max(k.offsetHeight, r.offsetHeight);
       k.style.minHeight = r.style.minHeight = `${h}px`;
     });
@@ -447,7 +444,12 @@ export function createScore({ player, api, notice }) {
     });
     let grid;
     if (aligned) {
-      const rows = lyricKids().map((_, k) => { const r = el('div', { className: 'arow' }); const t = k >= 1 ? lyricLines.lines[k - 1]?.t : null; if (t != null) r.dataset.t = String(t); return r; });
+      const rows = lyricKids().map((k) => {
+        const r = el('div', { className: 'arow' });
+        if (k.dataset.t != null) r.dataset.t = k.dataset.t;
+        if (!k.classList.contains('ly-line') || k.classList.contains('gap')) r.dataset.free = '1';
+        return r;
+      });
       cells.forEach((c, i) => rows[rowOfBar(i)].append(c));
       grid = el('div', { className: 'chart aligned' }, ...rows);
     } else grid = el('div', { className: 'chart' }, ...cells);
@@ -512,7 +514,7 @@ export function createScore({ player, api, notice }) {
     return box;
   }
 
-  /** Online chord sheet (Songsterr): look it up, show how well it agrees, link to it. */
+  /** Online chord sheet (Songsterr), looked up automatically: shows how well it agrees and links to it. */
   function tabSource() {
     const box = el('div', { className: 'tab-src' });
     const t = cur.tabs;
@@ -528,25 +530,7 @@ export function createScore({ player, api, notice }) {
         el('label', { className: 'switch', title: 'Replace chords that differ with the tab\'s' }, sw, el('span'), 'Use tab chords'));
       return box;
     }
-    const go = el('button', { type: 'button', className: 'btn small ghost', textContent: 'Check against online chords' });
-    const msg = el('span', { className: 'muted', textContent: 'Finds a Songsterr chord sheet and marks where it agrees' });
-    const paste = el('input', { type: 'url', placeholder: 'or paste a Songsterr chords link', hidden: true, ariaLabel: 'Songsterr link' });
-    const run = async (url) => {
-      go.disabled = true;
-      msg.textContent = 'Searching…';
-      try {
-        cur.tabs = await api('/api/tabs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoId: cur.id, url: url || null }) });
-        applyTabs();
-        renderAll();
-      } catch (err) {
-        msg.textContent = err.message;
-        paste.hidden = false;
-        go.disabled = false;
-      }
-    };
-    go.addEventListener('click', () => run(paste.value.trim() || null));
-    paste.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(paste.value.trim()); });
-    box.append(go, msg, paste);
+    // no sheet found online: the detected chords stand on their own
     return box;
   }
 
@@ -664,7 +648,9 @@ export function createScore({ player, api, notice }) {
         return m < 0 || m > chart.clientHeight;
       },
       track: () => $('sc-body').querySelector('.chart.aligned')
-        ? [...$('sc-body').querySelectorAll('.arow[data-t]')].map((r) => ({ y: r.offsetTop + r.offsetHeight / 2, t: Number(r.dataset.t) }))
+        ? [...$('sc-body').querySelectorAll('.arow')].flatMap((r) => (r.dataset.free
+          ? [...r.querySelectorAll('.cell')].map((c) => ({ y: c.offsetTop + c.offsetHeight / 2, t: cur.bars[Number(c.dataset.bar)] })).filter((p) => p.t != null)
+          : r.dataset.t ? [{ y: r.offsetTop + r.offsetHeight / 2, t: Number(r.dataset.t) }] : []))
         : [...$('sc-body').querySelectorAll('.cell')].map((c) => ({ y: c.offsetTop + c.offsetHeight / 2, t: cur.bars[Number(c.dataset.bar)] })).filter((p) => p.t != null),
     }),
     syncSeed: () => { lastShift = shift(); lastTempo = player.tempo; },
