@@ -2,6 +2,11 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.20
+
+- Lyrics and chords stay level on songs whose synced words stretch across an instrumental: a line is no longer held for tens of seconds, and a long run of bars next to one line scrolls on its own instead of pushing the text out of view.
+- Scrollbars in the lyrics, chords and tab panes are hidden and appear only while you scroll by hand.
+
 ## 0.0.19
 
 - Removed the "Chords aligned with … / agrees / differs / Use tab chords" strip under the chords. Online chords still apply in the background.

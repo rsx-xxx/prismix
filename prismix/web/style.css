@@ -767,3 +767,9 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .pp-ghost { position: fixed; z-index: 60; pointer-events: none; display: flex; align-items: center; gap: 6px; border-radius: 12px; background: var(--surface); box-shadow: 0 14px 36px rgb(0 0 0 / .35), 0 0 0 2px var(--accent); transform: scale(1.015); }
 body.dragging { cursor: grabbing; user-select: none; }
 body.dragging * { cursor: grabbing !important; }
+
+/* pane scrollbars stay hidden until the user scrolls by hand (wheel, touch, drag, keys) */
+.ly-body, .chart, .tab-body, .fing-side { scrollbar-width: none; }
+.ly-body::-webkit-scrollbar, .chart::-webkit-scrollbar, .tab-body::-webkit-scrollbar, .fing-side::-webkit-scrollbar { width: 0; }
+.ly-body.manual, .chart.manual, .tab-body.manual, .fing-side.manual { scrollbar-width: thin; }
+.ly-body.manual::-webkit-scrollbar, .chart.manual::-webkit-scrollbar, .tab-body.manual::-webkit-scrollbar, .fing-side.manual::-webkit-scrollbar { width: 8px; }
