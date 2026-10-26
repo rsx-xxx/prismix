@@ -5,6 +5,7 @@ import json
 import logging
 import shutil
 import subprocess
+import tempfile
 import time
 import urllib.request
 from collections.abc import Callable
@@ -58,8 +59,15 @@ def search(query: str, limit: int = 8, offset: int = 0) -> list[dict]:
     """`limit` results after the first `offset` ones (yt-dlp has no paging, so earlier ones are fetched and dropped)."""
     import yt_dlp
 
-    with yt_dlp.YoutubeDL(_ydl_opts(extract_flat=True)) as ydl:
-        res = ydl.extract_info(f"ytsearch{offset + limit}:{query}", download=False)
+    # yt-dlp rewrites its cookie file on close, so concurrent searches each get a private copy
+    with tempfile.TemporaryDirectory() as tmp:
+        opts = _ydl_opts(extract_flat=True)
+        if src := opts.get("cookiefile"):
+            copy = Path(tmp) / "cookies.txt"
+            shutil.copyfile(src, copy)
+            opts["cookiefile"] = str(copy)
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            res = ydl.extract_info(f"ytsearch{offset + limit}:{query}", download=False)
     out = []
     for e in list((res or {}).get("entries", []))[offset:]:
         vid = e.get("id")
