@@ -62,18 +62,62 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
       rm.addEventListener('click', async () => {
         try { await api(`/api/playlists/${id}/items/${it.id}`, { method: 'DELETE' }); await load(); show(id); } catch (e) { notice(e.message); }
       });
-      const up = el('button', { type: 'button', className: 'icon-btn', ariaLabel: 'Move up', title: 'Move up', textContent: '↑', disabled: n === 0 });
-      up.addEventListener('click', () => move(p, n, -1));
-      row.append(go, up, rm);
+      const grip = el('span', { className: 'pp-grip', role: 'button', tabIndex: 0, ariaLabel: 'Drag to reorder', title: 'Drag to reorder (or Alt+↑/↓)' }, el('i'), el('i'), el('i'));
+      grip.addEventListener('pointerdown', (e) => drag(e, row, p));
+      grip.addEventListener('keydown', (e) => {
+        if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+        e.preventDefault();
+        move(p, n, e.key === 'ArrowUp' ? -1 : 1);
+      });
+      row.append(grip, go, rm);
       return row;
     }));
     poll();
   }
 
   async function move(p, n, d) {
+    if (n + d < 0 || n + d >= p.items.length) return;
     const ids = p.items.map((i) => i.id);
     [ids[n], ids[n + d]] = [ids[n + d], ids[n]];
-    try { await api(`/api/playlists/${p.id}`, JSON_POST('PATCH', { order: ids })); await load(); show(p.id); } catch (e) { notice(e.message); }
+    await saveOrder(p, ids);
+  }
+
+  async function saveOrder(p, ids) {
+    try { await api(`/api/playlists/${p.id}`, JSON_POST('PATCH', { order: ids })); await load(); } catch (e) { notice(e.message); }
+    show(p.id);
+  }
+
+  /** Drag a row by its grip: rows swap live under the pointer, the order is saved on release. */
+  function drag(e, row, p) {
+    if (e.button > 0) return;
+    e.preventDefault();
+    const list = $('pp-list');
+    const grip = e.currentTarget;
+    grip.setPointerCapture(e.pointerId);
+    row.classList.add('drag');
+    const renumber = () => list.querySelectorAll('.pp-n').forEach((n, i) => { n.textContent = String(i + 1); });
+    const over = (ev) => {
+      for (const other of list.children) {
+        if (other === row) continue;
+        const r = other.getBoundingClientRect();
+        if (ev.clientY < r.top || ev.clientY > r.bottom) continue;
+        list.insertBefore(row, ev.clientY > r.top + r.height / 2 ? other.nextSibling : other);
+        renumber();
+        break;
+      }
+    };
+    const end = (ev) => {
+      grip.removeEventListener('pointermove', over);
+      grip.removeEventListener('pointerup', end);
+      grip.removeEventListener('pointercancel', end);
+      row.classList.remove('drag');
+      const ids = [...list.children].map((r) => r.dataset.id);
+      if (ids.every((id, i) => id === p.items[i].id)) return;
+      saveOrder(p, ids);
+    };
+    grip.addEventListener('pointermove', over);
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
   }
 
   async function poll() {

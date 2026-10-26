@@ -28,7 +28,7 @@ export function createScore({ player, api, notice }) {
   let renderToken = 0;
   let last = { bar: -2, beat: -2, chord: -2 };
   const flag = (k, dflt) => { try { const v = localStorage.getItem(`stems:sc-${k}`); return v === null ? dflt : v === '1'; } catch { return dflt; } };
-  const opts = { easy: flag('easy', false), simple: flag('simple', false), useTab: flag('useTab', false) };
+  const opts = { easy: flag('easy', false), simple: flag('simple', false), useTab: flag('useTab', true) };
   const loadCapoMode = () => { try { return localStorage.getItem('stems:sc-capoMode') || 'off'; } catch { return 'off'; } };
   let capoMode = loadCapoMode(); // 'off' | 'auto' | '1'..'7'
   const alts = new Map(); // chord shape -> which alternative fingering is showing
@@ -79,6 +79,20 @@ export function createScore({ player, api, notice }) {
     cur.tabs = tabs?.marks ? tabs : null;
     if (structure) setData(structure);
     renderAll();
+    if (structure && !cur.tabs && !lookedUp.has(id)) autoTabs(id);
+  }
+
+  /** Online chords are looked up by themselves, once per track per session; with "Use tab chords" on they replace the detected ones. */
+  const lookedUp = new Set();
+  async function autoTabs(id) {
+    lookedUp.add(id);
+    try {
+      const t = await api('/api/tabs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoId: id, url: null }) });
+      if (!cur || cur.id !== id || cur.tabs) return;
+      cur.tabs = t;
+      applyTabs();
+      renderAll();
+    } catch { /* no chord sheet online: the detected chords stay */ }
   }
 
   function close() {
@@ -94,6 +108,8 @@ export function createScore({ player, api, notice }) {
     $('ahead').replaceChildren();
     ahead = [];
     $('sc-body').replaceChildren();
+    $('fing').replaceChildren();
+    $('fing').hidden = true;
     document.dispatchEvent(new Event('chords:change'));
   }
 
@@ -419,7 +435,9 @@ export function createScore({ player, api, notice }) {
       cells.forEach((c, i) => rows[rowOfBar(i)].append(c));
       grid = el('div', { className: 'chart aligned' }, ...rows);
     } else grid = el('div', { className: 'chart' }, ...cells);
-    body.replaceChildren(el('div', { className: 'chart-wrap' }, grid, el('aside', { className: 'chart-side', 'aria-label': 'Chord fingerings' }, fingerOpts(), diagrams())), el('div', { className: 'chart-extra' }, tabSource()));
+    body.replaceChildren(grid, el('div', { className: 'chart-extra' }, tabSource()));
+    $('fing').replaceChildren(fingerOpts(), diagrams());
+    $('fing').hidden = false;
     if (aligned) alignRows();
     markBar(last.bar);
     markChord(last.chord);
