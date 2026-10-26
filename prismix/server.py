@@ -19,6 +19,7 @@ from . import (
     REPO,
     __version__,
     analysis,
+    browser,
     export,
     lan,
     library,
@@ -244,6 +245,14 @@ def create_app() -> FastAPI:
             raise HTTPException(404, "Not found") from None
         if not ok:
             raise HTTPException(404, "Not found")
+        return {"ok": True}
+
+    @app.post("/api/open-link")
+    def open_link(url: str = Query(min_length=8, max_length=2000)):
+        """Open a link on the host machine in Zen (remote clients never get here: the guard blocks their POSTs)."""
+        if urlparse(url).scheme not in ("http", "https"):
+            raise HTTPException(400, "Only web links")
+        browser.open_url(url)
         return {"ok": True}
 
     @app.get("/api/config")

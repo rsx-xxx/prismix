@@ -12,6 +12,8 @@
   --on-primary: oklch(0.16 0.01 275);
   --primary: oklch(0.97 0.004 275);
   --glow: oklch(0.45 0.12 285 / 0.35);
+  --sec-pre: #ddd6fe; --sec-chorus: #fde68a; --sec-verse: #bae6fd; --sec-bridge: #fbcfe8; --sec-quiet: rgba(255,255,255,.5);
+  --sec-label: rgba(255,255,255,.4);
   --radius: 16px;
   --row-h: 84px;
   --dock-h: 176px;
@@ -31,6 +33,8 @@
     --primary: oklch(0.2 0.02 275);
     --on-primary: oklch(0.98 0 0);
     --glow: oklch(0.8 0.1 285 / 0.4);
+    --sec-pre: #5b3fc4; --sec-chorus: #8a5a00; --sec-verse: #0b5f8a; --sec-bridge: #a3175f; --sec-quiet: rgba(0,0,0,.55);
+      --sec-label: rgba(0,0,0,.55);
   }
 }
 :root[data-theme="light"] {
@@ -46,6 +50,8 @@
   --primary: oklch(0.2 0.02 275);
   --on-primary: oklch(0.98 0 0);
   --glow: oklch(0.8 0.1 285 / 0.4);
+  --sec-pre: #5b3fc4; --sec-chorus: #8a5a00; --sec-verse: #0b5f8a; --sec-bridge: #a3175f; --sec-quiet: rgba(0,0,0,.55);
+  --sec-label: rgba(0,0,0,.55);
 }
 
 * { box-sizing: border-box; }
@@ -362,6 +368,14 @@ kbd { font: 12px var(--font); background: var(--surface-2); border: 1px solid va
 .sc-cta h3 { margin: 0; }
 .sc-cta p { margin: 0; max-width: 56ch; }
 .sc-cta .bar { width: min(420px, 100%); }
+.chart-wrap { display: flex; gap: 12px; align-items: flex-start; }
+.chart-wrap > .chart { flex: 1 1 auto; min-width: 0; }
+.chart-side { flex: 0 0 168px; max-height: var(--pane-h); overflow-y: auto; overscroll-behavior: contain; padding: 2px; }
+.chart-side .fing-opts { flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 10px; font-size: 12px; }
+.chart-side .diagrams { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 0; }
+.chart-side .diagrams figure { padding: 6px 4px 4px; }
+.chart-side .diagrams svg { width: 100%; height: auto; }
+@media (max-width: 760px) { .chart-wrap { flex-direction: column; } .chart-wrap > .chart { width: 100%; } .chart-side { flex-basis: auto; max-height: none; width: 100%; } .chart-side .diagrams { display: flex; flex-wrap: wrap; } }
 .diagrams { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
 .diagrams figure { margin: 0; display: grid; justify-items: center; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px 6px; }
 .diagrams figcaption { font-weight: 650; font-size: 14px; }
@@ -558,7 +572,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 /* Landmarks: music/lyrics starts and song sections, on the seek bar, over the lanes and as a band above the seek bar. */
 .mk { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .mk-lane { z-index: 2; }
-.mk-quiet { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, rgba(255,255,255,.07) 0 4px, transparent 4px 9px); }
+.mk-quiet { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text) 7%, transparent) 0 4px, transparent 4px 9px); }
 .mk-seek .mk-quiet { opacity: .8; }
 .mk-flag { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; border-radius: 1px; opacity: .85; }
 .mk-flag.music { background: #5eead4; box-shadow: 0 0 8px #5eead4; }
@@ -566,14 +580,14 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .mk-lane .mk-flag.lyrics { background: repeating-linear-gradient(to bottom, #c4b5fd 0 4px, transparent 4px 8px); width: 1px; }
 .secband { position: relative; height: 18px; margin: 0 auto 4px; max-width: 1180px; width: 100%; }
 .secband[hidden] { display: none; }
-.sec { position: absolute; top: 0; bottom: 0; box-sizing: border-box; padding: 0 3px; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border: 0; border-left: 1px solid rgba(0,0,0,.35); border-radius: 5px; cursor: pointer; font: 600 10px/18px system-ui, sans-serif; letter-spacing: .03em; color: rgba(255,255,255,.7); background: rgba(255,255,255,.08); transition: background .15s, color .15s; }
-.sec:hover { background: rgba(255,255,255,.16); color: #fff; }
-.sec[data-kind=prechorus] { background: rgba(167,139,250,.2); color: #ddd6fe; }
-.sec[data-kind=chorus], .sec[data-kind=refrain] { background: rgba(251,191,36,.22); color: #fde68a; }
-.sec[data-kind=verse] { background: rgba(125,211,252,.16); color: #bae6fd; }
-.sec[data-kind=bridge] { background: rgba(244,114,182,.2); color: #fbcfe8; }
-.sec[data-kind=intro], .sec[data-kind=outro], .sec[data-kind=inst] { background: rgba(255,255,255,.06); color: rgba(255,255,255,.5); }
-.sec.cur { box-shadow: inset 0 0 0 1px currentColor; filter: brightness(1.25); }
+.sec { position: absolute; top: 0; bottom: 0; box-sizing: border-box; padding: 0 3px; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border: 0; border-left: 1px solid rgba(0,0,0,.35); border-radius: 5px; cursor: pointer; font: 600 10px/18px system-ui, sans-serif; letter-spacing: .03em; color: var(--sec-quiet); background: color-mix(in srgb, var(--text) 8%, transparent); transition: background .15s, color .15s; }
+.sec:hover { background: color-mix(in srgb, var(--text) 14%, transparent); color: var(--text); }
+.sec[data-kind=prechorus] { background: rgba(167,139,250,.2); color: var(--sec-pre); }
+.sec[data-kind=chorus], .sec[data-kind=refrain] { background: rgba(251,191,36,.22); color: var(--sec-chorus); }
+.sec[data-kind=verse] { background: rgba(125,211,252,.16); color: var(--sec-verse); }
+.sec[data-kind=bridge] { background: rgba(244,114,182,.2); color: var(--sec-bridge); }
+.sec[data-kind=intro], .sec[data-kind=outro], .sec[data-kind=inst] { background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--sec-quiet); }
+.sec.cur { box-shadow: inset 0 0 0 1px currentColor; font-weight: 800; }
 .marks { gap: .35rem; }
 .cell { position: relative; }
 .cell.pre { opacity: .35; }
@@ -582,10 +596,10 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .cell[data-kind=verse]::after { color: #bae6fd; }
 .cell[data-kind=bridge]::after { color: #fbcfe8; }
 .cell[data-ly]::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2px; border-radius: 1px; background: #c4b5fd; opacity: .6; }
-.ly-line[data-sec]::before { content: attr(data-sec); display: block; margin: .9em 0 .25em; font: 700 10px/1 system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.4); }
-.ly-line[data-kind=chorus]::before, .ly-line[data-kind=refrain]::before { color: #fde68a; }
-.ly-line[data-kind=verse]::before { color: #bae6fd; }
-.ly-line[data-kind=bridge]::before { color: #fbcfe8; }
+.ly-line[data-sec]::before { content: attr(data-sec); display: block; margin: .9em 0 .25em; font: 700 10px/1 system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--sec-label); }
+.ly-line[data-kind=chorus]::before, .ly-line[data-kind=refrain]::before { color: var(--sec-chorus); }
+.ly-line[data-kind=verse]::before { color: var(--sec-verse); }
+.ly-line[data-kind=bridge]::before { color: var(--sec-bridge); }
 
 .ver { align-self: center; padding: 1px 7px; border-radius: 999px; font: 600 11px/18px system-ui, sans-serif; color: var(--muted); border: 1px solid var(--line, rgba(255,255,255,.12)); text-decoration: none; }
 .ver:hover { color: var(--text); border-color: var(--accent); }
@@ -666,3 +680,15 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .card:hover .add, .card .add:focus-visible { opacity: 1; }
 .card .add:hover { background: var(--accent); }
 @media (hover: none) { .card .add { opacity: 1; } }
+
+/* lyrics credit: a quiet gray link, not the accent colour */
+#ly-credit a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+#ly-credit a:hover { color: var(--text); }
+
+/* light theme: dimmed lyric lines and bar labels keep enough contrast on white */
+:root[data-theme="light"] .ly-line { opacity: .8; }
+:root[data-theme="light"] .ly-line.past { opacity: .6; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .ly-line { opacity: .8; }
+  :root:not([data-theme]) .ly-line.past { opacity: .6; }
+}

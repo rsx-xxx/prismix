@@ -2,12 +2,20 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.7
+
+- Pasting a Spotify playlist works on machines without system root certificates (the desktop builds), and matching a playlist's songs to YouTube no longer fails when several searches run at once.
+- Every link Prismix opens goes to the Zen browser when it is installed, otherwise to the default one.
+- Chord fingering diagrams sit in a side bar next to the bars, so they stay in view while the chords scroll.
+- Light theme: song-part labels, the section strip and dimmed lyrics are readable on white.
+- The lyrics header shows only a quiet gray Genius link instead of the long status line.
+- Android release APKs are signed with one fixed key, so each update installs over the last. Desktop builds stay unsigned (paid); `packaging/SIGNING.md` lists the free options.
+
 ## 0.0.6
 
 - Spotify links work like YouTube ones: paste a track to split it, or an album, playlist or artist link to open it in Playlists and save or process all. Each song is matched to a YouTube video by length and name; nothing is downloaded from Spotify (up to 100 songs per list).
 - The Android app reaches the host even with a VPN or per-app proxy on the phone (for example Cloudflare WARP): its traffic is pinned to the Wi-Fi network.
 - The Android app takes a host by name (`prismix.local`) as well as by address, and shows "Connecting…" until the page is there instead of a black screen. A host that moved is found again.
-- Release builds are code-signed on Windows and macOS once the signing secrets are set up (see `packaging/SIGNING.md`).
 
 ## 0.0.5
 

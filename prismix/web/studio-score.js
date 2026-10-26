@@ -419,7 +419,7 @@ export function createScore({ player, api, notice }) {
       cells.forEach((c, i) => rows[rowOfBar(i)].append(c));
       grid = el('div', { className: 'chart aligned' }, ...rows);
     } else grid = el('div', { className: 'chart' }, ...cells);
-    body.replaceChildren(grid, el('div', { className: 'chart-extra' }, tabSource(), fingerOpts(), diagrams()));
+    body.replaceChildren(el('div', { className: 'chart-wrap' }, grid, el('aside', { className: 'chart-side', 'aria-label': 'Chord fingerings' }, fingerOpts(), diagrams())), el('div', { className: 'chart-extra' }, tabSource()));
     if (aligned) alignRows();
     markBar(last.bar);
     markChord(last.chord);
