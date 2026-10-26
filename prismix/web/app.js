@@ -88,8 +88,8 @@ const plview = createPlaylistView({
 });
 function openFrom(id, plId) {
   const it = state.library.find((i) => i.id === id);
-  if (!it) { notice('That song is not prepared yet. Use Process all.'); return; }
   state.plist = plId || null;
+  if (!it) { startProcess(id, $('quality').value); return; }
   location.hash = `#/v/${id}/${it.models.includes(state.defaultModel) ? state.defaultModel : it.models[0]}`;
 }
 

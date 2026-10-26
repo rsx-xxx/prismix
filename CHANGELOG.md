@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.13
+
+- Clicking a not-yet-processed song in a playlist now processes just that song, instead of asking you to use Process all.
+
 ## 0.0.12
 
 - Library and player covers fall back to the YouTube thumbnail when the saved cover file is missing, instead of showing a broken image.
