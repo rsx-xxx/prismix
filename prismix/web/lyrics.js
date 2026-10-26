@@ -10,6 +10,7 @@ const el = (tag, props = {}, ...kids) => {
   return n;
 };
 const LEAD = 0.25; // light a line slightly early: reading is faster than singing
+const MAX_WORD = 6; // seconds; no sung word or silence between words is longer
 const BREAK_S = 6; // a pause between sung lines at least this long gets a ♪ row
 const PAUSE_MS = Infinity; // after the user scrolls by hand, leave the view alone until play, a seek or the Follow button
 
@@ -34,7 +35,9 @@ const PRONOUNCED = /[a-zа-яё']/i; // what align.py can place; other tokens ha
 export function timeLine(text, t, next, ws, we) {
   const words = text.split(/(\s+)/).filter((w) => w !== '');
   const real = words.filter((w) => PRONOUNCED.test(w) && !/^\s+$/.test(w)).length;
-  const exact = !!ws && ws.length === we?.length && ws.length === real && real > 0;
+  // word times that stretch over an instrumental (a word held for seconds, or a long silence between words) are alignment errors
+  const smeared = !!ws && ws.some((a, k) => we?.[k] - a > MAX_WORD || (k > 0 && a - we[k - 1] > MAX_WORD));
+  const exact = !!ws && ws.length === we?.length && ws.length === real && real > 0 && !smeared;
   const syl = [];
   let wi = 0, edge = t;
   const parts = words.map((w) => {
@@ -50,11 +53,11 @@ export function timeLine(text, t, next, ws, we) {
     }
     return { pieces };
   });
-  if (exact) return { parts, syl, end: Math.max(next ?? 0, we.at(-1)) };
+  if (exact) return { parts, syl, end: Math.min(Math.max(next ?? 0, we.at(-1)), we.at(-1) + MAX_TAIL) };
   const slot = next != null ? Math.max(0.5, next - t) : syl.length * SING + MAX_TAIL;
   const sung = Math.min(slot, syl.length * SING + MAX_TAIL);
   syl.forEach((o, k) => { o.t = t + (sung * k) / Math.max(1, syl.length); o.e = k + 1 < syl.length ? t + (sung * (k + 1)) / syl.length : t + sung; });
-  return { parts, syl, end: t + slot };
+  return { parts, syl, end: t + Math.min(slot, sung + MAX_TAIL) };
 }
 
 /**

@@ -1146,3 +1146,16 @@ window.addEventListener('beforeunload', savePrefs);
 const more = document.querySelector('details.more');
 document.addEventListener('pointerdown', (e) => { if (more?.open && !more.contains(e.target)) more.open = false; });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && more?.open) { more.open = false; e.stopPropagation(); } }, true);
+
+// Pane scrollbars appear only while the user scrolls by hand, not while playback scrolls the panes.
+{
+  const timers = new WeakMap();
+  const show = (e) => {
+    const box = e.target.closest?.('.ly-body, .chart, .tab-body, .fing-side');
+    if (!box) return;
+    box.classList.add('manual');
+    clearTimeout(timers.get(box));
+    timers.set(box, setTimeout(() => box.classList.remove('manual'), 900));
+  };
+  for (const ev of ['wheel', 'touchmove', 'pointerdown', 'keydown']) document.addEventListener(ev, show, { passive: true, capture: true });
+}
