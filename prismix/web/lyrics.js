@@ -10,6 +10,7 @@ const el = (tag, props = {}, ...kids) => {
   return n;
 };
 const LEAD = 0.25; // light a line slightly early: reading is faster than singing
+const BREAK_S = 6; // a pause between sung lines at least this long gets a ♪ row
 const PAUSE_MS = Infinity; // after the user scrolls by hand, leave the view alone until play, a seek or the Follow button
 
 const VOWELS = 'aeiouyаеёиоуыэюяіїєäöüéèêàâîôû';
@@ -134,8 +135,8 @@ export function createLyrics({ player, api, chords = () => [] }) {
     else credit.replaceChildren(data.web ? el('a', { href: data.web, target: '_blank', rel: 'noopener', textContent: 'Genius' }) : 'LRCLIB');
     body.replaceChildren(el('div', { className: `ly-lines${data.synced ? '' : ' plain'}` }, ...(data.synced ? [cur.intro] : []), ...nodes, ...(data.synced ? [cur.outro] : [])));
     body.scrollTop = 0;
+    annotate(); // adds the ♪ rows, so the chords can line up with the final set of rows
     document.dispatchEvent(new CustomEvent('lyrics:data', { detail: data }));
-    annotate();
     frame(player.position);
   }
 
@@ -206,6 +207,23 @@ export function createLyrics({ player, api, chords = () => [] }) {
     for (const [row, list] of [[cur.intro, intro], [cur.outro, outro]]) {
       row.replaceChildren(...(list.length ? [el('span', { className: 'ly-instr-mark', textContent: '♪' }), ...list.map(chip)] : []));
     }
+    // an instrumental stretch between two sung lines is one small ♪ row; the chords scroll on while the lyrics wait there
+    cur.brks ??= new Map();
+    lines.forEach((ln, i) => {
+      const tl = cur.timed[i], j = cur.timed.findIndex((x, k) => k > i && x);
+      if (!tl) { // a rest the lyrics file already marks with ♪
+        if (!ln.text && ln.t != null && j >= 0) cur.brks.set(i, { n: nodes[i], own: true, t0: ln.t, t1: lines[j].t });
+        return;
+      }
+      const marked = lines.slice(i + 1, j < 0 ? i + 1 : j).some((x) => !x.text && x.t != null);
+      if (j < 0 || marked || lines[j].t - tl.end < BREAK_S) { if (!cur.brks.get(i)?.own) cur.brks.get(i)?.n.remove(); cur.brks.delete(i); return; }
+      let b = cur.brks.get(i);
+      if (!b) { b = { n: el('div', { className: 'ly-brk', textContent: '♪' }) }; cur.brks.set(i, b); nodes[i].after(b.n); }
+      b.t0 = tl.end; b.t1 = lines[j].t;
+      b.n.dataset.t = String(b.t0);
+    });
+    const lastEnd = lastT < 0 ? null : cur.timed[lastT].end + 0.5;
+    if (lastEnd == null) delete cur.outro.dataset.t; else cur.outro.dataset.t = String(lastEnd);
     cur.sy = nodes.map((n) => [...n.querySelectorAll('.sy')]);
     cur.sungTo = -1;
   }
@@ -219,6 +237,7 @@ export function createLyrics({ player, api, chords = () => [] }) {
       if (lines[mid].t <= pos + LEAD) { i = mid; lo = mid + 1; } else hi = mid - 1;
     }
     sing(pos);
+    for (const b of cur.brks?.values() ?? []) if (!b.own) b.n.classList.toggle('now', pos >= b.t0 && pos < b.t1 - LEAD);
     if (i === cur.active) return;
     cur.active = i;
     cur.nodes.forEach((n, k) => {
@@ -331,7 +350,16 @@ export function createLyrics({ player, api, chords = () => [] }) {
         const m = offsetIn(body, n) + n.offsetHeight / 2;
         return m < 0 || m > body.clientHeight;
       },
-      track: () => (cur?.timed ?? []).flatMap((tl, i) => (tl ? [{ y: offsetIn(body, cur.nodes[i]) + body.scrollTop + cur.nodes[i].offsetHeight / 2, t: cur.data.lines[i].t }] : [])),
+      track: () => {
+        const mid = (n) => offsetIn(body, n) + body.scrollTop + n.offsetHeight / 2;
+        return (cur?.timed ?? []).flatMap((tl, i) => {
+          const b = cur.brks?.get(i);
+          if (!tl) return b?.own ? [{ y: mid(b.n), t: b.t0 }, { y: mid(b.n), t: Math.max(b.t0, b.t1 - 1.5) }] : [];
+          const pts = [{ y: mid(cur.nodes[i]), t: cur.data.lines[i].t }];
+          if (b) pts.push({ y: mid(b.n), t: b.t0 }, { y: mid(b.n), t: Math.max(b.t0, b.t1 - 1.5) });
+          return pts;
+        });
+      },
     }),
   };
 
