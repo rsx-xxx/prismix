@@ -800,3 +800,31 @@ body.dragging * { cursor: grabbing !important; }
 #band-note { position: fixed; left: 50%; bottom: 1.2rem; transform: translate(-50%, 12px); padding: .5rem 1rem; border-radius: 999px; background: var(--ink, #222); color: var(--bg, #fff); font-size: .85rem; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 60; }
 #band-note.on { opacity: 1; transform: translate(-50%, 0); }
 #queue-btn[hidden] { display: none; }
+
+/* ── states, touch targets, motion ── */
+button, .btn, .icon-btn, summary, select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.btn:disabled, .icon-btn:disabled, .btn[aria-disabled=true] { opacity: .45; cursor: not-allowed; transform: none; }
+.btn:disabled:hover { background: var(--surface-2); }
+.btn.primary:disabled:hover { background: var(--primary); opacity: .45; }
+[aria-busy=true] { cursor: progress; }
+.btn:focus-visible, .icon-btn:focus-visible { outline-offset: 3px; border-radius: 999px; }
+h1, h2, h3 { text-wrap: balance; }
+html { scrollbar-gutter: stable; }
+dialog { transition: opacity .2s, transform .25s cubic-bezier(.2, .8, .2, 1), display .25s allow-discrete, overlay .25s allow-discrete; opacity: 0; transform: translateY(8px) scale(.98); }
+dialog[open] { opacity: 1; transform: none; }
+@starting-style { dialog[open] { opacity: 0; transform: translateY(8px) scale(.98); } }
+dialog::backdrop { transition: opacity .25s; opacity: 0; }
+dialog[open]::backdrop { opacity: 1; }
+@starting-style { dialog[open]::backdrop { opacity: 0; } }
+@media (hover: none) {
+  .btn:hover { background: var(--surface-2); }
+  .btn.primary:hover { background: var(--primary); opacity: 1; }
+  .btn.ghost:hover { background: transparent; }
+  .icon-btn:hover { background: transparent; color: var(--muted); }
+  .card:hover { transform: none; box-shadow: none; }
+}
+@media (pointer: coarse) {
+  .btn { min-height: 44px; }
+  .btn.small { min-height: 40px; padding-inline: 14px; }
+  .icon-btn { width: 44px; height: 44px; }
+}

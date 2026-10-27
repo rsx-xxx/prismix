@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import socket
 import ssl
 import threading
 import time
@@ -25,7 +26,7 @@ PORTS = (443, lan.HTTPS_PORT)  # the clean name-only link, then the classic one
 # Answered here even while connected: they describe this computer, not the host.
 LOCAL_API = ("/api/client", "/api/update", "/api/version")
 RELAYED = ("/api/", "/media/", "/remote/hello")
-KEEP_REQUEST = ("range", "if-none-match", "if-modified-since", "x-band-token", "accept", "accept-encoding")
+KEEP_REQUEST = ("range", "if-none-match", "if-modified-since", "x-band-token", "if-range", "accept", "accept-encoding")
 KEEP_RESPONSE = ("content-type", "content-length", "content-range", "accept-ranges", "content-encoding",
                  "cache-control", "etag", "last-modified")
 
@@ -90,6 +91,10 @@ def _handshake(host: str, ports: list[int]) -> tuple[int, ssl.SSLContext, dict]:
         if hello.get("app") != "prismix":
             raise ConnectError("That is not a Prismix host")
         return port, ctx, hello
+    if isinstance(last, httpx.TimeoutException | TimeoutError):
+        raise ConnectError(f"{host} did not answer. Same Wi-Fi? Is Prismix open there?")
+    if isinstance(last, socket.gaierror):
+        raise ConnectError(f"Could not find {host}. Try its address instead, e.g. 192.168.1.20")
     raise ConnectError(f"Could not reach {host}" + (f" ({last})" if last else ""))
 
 
@@ -187,6 +192,7 @@ async def relay_ws(ws: WebSocket, up: Upstream) -> None:
     finally:
         for t in tasks:
             t.cancel()
+            t.add_done_callback(lambda f: f.cancelled() or f.exception())  # a dropped peer must not log "never retrieved"
         code = remote.close_code or 1011
         with contextlib.suppress(Exception):
             await remote.close()

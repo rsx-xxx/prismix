@@ -16,7 +16,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,7 +28,6 @@ import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
 
 /**
  * Songs kept on the phone for use without a host. One folder per song under files/offline/<id>, holding the host's
@@ -247,9 +245,7 @@ final class Offline {
         URL u = new URL(url);
         if (!u.getHost().equals(Main.hostName())) throw new IllegalStateException("not the connected host");
         HttpsURLConnection c = (HttpsURLConnection) u.openConnection();
-        SSLContext tls = SSLContext.getInstance("TLS");
-        tls.init(null, Main.TRUST_ALL, new SecureRandom());
-        c.setSSLSocketFactory(tls.getSocketFactory());
+        c.setSSLSocketFactory(Main.tls());
         c.setHostnameVerifier((h, s) -> true);
         c.setConnectTimeout(8000);
         c.setReadTimeout(readMs);

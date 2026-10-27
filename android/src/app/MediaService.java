@@ -20,10 +20,8 @@ import android.os.PowerManager;
 
 import java.io.InputStream;
 import java.net.URL;
-import java.security.SecureRandom;
 
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
 
 /**
  * Keeps the app alive with the screen off and shows the song in the notification shade and on the lock screen
@@ -94,7 +92,7 @@ public class MediaService extends Service {
             dur = i.getLongExtra("dur", 0);
             rate = i.getFloatExtra("rate", 1f);
             String url = i.getStringExtra("art");
-            if (url != null && !url.isEmpty()) { artUrl = url; art = null; fetchArt(url); }
+            if (url != null && !url.isEmpty() && !url.equals(artUrl)) { artUrl = url; art = null; fetchArt(url); }
             show();
         }
         return START_NOT_STICKY;
@@ -164,9 +162,7 @@ public class MediaService extends Service {
                 URL u = new URL(url);
                 if (!u.getHost().equals(Main.hostName())) return;
                 HttpsURLConnection c = (HttpsURLConnection) u.openConnection();
-                SSLContext ctx = SSLContext.getInstance("TLS");
-                ctx.init(null, Main.TRUST_ALL, new SecureRandom());
-                c.setSSLSocketFactory(ctx.getSocketFactory());
+                c.setSSLSocketFactory(Main.tls());
                 c.setHostnameVerifier((h, s) -> true);
                 c.setConnectTimeout(3000);
                 c.setReadTimeout(5000);

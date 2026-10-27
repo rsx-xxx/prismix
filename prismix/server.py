@@ -190,6 +190,16 @@ def create_app() -> FastAPI:
         return await call_next(request)
 
     @app.middleware("http")
+    async def no_cross_site(request: Request, call_next):
+        # This computer's own API changes things (delete, open links, join a host): a web page open in another tab
+        # must not be able to drive it, so a browser's cross-site write is refused. Non-browser callers send no Origin.
+        if (request.method not in ("GET", "HEAD", "OPTIONS")
+                and band_mod.is_loopback(request.client.host if request.client else None)
+                and not band_mod.same_origin(request.headers.get("origin"), request.headers.get("host"))):
+            return Response("Cross-site request", status_code=403)
+        return await call_next(request)
+
+    @app.middleware("http")
     async def joined(request: Request, call_next):
         # Joined to another host: this window's own data calls go there; LAN visitors still get this computer.
         up = app.state.upstream
@@ -211,6 +221,11 @@ def create_app() -> FastAPI:
 
     @app.websocket("/ws")
     async def band_ws(ws: WebSocket):
+        # A page on another site could otherwise connect to this computer's socket and act as the host
+        if band_mod.is_loopback(ws.client.host if ws.client else None) \
+                and not band_mod.same_origin(ws.headers.get("origin"), ws.headers.get("host")):
+            await ws.close(code=4403)
+            return
         up = app.state.upstream
         if up and band_mod.is_loopback(ws.client.host if ws.client else None):
             await client.relay_ws(ws, up)
@@ -234,8 +249,7 @@ def create_app() -> FastAPI:
         """Joining a host is for the window on this computer, and never for a page in another tab or site."""
         if not band_mod.is_loopback(request.client.host if request.client else None):
             raise HTTPException(403, "Only on this computer")
-        origin = request.headers.get("origin")
-        if origin and urlparse(origin).netloc != request.headers.get("host"):
+        if not band_mod.same_origin(request.headers.get("origin"), request.headers.get("host")):
             raise HTTPException(403, "Cross-site request")
 
     @app.get("/api/client")
