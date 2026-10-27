@@ -160,3 +160,45 @@ def test_shared_change_is_announced_to_everyone_else(client):
         while (m := host.receive_json())["t"] != "changed":
             pass
         assert m["who"] == "Ann"
+
+
+def test_cross_site_write_and_socket_refused_on_loopback(client, monkeypatch):
+    monkeypatch.setattr(band_mod, "is_loopback", lambda h: True)
+    evil = {"origin": "https://evil.example"}
+    assert client.post("/api/open-link?url=https://example.com", headers=evil).status_code == 403
+    assert client.get("/api/band", headers=evil).status_code == 200  # reads stay open
+    with pytest.raises(Exception), client.websocket_connect("/ws", headers=evil):  # noqa: B017 - closed before accept
+        pass
+
+
+def test_same_origin():
+    assert band_mod.same_origin(None, "127.0.0.1:8000")
+    assert band_mod.same_origin("http://127.0.0.1:8000", "127.0.0.1:8000")
+    assert not band_mod.same_origin("https://evil.example", "127.0.0.1:8000")
+
+
+def test_stalled_client_does_not_block_broadcast(monkeypatch):
+    import asyncio
+
+    band = band_mod.Band()
+    monkeypatch.setattr(band_mod, 'SEND_TIMEOUT', 0.05)
+
+    class Stuck:
+        client = None
+
+        async def send_text(self, _):
+            await asyncio.sleep(10)
+
+        async def close(self, code=1000):
+            pass
+
+    class Fine(Stuck):
+        got: list = []
+
+        async def send_text(self, text):
+            self.got.append(text)
+
+    for i, ws in enumerate((Stuck(), Fine()), 1):
+        band.clients[i] = band_mod.Client(ws, i, "x", "other", False)
+    asyncio.run(asyncio.wait_for(band.broadcast({"t": "x"}), 2))
+    assert Fine.got

@@ -5,6 +5,7 @@ import { chordName, chordPaint, keyName, useFlats, getAccidentals, setAccidental
 import { createMedia } from './media.js';
 import { describe } from './band.js';
 import { timeLine, splitAt } from './lyrics.js';
+import { createSocket } from './socket.js';
 
 const $ = (id) => document.getElementById(id);
 const LS = 'prismix.remote';
@@ -94,27 +95,26 @@ applyLook();
 let seekDrag = false, seekHold = 0; // see the seek bar handlers
 
 // ── connection + clock ──
-let ws;
 let samples = [];
 let welcomed = false;
-function connect() {
-  const sock = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
-  ws = sock;
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ t: 'hello', name: store.name, role: store.role, token: store.pin }));
+const net = createSocket({
+  url: () => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`,
+  fatal: [4001, 4003],
+  auto: false,
+  onopen: () => {
+    net.send({ t: 'hello', name: store.name, role: store.role, token: store.pin });
     samples = [];
     for (let i = 0; i < 8; i++) setTimeout(ping, i * 120);
-  };
-  ws.onmessage = (e) => onMessage(JSON.parse(e.data));
-  ws.onclose = (e) => {
-    if (ws !== sock) return;
-    setLink('bad', 'Disconnected, retrying…');
-    if (e.code === 4001 || e.code === 4003) { showJoin(e.code === 4001 ? 'Wrong PIN.' : 'The host removed you.', e.code === 4001); return; }
+  },
+  onmessage: onMessage,
+  onclose: (e, fatal) => {
+    S.hostOnline = false;
+    if (fatal) { setLink('bad', 'Disconnected'); showJoin(e.code === 4001 ? 'Wrong PIN.' : 'The host removed you.', e.code === 4001); return; }
+    setLink('bad', 'Reconnecting…');
     if (!welcomed) $('boot').querySelector('p').textContent = 'Looking for the host…';
-    setTimeout(connect, 1200);
-  };
-}
-const ping = () => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'ping', c: performance.now() }));
+  },
+});
+const ping = () => net.send({ t: 'ping', c: performance.now() });
 setInterval(ping, 4000);
 
 function setLink(state, text) {
@@ -146,7 +146,7 @@ function onMessage(m) {
     const best = samples.reduce((a, b) => (b.rtt < a.rtt ? b : a));
     S.offset = best.off;
     S.rtt = best.rtt;
-    ws.send(JSON.stringify({ t: 'rtt', v: best.rtt }));
+    net.send({ t: 'rtt', v: best.rtt });
     setLink(S.hostOnline ? 'live' : 'bad', `${S.hostOnline ? 'Connected' : 'Host offline'} · ${Math.round(best.rtt)} ms`);
   } else if (m.t === 'state') {
     setHost(m);
@@ -191,7 +191,7 @@ function setHost(m) {
   if (S.mode === 'listen') syncLocal(before == null || wasPlaying !== !!m.playing || Math.abs(hostPos() - before) > 0.4);
 }
 
-const send = (op, v) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'cmd', op, v }));
+const send = (op, v) => net.send({ t: 'cmd', op, v });
 
 // ── the shared timeline ──
 const hostPos = () => {
@@ -1178,7 +1178,7 @@ const MODE_NOTE = {
   solo: 'Plays only on this phone, on its own tempo and key.',
 };
 const claimSpeaker = () => { if (S.mode === 'listen' && S.local && S.speaker !== S.id) sendSpeaker(true); };
-const sendSpeaker = (on) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'speaker', on }));
+const sendSpeaker = (on) => net.send({ t: 'speaker', on });
 function paintSpeaker() {
   $('spk-row').hidden = S.mode !== 'listen';
   $('spk').checked = S.speaker != null && S.speaker === S.id;
@@ -1320,14 +1320,11 @@ $('join').onsubmit = (e) => {
   welcomed = false;
   $('boot').hidden = false;
   $('join').hidden = true;
-  const old = ws;
-  ws = null;
-  old?.close(1000);
-  connect();
+  net.reconnect();
 };
 if (OFFLINE) offlineStart();
 else {
-  if (store.name && store.role) connect(); else showJoin();
+  if (store.name && store.role) net.reconnect(); else showJoin();
   save(); // hand the settings to the app for the offline page
 }
 requestAnimationFrame(tick);

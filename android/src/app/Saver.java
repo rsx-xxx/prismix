@@ -15,12 +15,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.security.SecureRandom;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
 
 /** Saves a song from the host into the phone's Music folder (Music/Prismix), one file at a time. */
 final class Saver {
@@ -35,9 +33,7 @@ final class Saver {
                 URL u = new URL(url);
                 if (!u.getHost().equals(Main.hostName())) throw new IllegalStateException("not the connected host");
                 HttpsURLConnection c = (HttpsURLConnection) u.openConnection();
-                SSLContext tls = SSLContext.getInstance("TLS");
-                tls.init(null, Main.TRUST_ALL, new SecureRandom());
-                c.setSSLSocketFactory(tls.getSocketFactory());
+                c.setSSLSocketFactory(Main.tls());
                 c.setHostnameVerifier((h, s) -> true);
                 c.setConnectTimeout(8000);
                 c.setReadTimeout(10 * 60 * 1000); // the host encodes before it answers
