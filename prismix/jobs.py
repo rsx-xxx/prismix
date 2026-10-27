@@ -104,6 +104,18 @@ class JobManager:
             self._promote(job)
         return job
 
+    def listing(self) -> list[Job]:
+        """The running job, then the waiting ones in the order they will run, then the latest finished ones."""
+        done = sorted((j for j in self._jobs.values() if j.finished), key=lambda j: j.created, reverse=True)[:5]
+        return [*([self._running] if self._running else []), *self._pending, *done]
+
+    def promote(self, job_id: str) -> bool:
+        job = self._jobs.get(job_id)
+        if not job or job.finished:
+            return False
+        self._promote(job)
+        return True
+
     def _rush_end(self) -> int:
         return next((i for i, j in enumerate(self._pending) if not j.rush), len(self._pending))
 

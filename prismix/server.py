@@ -639,6 +639,24 @@ def create_app() -> FastAPI:
             "Cache-Control": "no-store",
         }, background=BackgroundTask(res.cleanup))
 
+    @app.get("/api/jobs")
+    def jobs_list():
+        titles = {i["id"]: i.get("title") for pl in playlists.list_all() for i in pl["items"]}
+        out = []
+        for j in jobs.listing():
+            try:
+                meta = library.read_meta(j.video_id, j.model)
+            except ValueError:
+                meta = None
+            out.append({**j.snapshot(), "title": (meta or {}).get("title") or titles.get(j.video_id) or j.video_id})
+        return out
+
+    @app.post("/api/jobs/{job_id}/promote")
+    def jobs_promote(job_id: str):
+        if not jobs.promote(job_id):
+            raise HTTPException(404, "That job is not waiting any more")
+        return {"ok": True}
+
     @app.get("/api/jobs/{job_id}/events")
     async def job_events(job_id: str, request: Request):
         job = jobs.get(job_id)

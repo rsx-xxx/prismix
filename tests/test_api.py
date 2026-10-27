@@ -98,3 +98,10 @@ def test_playlists_crud(tmp_path, monkeypatch):
         assert c.delete(f"/api/playlists/{pl['id']}").status_code == 200
         assert c.get("/api/playlists").json() == []
         assert c.patch("/api/playlists/nope", json={"name": "x"}).status_code == 404
+
+
+def test_queue_listing_endpoint(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as c:
+        r = c.get("/api/jobs")
+        assert r.status_code == 200 and r.json() == []
+        assert c.post("/api/jobs/nope/promote").status_code == 404
