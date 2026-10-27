@@ -12,6 +12,7 @@ import { createMarkers } from './markers.js';
 import { createSplit } from './split.js';
 import { initCheatsheet } from './cheatsheet.js';
 import { createBand } from './band.js';
+import { createJoin } from './join.js';
 import { createMedia } from './media.js';
 import { initLinks } from './links.js';
 
@@ -1102,6 +1103,7 @@ function dispatch(e) {
 }
 
 const band = createBand({ player, current: () => state.current, $ });
+createJoin({ $ });
 // Media keys, Now Playing and the Windows media overlay drive the studio player.
 const media = createMedia({
   play: () => player.play(),
