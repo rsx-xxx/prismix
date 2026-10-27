@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.25
+
+- The app checks GitHub for a newer release and shows Update to vX.Y.Z next to the version label; it downloads the installer for your system, or opens the release page where there is none.
+
 ## 0.0.24
 
 - Offline mode in the Android app: tap Save next to a song (or Save all in a playlist) while connected, and its stems, lyrics, chords and tab are kept on the phone. Without the host, the app offers Play saved songs, which opens the same page in Solo with the saved songs only, so the band can rehearse anywhere. Tap Saved, then Remove?, to free the space. The menu's Offline switch, Keep every song I open, saves each song as you open it.
