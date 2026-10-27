@@ -1,5 +1,5 @@
 // Bars and chords for the open track: ruler, chart, fingering diagrams, capo, chart PDF.
-import { bestCapo, capoSavings, chordName, chordPaint, keyName, fifthsFor, simplify, voicing, voicingCount } from './theory.js';
+import { bestCapo, capoSavings, chordName, chordPaint, keyName, useFlats, simplify, voicing, voicingCount } from './theory.js';
 import { chartPdf } from './score.js';
 import { cancelGlide, glide, offsetIn, lockstep } from './scroll.js';
 
@@ -35,7 +35,7 @@ export function createScore({ player, api, notice }) {
   const remember = (k) => { try { localStorage.setItem(`stems:sc-${k}`, opts[k] ? '1' : '0'); } catch { /* ignore */ } };
 
   const shift = () => player.semitones + player.chordKey;
-  const flats = () => cur?.data && fifthsFor(cur.data.structure.key, shift() - capoFret()) < 0;
+  const flats = () => cur?.data && useFlats(cur.data.structure.key, shift() - capoFret());
   const shown = (c) => (opts.simple ? simplify(c) : c);
   const name = (c) => chordName(shown(c), shift() - capoFret(), flats());
   const capoFret = () => {
@@ -94,6 +94,8 @@ export function createScore({ player, api, notice }) {
       renderAll();
     } catch { /* no chord sheet online: the detected chords stay */ }
   }
+
+  window.addEventListener('accidentals', () => { if (cur?.data) renderAll(); });
 
   /** The chords source changed: drop the sheet in use and look the new one up. */
   function retab(id) {
