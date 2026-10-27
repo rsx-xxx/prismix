@@ -15,6 +15,7 @@ import os
 import re
 import socket
 import threading
+import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -123,27 +124,43 @@ def ensure_cert(ip: str, name: str = ""):
 SERVICE = "_prismix._tcp.local."
 
 
-def advertise(ip: str, port: int) -> None:
-    """Announce the host over mDNS so the phone app finds it without typing an address."""
+def advertise(ip: str, port: int):
+    """Announce the host over mDNS so the phone app finds it without typing an address.
+
+    Returns `move(ip)`, which re-announces on a new address after the network changed.
+    """
     try:
         from zeroconf import ServiceInfo, Zeroconf
     except ImportError:
         log.warning("band: the zeroconf package is missing, phones must be pointed at the host by hand")
-        return
+        return lambda _ip: None
     name = socket.gethostname().split(".")[0] or "host"
-    info = ServiceInfo(
-        SERVICE, f"Prismix on {name}.{SERVICE}", addresses=[socket.inet_aton(ip)], port=port,
-        properties={"path": "/remote", "host": name}, server=f"{host_name() or name + '.local'}.")
+    lock = threading.Lock()
+    live: dict = {}
 
-    def run() -> None:
-        try:
-            zc = Zeroconf(interfaces=[ip])
-            zc.register_service(info)
-            threading.Event().wait()  # keep the responder alive for the process's lifetime
-        except Exception:
-            log.warning("band: mDNS announce failed", exc_info=True)
+    def announce(addr: str) -> None:
+        info = ServiceInfo(
+            SERVICE, f"Prismix on {name}.{SERVICE}", addresses=[socket.inet_aton(addr)], port=port,
+            properties={"path": "/remote", "host": name}, server=f"{host_name() or name + '.local'}.")
+        with lock:
+            if zc := live.pop("zc", None):
+                try:
+                    zc.unregister_all_services()
+                    zc.close()
+                except Exception:  # noqa: BLE001 - the old interface is already gone
+                    log.debug("band: closing the old mDNS responder failed", exc_info=True)
+            try:
+                zc = Zeroconf(interfaces=[addr])
+                zc.register_service(info)
+                live["zc"] = zc
+            except Exception:
+                log.warning("band: mDNS announce failed", exc_info=True)
 
-    threading.Thread(target=run, daemon=True, name="band-mdns").start()
+    def move(addr: str) -> None:
+        threading.Thread(target=announce, args=(addr,), daemon=True, name="band-mdns").start()
+
+    move(ip)
+    return move
 
 
 def _free(port: int) -> bool:
@@ -178,6 +195,32 @@ def _redirect_http(name: str, port: int) -> None:
     threading.Thread(target=srv.serve_forever, daemon=True, name="band-http-redirect").start()
 
 
+def _share_url(name: str, ip: str, port: int, clean: bool) -> str:
+    # the name survives a new DHCP lease; the address rides along for phones that cannot resolve .local
+    if name:
+        return f"https://{name if clean else f'{name}:{port}'}/remote?ip={ip}"
+    return f"https://{ip}:{port}/remote"
+
+
+def _watch_network(app, move, name: str, port: int, clean: bool, ip: str) -> None:
+    """The Wi-Fi changes under a running host (sleep, roaming, a new DHCP lease): keep the link, QR and mDNS current."""
+    def run() -> None:
+        current = ip
+        while True:
+            time.sleep(8)
+            try:
+                now = lan_ip()
+            except Exception:  # noqa: BLE001 - never let the watcher die
+                continue
+            if now and now != current:
+                log.info("band: network address changed %s -> %s", current, now)
+                current = now
+                app.state.band.share_url = _share_url(name, now, port, clean)
+                move(now)
+
+    threading.Thread(target=run, daemon=True, name="band-network").start()
+
+
 def start(app, port: int = HTTPS_PORT) -> uvicorn.Server | None:
     """Serve `app` over HTTPS on all interfaces in a daemon thread and publish the phone link."""
     ip = lan_ip()
@@ -192,9 +235,10 @@ def start(app, port: int = HTTPS_PORT) -> uvicorn.Server | None:
         return None
 
     def serve(on: int) -> uvicorn.Server:
+        # a vanished phone is noticed within ~20 s instead of the TCP timeout
         server = uvicorn.Server(uvicorn.Config(
             app, host="0.0.0.0", port=on, ssl_certfile=str(crt), ssl_keyfile=str(key),
-            log_level="warning", log_config=None))
+            log_level="warning", log_config=None, ws_ping_interval=10, ws_ping_timeout=10))
         threading.Thread(target=server.run, daemon=True).start()
         return server
 
@@ -203,13 +247,9 @@ def start(app, port: int = HTTPS_PORT) -> uvicorn.Server | None:
     if clean:
         serve(STANDARD_HTTPS)
         _redirect_http(name, STANDARD_HTTPS)
-    # the name survives a new DHCP lease; the address rides along for phones that cannot resolve .local
-    if name:
-        host = name if clean else f"{name}:{port}"
-        app.state.band.share_url = f"https://{host}/remote?ip={ip}"
-    else:
-        app.state.band.share_url = f"https://{ip}:{port}/remote"
-    advertise(ip, port)
+    app.state.band.share_url = _share_url(name, ip, port, clean)
+    move = advertise(ip, port)
+    _watch_network(app, move, name, port, clean, ip)
     log.info("band: phones open %s", app.state.band.share_url)
     return server
 

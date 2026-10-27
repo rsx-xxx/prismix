@@ -23,6 +23,7 @@ ROLES = ("singer", "guitar", "bass", "drums", "keys", "other")
 CMD_OPS = {"play", "pause", "seek", "tempo", "pitch", "cents", "chordkey", "loop", "mute", "solo", "load"}
 SHARED_OPS = {"tempo", "pitch", "cents", "chordkey", "load"}
 MAX_MSG = 16_384
+SEND_TIMEOUT = 3.0  # a phone that stops reading must not stall the fan-out to everyone else
 
 
 def now_ms() -> float:
@@ -30,7 +31,16 @@ def now_ms() -> float:
 
 
 def is_loopback(host: str | None) -> bool:
-    return host in ("127.0.0.1", "::1", "localhost")
+    return host in ("127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost")
+
+
+def same_origin(origin: str | None, host: str | None) -> bool:
+    """True for a request with no Origin (not a browser page) or one from the page served by `host` itself."""
+    if not origin:
+        return True
+    from urllib.parse import urlparse
+
+    return urlparse(origin).netloc == (host or "")
 
 
 class Client:
@@ -93,9 +103,11 @@ class Band:
     # ── fan-out ──
     async def _send(self, c: Client, msg: dict) -> None:
         try:
-            await c.ws.send_text(json.dumps(msg, separators=(",", ":")))
-        except Exception:  # noqa: BLE001 - peer vanished; the receive loop will clean up
+            await asyncio.wait_for(c.ws.send_text(json.dumps(msg, separators=(",", ":"))), SEND_TIMEOUT)
+        except Exception:  # noqa: BLE001 - peer vanished or stalled; drop it so its receive loop cleans up
             log.debug("send to client %s failed", c.id)
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(c.ws.close(code=1011), 1)
 
     async def broadcast(self, msg: dict, *, skip: Client | None = None) -> None:
         await asyncio.gather(*(self._send(c, msg) for c in list(self.clients.values()) if c is not skip))
@@ -121,7 +133,7 @@ class Band:
         except Exception:  # noqa: BLE001
             await ws.close(code=4000)
             return
-        if hello.get("t") != "hello":
+        if not isinstance(hello, dict) or hello.get("t") != "hello":
             await ws.close(code=4000)
             return
         is_host = local and bool(hello.get("host"))

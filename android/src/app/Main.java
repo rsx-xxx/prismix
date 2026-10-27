@@ -4,7 +4,10 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -36,6 +39,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import org.json.JSONException;
@@ -57,6 +61,7 @@ import java.util.concurrent.Executors;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
@@ -80,6 +85,7 @@ public class Main extends Activity {
     private SharedPreferences prefs;
     private WebView web;
     private LinearLayout panel;
+    private ScrollView scroll; // the screens can outgrow a small phone, especially with the keyboard up
     private String host = "";
     private int gen;
     private ConnectivityManager cm;
@@ -118,9 +124,14 @@ public class Main extends Activity {
         panel.setPadding(dp(28), dp(96), dp(28), dp(28));
         panel.setBackgroundColor(Color.parseColor(BG));
 
+        scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Color.parseColor(BG));
+        scroll.addView(panel, new FrameLayout.LayoutParams(-1, -2));
+
         FrameLayout root = new FrameLayout(this);
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
-        root.addView(panel, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
         bindWifi();
         open(getIntent());
@@ -139,6 +150,22 @@ public class Main extends Activity {
         ui.postDelayed(this::netUp, 1500); // mobile data only, or no answer: do not wait for it
     }
 
+    /** Wi-Fi came back (maybe another network): if the host on screen is gone from it, search again instead of waiting forever. */
+    private void recheck() {
+        final String a = host;
+        if (a.isEmpty() || web.getVisibility() != View.VISIBLE || connecting) return;
+        final int g = gen;
+        new Thread(() -> {
+            Host h = null;
+            for (int i = 0; i < 3 && h == null; i++) {
+                if (i > 0) { try { Thread.sleep(1500); } catch (InterruptedException e) { return; } }
+                h = hello(a);
+            }
+            final boolean gone = h == null;
+            ui.post(() -> { if (gone && g == gen && a.equals(host) && web.getVisibility() == View.VISIBLE) discover(); });
+        }, "recheck").start();
+    }
+
     private void netUp() {
         netReady = true;
         Runnable r = afterNet;
@@ -153,7 +180,9 @@ public class Main extends Activity {
 
     /** Notifications need a grant on Android 13+; battery savers kill a silent background app, so ask once to be exempt. */
     private void ask() {
-        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED
+                && !prefs.getBoolean("notifAsked", false)) {
+            prefs.edit().putBoolean("notifAsked", true).apply(); // the page reports media every few seconds: never nag
             requestPermissions(new String[] { "android.permission.POST_NOTIFICATIONS" }, 1);
             return;
         }
@@ -294,6 +323,7 @@ public class Main extends Activity {
             m.wifi = n;
             try { m.cm.bindProcessToNetwork(n); } catch (RuntimeException e) { /* keep the default route */ }
             m.ui.post(m::netUp);
+            m.ui.post(m::recheck);
         }
 
         @Override
@@ -346,7 +376,7 @@ public class Main extends Activity {
         listing = false;
         showSearching();
         whenNet(() -> sweep(g));
-        ui.postDelayed(() -> { if (g == gen && found.isEmpty()) { stopSearch(); showNone(); } }, 10500);
+        ui.postDelayed(() -> { if (g == gen && (found.isEmpty() || wantName != null)) { stopSearch(); showNone(); } }, 10500);
     }
 
     private void sweep(final int g) {
@@ -455,14 +485,34 @@ public class Main extends Activity {
         public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
     } };
 
+    private static SSLSocketFactory factory;
+
+    /** One socket factory for every call to the host: building an SSLContext per probe made the /24 sweep needlessly slow. */
+    static synchronized SSLSocketFactory tls() throws Exception {
+        if (factory == null) {
+            SSLContext ctx = SSLContext.getInstance("TLS");
+            ctx.init(null, TRUST_ALL, new SecureRandom());
+            factory = ctx.getSocketFactory();
+        }
+        return factory;
+    }
+
+    /** Only the local network is ever joined: a link or QR from elsewhere must not point the app (and its bridge) at the internet. */
+    static boolean isLocal(String ip) {
+        if (!ip.matches("\\d{1,3}(\\.\\d{1,3}){3}")) return false;
+        String[] p = ip.split("\\.");
+        int a = Integer.parseInt(p[0]), b = Integer.parseInt(p[1]);
+        if (a > 255 || b > 255 || Integer.parseInt(p[2]) > 255 || Integer.parseInt(p[3]) > 255) return false;
+        return a == 10 || a == 127 || (a == 172 && b >= 16 && b < 32) || (a == 192 && b == 168) || (a == 169 && b == 254)
+                || (a == 100 && b >= 64 && b < 128); // CGNAT, which Tailscale and some hotspots use
+    }
+
     /** The host answering at this address, else null. Only used to discover, never to send data. */
     private static Host hello(String addr) {
         HttpsURLConnection c = null;
         try {
-            SSLContext ctx = SSLContext.getInstance("TLS");
-            ctx.init(null, TRUST_ALL, new SecureRandom());
             c = (HttpsURLConnection) new URL("https://" + addr + ":" + PORT + "/remote/hello").openConnection();
-            c.setSSLSocketFactory(ctx.getSocketFactory());
+            c.setSSLSocketFactory(tls());
             c.setHostnameVerifier((h, s) -> true);
             c.setConnectTimeout(700);
             c.setReadTimeout(1500);
@@ -499,7 +549,11 @@ public class Main extends Activity {
         b.setText(label);
         b.setAllCaps(false);
         b.setTextColor(primary ? Color.parseColor("#1a1206") : Color.WHITE);
-        b.setBackgroundColor(Color.parseColor(primary ? "#ff9a3d" : "#2a2724"));
+        GradientDrawable fill = new GradientDrawable();
+        fill.setColor(Color.parseColor(primary ? "#ff9a3d" : "#2a2724"));
+        fill.setCornerRadius(dp(14));
+        b.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(60, 255, 255, 255)), fill, null));
+        b.setStateListAnimator(null);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(52));
         lp.topMargin = dp(10);
         b.setLayoutParams(lp);
@@ -509,11 +563,18 @@ public class Main extends Activity {
     private void screen(String title, String sub) {
         panel.removeAllViews();
         web.setVisibility(View.GONE);
-        panel.setVisibility(View.VISIBLE);
+        scroll.setVisibility(View.VISIBLE);
+        scroll.scrollTo(0, 0);
         bars(BG, false);
         panel.addView(text("Prismix Band", 28, Color.WHITE, 6));
         panel.addView(text(title, 16, Color.parseColor("#e8e2da"), 4));
         if (sub != null) panel.addView(text(sub, 14, Color.parseColor("#9b948b"), 20));
+    }
+
+    private ProgressBar spinner() {
+        ProgressBar p = new ProgressBar(this);
+        p.setIndeterminateTintList(ColorStateList.valueOf(Color.parseColor("#ff9a3d")));
+        return p;
     }
 
     private void scanButton() {
@@ -551,7 +612,7 @@ public class Main extends Activity {
     private void showSearching() {
         screen(wantName != null ? "Looking for " + wantName + "…" : "Looking for your band's host…",
                 "Open Prismix on the computer and share to the network.");
-        panel.addView(new ProgressBar(this));
+        panel.addView(spinner());
         scanButton();
         offlineButton();
     }
@@ -582,9 +643,13 @@ public class Main extends Activity {
     }
 
     private void showNone() {
-        String what = wantName != null ? "Could not find " + wantName : "No host found";
-        screen(what, "Phone and computer must be on the same Wi-Fi, and the host must be sharing. "
+        showNone(wantName != null ? "Could not find " + wantName : "No host found",
+                "Phone and computer must be on the same Wi-Fi, and the host must be sharing. "
                 + "A VPN that blocks everything outside its tunnel has to allow the local network.");
+    }
+
+    private void showNone(String what, String why) {
+        screen(what, why);
         Button retry = button("Search again", true);
         retry.setOnClickListener(v -> discover());
         panel.addView(retry);
@@ -614,7 +679,7 @@ public class Main extends Activity {
 
     private void showConnecting(String name) {
         screen("Connecting to " + name + "…", "Opening the band page on your local network.");
-        panel.addView(new ProgressBar(this));
+        panel.addView(spinner());
         Button other = button("Pick another host", false);
         other.setOnClickListener(v -> discover());
         panel.addView(other);
@@ -654,6 +719,7 @@ public class Main extends Activity {
 
     /** Opens the host's page. Progress stays on screen until the page really appears, so there is no black gap. */
     private void go(final String a) {
+        if (!isLocal(a)) { stopSearch(); ++gen; connecting = false; showNone("Not on your local network", a + " is not a local address, so the app will not connect to it."); return; }
         stopSearch();
         final int g = ++gen;
         host = a;
@@ -685,7 +751,7 @@ public class Main extends Activity {
     private void reveal() {
         if (!connecting) return;
         connecting = false;
-        panel.setVisibility(View.GONE);
+        scroll.setVisibility(View.GONE);
         web.setVisibility(View.VISIBLE);
     }
 

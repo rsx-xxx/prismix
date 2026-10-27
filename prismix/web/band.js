@@ -1,5 +1,7 @@
 // Band mode, host side: publishes the player's state to the hub so phones can follow it,
 // applies the commands phones send, and drives the Band panel (QR, roster, lock, PIN).
+import { createSocket } from './socket.js';
+
 const LS = 'prismix.band';
 
 const signed = (v) => `${v > 0 ? '+' : ''}${v}`;
@@ -16,7 +18,6 @@ export function describe(m) {
 }
 
 export function createBand({ player, current, open, $ }) {
-  let ws;
   let timer = 0;
   let status = { clients: [], locked: false, token: false, url: '', qr: '' };
   const saved = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch { return {}; } };
@@ -41,9 +42,7 @@ export function createBand({ player, current, open, $ }) {
     };
   };
 
-  function publish() {
-    if (ws?.readyState === 1) ws.send(JSON.stringify(snapshot()));
-  }
+  function publish() { net.send(snapshot()); }
 
   const commands = {
     play: () => player.play(),
@@ -71,26 +70,30 @@ export function createBand({ player, current, open, $ }) {
     noteTimer = setTimeout(() => n.classList.remove('on'), 2600);
   }
 
-  function connect() {
-    ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ t: 'hello', host: true, name: 'Host' }));
+  // 4002: another window on this computer took over as host; reconnecting would start a tug of war
+  const net = createSocket({
+    url: () => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`,
+    fatal: [4002, 4403],
+    onopen: () => {
+      net.send({ t: 'hello', host: true, name: 'Host' });
       const s = saved();
-      post({ token: s.token ?? '', locked: !!s.locked });
+      post({ token: s.token ?? '', locked: !!s.locked }).catch(() => {});
       publish();
-    };
-    ws.onmessage = (e) => {
-      const m = JSON.parse(e.data);
+    },
+    onmessage: (m) => {
       if (m.t === 'cmd') commands[m.op]?.(m.v);
       else if (m.t === 'changed') note(describe(m));
       else if (m.t === 'roster' || m.t === 'welcome') { Object.assign(status, m); player.setHeld?.(m.speaker != null); render(); }
-    };
-    ws.onclose = () => setTimeout(connect, 1500);
-  }
+    },
+    onclose: () => { status = { ...status, clients: [], speaker: null }; player.setHeld?.(false); render(); },
+  });
+  setInterval(() => net.send({ t: 'ping', c: 0 }), 4000); // the hub answers: silence means the link is dead
 
   async function post(body) {
     const r = await fetch('/api/band', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-    if (r.ok) { status = { ...status, ...(await r.json()) }; render(); }
+    if (!r.ok) { note('Could not save the Band settings'); return; }
+    status = { ...status, ...(await r.json()) };
+    render();
   }
 
   // ── panel ──
@@ -116,7 +119,7 @@ export function createBand({ player, current, open, $ }) {
       const kick = document.createElement('button');
       kick.className = 'btn small ghost';
       kick.textContent = 'Kick';
-      kick.onclick = () => ws.send(JSON.stringify({ t: 'admin', kick: c.id }));
+      kick.onclick = () => net.send({ t: 'admin', kick: c.id });
       li.append(who, kick);
       return li;
     }));
@@ -133,10 +136,10 @@ export function createBand({ player, current, open, $ }) {
 
   $('band-btn').addEventListener('click', () => { render(); $('band').showModal(); });
   $('band-close').addEventListener('click', () => $('band').close());
-  $('band-out').addEventListener('change', (e) => ws.send(JSON.stringify({ t: 'admin', speaker: e.target.value === '' ? null : +e.target.value })));
+  $('band-out').addEventListener('change', (e) => net.send({ t: 'admin', speaker: e.target.value === '' ? null : +e.target.value }));
   $('band-lock').addEventListener('change', (e) => {
     localStorage.setItem(LS, JSON.stringify({ ...saved(), locked: e.target.checked }));
-    ws.send(JSON.stringify({ t: 'admin', locked: e.target.checked }));
+    net.send({ t: 'admin', locked: e.target.checked });
   });
   $('band-pin').addEventListener('change', (e) => {
     const token = e.target.value.trim();
@@ -149,5 +152,5 @@ export function createBand({ player, current, open, $ }) {
   ['state', 'seek', 'tune', 'loop', 'mix'].forEach((t) => player.addEventListener(t, publish));
   timer = setInterval(() => { if (player.playing) publish(); }, 2000);
   connect();
-  return { publish, stop() { clearInterval(timer); ws?.close(); } };
+  return { publish, stop() { clearInterval(timer); net.stop(); } };
 }
