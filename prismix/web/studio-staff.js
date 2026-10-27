@@ -33,6 +33,10 @@ const RESTS = {
   16: { y: 1, h: 7, svg: '<svg viewBox="0 0 10 28" aria-hidden="true"><circle cx="3" cy="5" r="2" fill="currentColor"/><circle cx="2" cy="11" r="2" fill="currentColor"/><path d="M4 6 Q8 6 8.5 2 M3 12 Q7 12 7.5 8 M8.5 2 L3 26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>' },
 };
 
+const FLAG_H = 4.6;
+const FLAG_UP = '<svg viewBox="0 0 10 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0 C1 7 9 8 8 17 C7 12 4 10 0 10 Z" fill="currentColor"/></svg>';
+const FLAG_DN = '<svg viewBox="0 0 10 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 20 C1 13 9 12 8 3 C7 8 4 10 0 10 Z" fill="currentColor"/></svg>';
+
 const beamsOf = (v) => (v <= 1 / 32 ? 3 : v <= 1 / 16 ? 2 : v <= 1 / 8 ? 1 : 0);
 
 // A length in whole notes -> the plain note value under it and whether it is dotted.
@@ -55,15 +59,32 @@ function signature(fifths) {
   return alter;
 }
 
+// Key signature that suits the notes best: fewest out-of-scale pitch classes, ties go to the detected key, then to the
+// accidentals setting. The stored key can be off (detection, transposed sources), the notes are what has to be spelled.
+function fitFifths(mids, key) {
+  const want = fifthsFor(key, 0);
+  const hist = new Array(12).fill(0);
+  for (const m of mids) hist[((m % 12) + 12) % 12]++;
+  let best = want, bestCost = Infinity;
+  for (let f = -7; f <= 7; f++) {
+    const scale = new Set([0, 2, 4, 5, 7, 9, 11].map((d) => (d + 7 * f + 1200) % 12)); // major scale on fifths f
+    let cost = 0;
+    for (let pc = 0; pc < 12; pc++) if (!scale.has(pc)) cost += hist[pc];
+    cost = cost * 100 + Math.abs(f) * 2 + (f === want ? 0 : 1);
+    if (cost < bestCost) { bestCost = cost; best = f; }
+  }
+  return mids.length ? best : want;
+}
+
 export function scoreLayout(p, key) {
   const drums = p.kind === 'drums';
-  const fifths = drums ? 0 : fifthsFor(key, 0);
-  const lay = { drums, fifths, flats: useFlats(key, 0), p, sig: signature(fifths), bars: [] };
+  const mids = [];
+  if (!drums) for (const b of p.bars) for (const beat of b.n) for (const [s, f] of beat[2]) if (p.tuning[s] != null) mids.push(p.tuning[s] + f);
+  const fifths = drums ? 0 : fitFifths(mids, key);
+  const lay = { drums, fifths, flats: fifths < 0 || (fifths === 0 && useFlats(key, 0)), p, sig: signature(fifths), bars: [] };
   if (drums) {
     lay.staves = [{ y0: 0, T: 0 }];
   } else {
-    const mids = [];
-    for (const b of p.bars) for (const beat of b.n) for (const [s, f] of beat[2]) if (p.tuning[s] != null) mids.push(p.tuning[s] + f);
     mids.sort((a, b) => a - b);
     const median = mids[mids.length >> 1] ?? 72;
     const low = mids.filter((m) => m < 60).length, high = mids.length - low;
@@ -243,7 +264,7 @@ function voice(list, vi, stave, tb, lay, items) {
         const yb = (run.length > 1 ? beamY : e.stemEnd) + (up ? (n - 1) * 1.15 : -(n - 1) * 1.15) - (up ? 0 : 0.5);
         if (nxt && nxt.beams >= n) items.push({ cls: 'beam', x: e.pos, y: yb, dx: sdxE - 0.15, wFrac: nxt.pos - e.pos, w: 0.3, h: 0.55 });
         else if (run.length > 1 && !(prv && prv.beams >= n)) items.push({ cls: `beam stub ${prv ? 'l' : 'r'}`, x: e.pos, y: yb, dx: prv ? sdxE - 1.9 : sdxE - 0.15, w: 2.0, h: 0.55 });
-        else if (run.length === 1) items.push({ cls: `flag ${up ? 'up' : 'dn'}`, x: e.pos, y: e.stemEnd + (up ? n - 1 : 1 - n) * 1.2, dx: sdxE, w: 2.2 });
+        else if (run.length === 1) items.push({ cls: 'flag', x: e.pos, y: up ? e.stemEnd + (n - 1) * 1.3 : e.stemEnd - FLAG_H - (n - 1) * 1.3, dx: sdxE - 0.1, w: 2.4, h: FLAG_H, svg: up ? FLAG_UP : FLAG_DN });
       }
     });
   }
@@ -253,7 +274,7 @@ function voice(list, vi, stave, tb, lay, items) {
   const staffTop = drums ? 0 : stave.y0;
   const rest = (at, v, dur) => {
     const r = RESTS[v] || RESTS[16];
-    items.push({ cls: `rest ${r.cls ?? ''}`.trim(), x: Math.min(0.97, (at + (dur ?? 0) / 2) / len), y: staffTop + r.y, h: r.h, svg: r.svg, w: v >= 2 ? 3.2 : 2.6, dx: -1.5 });
+    items.push({ cls: `rest ${r.cls ?? ''}`.trim(), x: Math.min(0.97, (at + (dur ?? 0) / 2) / len), y: staffTop + r.y, h: r.h, svg: r.svg, w: v >= 2 ? 3.2 : 2.6, dx: v >= 2 ? -1.5 : -0.4 });
   };
   if (!evs.length) {
     items.push({ cls: `rest ${RESTS[1].cls}`, x: 0.5, y: staffTop + RESTS[1].y, h: 1, w: 3.2, dx: -1.6 });
@@ -289,6 +310,7 @@ export function paintScore(stf, i, lay) {
 // Clef and key signature at the start of every row.
 export function clefColumn(lay) {
   const col = el('div', { className: 'clefs', 'aria-hidden': 'true' });
+  for (const st of lay.staves) col.append(el('span', { className: 'lines', style: `top:calc(${st.y0 - lay.ymin} * var(--hs))` }));
   const place = (cls, y, text, x, extra = '') => col.append(el('span', { className: `s ${cls}`, textContent: text, style: `left:calc(${x} * var(--hs));top:calc(${y - lay.ymin} * var(--hs));${extra}` }));
   const marks = [];
   const signs = lay.fifths > 0 ? SHARP_STEPS : FLAT_STEPS;

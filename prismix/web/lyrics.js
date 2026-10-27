@@ -9,7 +9,8 @@ const el = (tag, props = {}, ...kids) => {
   n.append(...kids);
   return n;
 };
-const LEAD = 0.25; // light a line slightly early: reading is faster than singing
+const SING_LEAD = 0.18; // output-latency estimates run short (Bluetooth, AirPlay), so colour syllables a touch ahead
+const LEAD = 0.35; // light a line slightly early: reading is faster than singing
 const MAX_WORD = 6; // seconds; no sung word or silence between words is longer
 const BREAK_S = 6; // a pause between sung lines at least this long gets a ♪ row
 const PAUSE_MS = Infinity; // after the user scrolls by hand, leave the view alone until play, a seek or the Follow button
@@ -255,7 +256,8 @@ export function createLyrics({ player, api, chords = () => [] }) {
 
   /** Colour what has been sung in the lit line: whole syllables before the current one, and only the part of the current
    *  syllable that has sounded so far (--p, 0..100), so a word fills in as it is sung. */
-  function sing(pos) {
+  function sing(at) {
+    const pos = at + SING_LEAD;
     const i = cur.active, sy = cur.sy?.[i];
     if (!sy?.length) return;
     let k = -1;

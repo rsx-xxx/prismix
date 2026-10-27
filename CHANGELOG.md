@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.44
+
+- Score fixes: the key signature now follows the notes (no more sharps over flat songs), staff lines run through the clef column, flags are curved, and rests keep clear of stems. Tabs open larger and have A− / A+ buttons to change their size. The Video button is gone from the bottom bar. Lyrics light up a little earlier to cover output latency.
+
 ## 0.0.43
 
 - Keys and other pitched instruments now show as staff notation (treble and bass clefs, key signature, stems, beams, rests, ties) instead of numbered tab. Drums are a new part and show as a percussion score. Numbered tab stays for guitar and bass only. Cached tabs refresh once to add the drum parts.

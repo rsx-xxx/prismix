@@ -47,6 +47,15 @@ function timeline(map, n, secs, recEnds) {
 
 export function createTab({ player, chordsIn = () => [] }) {
   const root = $('tabview'), body = $('tab-body'), credit = $('tab-credit'), pick = $('tab-part'), variants = $('tab-variant'), tools = $('tab-tools');
+  let zoom = Number(localStorage.getItem('prismix.tabZoom')) || 1.25;
+  const applyZoom = (d = 0) => {
+    zoom = Math.min(2.5, Math.max(0.8, Math.round((zoom + d) * 20) / 20));
+    body.style.setProperty('--z', String(zoom));
+    try { localStorage.setItem('prismix.tabZoom', String(zoom)); } catch { /* ignore */ }
+  };
+  applyZoom();
+  $('tab-zoom-in').addEventListener('click', () => applyZoom(0.15));
+  $('tab-zoom-out').addEventListener('click', () => applyZoom(-0.15));
   let ro = null;
   let cur = null; // { id, tab, st, secs: bar start seconds, cells: [], row: -1 }
   let part = null;
