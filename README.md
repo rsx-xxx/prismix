@@ -6,47 +6,63 @@
 [![Build](https://img.shields.io/github/actions/workflow/status/rsx-xxx/prismix/release.yml)](https://github.com/rsx-xxx/prismix/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-## Features
+## Get started
 
-- **Stems:** Demucs v4 (4 stems) or BS-RoFormer (6 stems with guitar and piano), on CUDA, Apple Silicon or CPU. Mute or solo each stem.
-- **Tempo and key:** 50–150 % tempo and ±12 semitones plus fine tune without the robotic sound, A-B loop, and export of the mix or single stems (mp3, m4a, flac, wav, ogg, opus).
-- **Chords and bars:** beats, bars, key and chords are detected once per track. Chord chart, fingering diagrams, capo suggestions, PDF export, and a check against Songsterr chord sheets.
-- **Lyrics:** synced lyrics from Genius and LRCLIB, timed to the vocals word by word.
-- **Band mode:** phones scan a QR code and follow the host's player. Each picks a part (vocals, guitar, bass, keys, drums), sees the current bar, chord and lyric line, and can control playback. No outside server.  A phone in Hear here mode can take over the room's sound (the host goes silent), so the Mac needs no speakers. Phones can simplify chords for themselves, and the song shows in the system media controls. The Android app can save songs on the phone (about 25 MB each) and play them in Solo with no host at all.
-- **Sources:** a YouTube or Spotify link (track, album, playlist, artist), a search, a playlist, or a local audio or video file (up to 500 MB). Every split is cached, so nothing is processed twice.
+**1. Install**
 
-## Install
-
-**Desktop app:** download from the [latest release](https://github.com/rsx-xxx/prismix/releases/latest).
-
-| Platform | File |
+| Platform | How |
 |---|---|
-| Windows | `Prismix-Setup.exe` |
-| macOS (Apple Silicon) | `Prismix.dmg` |
-| Android (band phone) | `Prismix-Band.apk` |
+| macOS (Apple Silicon) | `brew tap rsx-xxx/prismix && brew install --cask prismix` |
+| Windows | [`Prismix-Setup.exe`](https://github.com/rsx-xxx/prismix/releases/latest) |
+| Android (band phone) | [`Prismix-Band.apk`](https://github.com/rsx-xxx/prismix/releases/latest) |
+| Any (from source) | `uv sync && uv run prismix` (Python 3.11–3.13, [uv](https://docs.astral.sh/uv/)) |
 
-On macOS, `brew tap rsx-xxx/prismix && brew install --cask prismix` installs it, The installed desktop app also updates itself from the update link in the toolbar.
+All installers are on the [latest release](https://github.com/rsx-xxx/prismix/releases/latest). They are unsigned, so macOS or Windows asks for confirmation on first launch.
 
-Desktop builds are unsigned (signing is paid; see `packaging/SIGNING.md`), so expect a SmartScreen or Gatekeeper prompt on first launch. The Android APK is signed with a fixed key and updates in place. The library lives in `%LOCALAPPDATA%\Prismix` (Windows) or `~/Library/Application Support/Prismix` (macOS).
+**2. Split a song.** Paste a YouTube or Spotify link, search by name, or drop in a local file, then press **Split**. The first run downloads the chord models (about 100 MB). Press `?` for keyboard shortcuts.
 
-**From source** (Python 3.11–3.13, [uv](https://docs.astral.sh/uv/)):
+**3. Play with it.** Mute or solo stems, change tempo and key, loop a section, read the chords and lyrics. Chords and tab can also be moved to another key without touching the sound (Chord key).
+
+**4. Bring the band.** Click **Band**, scan the QR code with a phone on the same Wi-Fi, pick your part. See [Band mode](#band-mode).
+
+### Homebrew (macOS)
 
 ```bash
-uv sync
-uv run prismix            # http://stems.localhost:8000
+brew tap rsx-xxx/prismix
+brew install --cask prismix                 # install
+brew update && brew upgrade --cask prismix --greedy   # update (the app also updates itself from the toolbar)
 ```
 
-Paste a YouTube link or search by name, then press **Split**. Press `?` in the app for keyboard shortcuts. The first run downloads the Beat This and BTC chord models from Hugging Face (about 100 MB).
+Already installed Prismix by hand? Link that copy to brew with `brew install --cask --force prismix`, which replaces it with the brew-managed app. Your library is kept. Run `brew update` before every upgrade: brew does not refresh third-party taps on its own, so it can say "latest version is already installed" while a newer release exists. `--greedy` is needed because the app updates itself.
+
+Your library lives in `~/Library/Application Support/Prismix` (macOS) or `%LOCALAPPDATA%\Prismix` (Windows).
+
+## What it does
+
+- **Stems:** splits a track into vocals, drums, bass, guitar, piano and the rest (Demucs v4 or BS-RoFormer, on CUDA, Apple Silicon or CPU). Mute or solo each one.
+- **Tempo and key:** 50–150 % tempo and ±12 semitones without the robotic sound, A-B loop, export of the mix or single stems (mp3, m4a, flac, wav, ogg, opus).
+- **Chords and tab:** beats, bars, key and chords are detected once per track. Chord chart, fingering diagrams, capo suggestions, PDF export, and Songsterr chord sheets and tab matched to the recording, in its key. A Notes setting picks flats or sharps.
+- **Lyrics:** synced lyrics from Genius and LRCLIB, timed to the vocals word by word.
+- **Band mode:** phones follow the host's player and show each musician their own part. No outside server.
+- **Sources:** YouTube or Spotify links (track, album, playlist, artist), a search, a playlist, or a local audio or video file (up to 500 MB). Every split is cached, so nothing is processed twice.
 
 ## Band mode
 
 1. Open Prismix on the computer and click **Band**.
-2. Scan the QR code with a phone on the same Wi-Fi (the Prismix Band app opens by itself, or tap Scan in the app) and, in a browser, accept the one-time certificate warning (the host serves HTTPS with a self-signed certificate).
+2. Scan the QR code with a phone on the same Wi-Fi. The Prismix Band app opens by itself, or tap Scan in the app. In a browser, accept the one-time certificate warning (the host uses a self-signed certificate).
 3. Pick your part. The phone follows the host's position, or plays the song itself in step with the room.
 
-The link uses `prismix.local` (or `prismix-<computer>.local` if another host has it, or your own via `PRISMIX_HOST_NAME`), with the IP address as a fallback. The Android app finds the host on its own (mDNS, then a Wi-Fi sweep) and reconnects by name if the address changes. You can also type a name or address in the app. It pins its traffic to Wi-Fi, so a VPN on the phone does not get in the way (unless the VPN blocks all non-VPN traffic). `prismix` from the CLI offers band mode like the desktop app does; `--no-share` keeps it local. You can lock playback and set a PIN in the Band panel.
+What phones can do:
 
-Another desktop can join as well: click **Join** in the toolbar, pick the host that appears (or type its name or address) and enter its PIN if it has one. The window then shows the host's library and follows its player, view-only if the host locked playback. Leave with Controls, Joined host, Leave.
+- **Hear here:** a phone plays the sound and the host goes silent, so the computer needs no speakers. The host can also choose which device plays.
+- **Change things:** tempo, key and chord key are shared, and everyone sees who changed what. A phone can simplify chords for itself only.
+- **Queue:** the host's **Queue** view shows songs being processed; click one to run it next.
+- **Solo (Android app):** save songs on the phone (about 25 MB each) and play them with no host at all.
+- **Lock and PIN:** lock playback and set a PIN in the Band panel.
+
+Another desktop can join too: click **Band**, switch to **Join**, pick the host that appears (or type its name or address) and enter its PIN. The window then shows the host's library and follows its player.
+
+Details: the link uses `prismix.local` (or `prismix-<computer>.local` if taken, or your own via `PRISMIX_HOST_NAME`), with the IP address as a fallback. The Android app finds the host on its own (mDNS, then a Wi-Fi sweep), reconnects by name if the address changes, and pins its traffic to Wi-Fi so a VPN does not get in the way. `prismix` from the CLI offers band mode like the desktop app; `--no-share` keeps it local.
 
 ## Configuration
 
