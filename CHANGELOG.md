@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.37
+
+- Settings no longer says Up to date when a newer release exists; the update check ignores the rolling master build.
+
 ## 0.0.36
 
 - A Notes setting (Auto, Flats, Sharps) in the app and on phones decides how chords and keys are spelled; Auto follows the key.
