@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.42
+
+- Chords above the lyrics: a line that begins over a chord that started earlier now shows that chord (dimmed) instead of leaving the first words bare. Settings open as a small panel under their button, with no dimming or blur of the page. The tab instrument picker is Guitar, Bass, Keys and Others, each with a dropdown of its parts by name. Notes (flats or sharps) stay a per-device setting. `scripts/build-mac.sh --install` builds and installs the Mac app locally.
+
 ## 0.0.41
 
 - Tabs now look like printed tab: every bar of the tab in its own order (none dropped when the recording match skips one), section names, tempo, rhythm stems and beams, ties, slides, hammer-ons, dead notes and let-ring brackets, with bars sized to their content. Cached tabs refresh once to pick this up. The background-fetch panel no longer covers the player.
