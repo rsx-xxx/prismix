@@ -17,7 +17,7 @@ from . import REPO, __version__
 
 log = logging.getLogger(__name__)
 
-API = "https://api.github.com/repos/" + REPO.removeprefix("https://github.com/") + "/releases/latest"
+API = "https://api.github.com/repos/" + REPO.removeprefix("https://github.com/") + "/releases?per_page=30"
 TTL = 6 * 3600  # GitHub allows 60 unauthenticated calls an hour; one every few hours is plenty
 RETRY = 15 * 60  # after a failed check (offline, rate limited) try again sooner
 
@@ -35,6 +35,12 @@ def parse(v: str) -> tuple[int, ...] | None:
 def newer(latest: str, current: str) -> bool:
     a, b = parse(latest), parse(current)
     return bool(a and b and a > b)
+
+
+def _pick(releases: list) -> dict:
+    """Highest versioned release. GitHub's "latest" flag is unusable: each master build moves it to the rolling 'latest' tag."""
+    versioned = [r for r in releases if not r.get("draft") and not r.get("prerelease") and parse(r.get("tag_name", ""))]
+    return max(versioned, key=lambda r: parse(r["tag_name"]), default={})
 
 
 def _summarize(release: dict) -> dict:
@@ -58,7 +64,7 @@ def check(*, force: bool = False, client: httpx.Client | None = None) -> dict:
         with client or httpx.Client(timeout=8, headers={"Accept": "application/vnd.github+json", "User-Agent": "prismix"}) as c:
             r = c.get(API)
             r.raise_for_status()
-            data = _summarize(r.json())
+            data = _summarize(_pick(r.json()))
         ttl = TTL
     except (httpx.HTTPError, ValueError) as e:
         log.info("update check failed: %s", e)
