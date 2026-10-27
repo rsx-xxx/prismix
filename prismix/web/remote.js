@@ -97,7 +97,7 @@ let ws;
 let samples = [];
 let welcomed = false;
 function connect() {
-  const sock = new WebSocket(`wss://${location.host}/ws`);
+  const sock = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   ws = sock;
   ws.onopen = () => {
     ws.send(JSON.stringify({ t: 'hello', name: store.name, role: store.role, token: store.pin }));
@@ -935,12 +935,24 @@ $('theme-seg').onclick = (e) => { const v = e.target.dataset?.theme; if (v) { st
 $('mode-seg').onclick = (e) => { const v = e.target.dataset?.mode; if (v) setMode(v); };
 $('change-me').onclick = () => { sheet.close(); showJoin(); };
 if (droid?.switchHost) { $('host-row').hidden = false; $('switch-host').onclick = () => droid.switchHost(); }
+// The desktop app opens this page for a host it has joined: leaving goes back to its own library.
+let joined = false;
+if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname) && !OFFLINE) {
+  rawFetch('/api/client').then((r) => r.json()).then((c) => {
+    if (!c.connected) return;
+    joined = true;
+    $('host-row').hidden = false;
+    $('host-row').querySelector('span').textContent = 'Joined host';
+    $('switch-host').textContent = 'Leave';
+    $('switch-host').onclick = async () => { await rawFetch('/api/client/disconnect', { method: 'POST' }); location.href = '/'; };
+  }).catch(() => { /* a plain browser tab on this computer */ });
+}
 
 async function showHostName() {
   $('host-name').textContent = location.hostname;
   try {
     const h = await (await rawFetch('/remote/hello')).json();
-    $('host-name').textContent = `${h.name} · ${location.hostname}`;
+    $('host-name').textContent = joined ? h.name : `${h.name} · ${location.hostname}`;
   } catch { /* the address alone will do */ }
 }
 
