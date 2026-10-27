@@ -1,7 +1,7 @@
 // Band mode, phone side. Follows the host's player over a WebSocket (server clock as the shared
 // timeline), shows lyrics (optionally with chords above the syllables they land on) or the bar chart,
 // and can drive the host, hear it locally, or go solo.
-import { chordName, chordPaint, fifthsFor, simplify } from './theory.js';
+import { chordName, chordPaint, fifthsFor, keyName, simplify } from './theory.js';
 import { createMedia } from './media.js';
 import { timeLine, splitAt } from './lyrics.js';
 
@@ -675,13 +675,14 @@ function update() {
   const cur = fmt(p);
   if (last.cur !== cur) { $('t-cur').textContent = cur; last.cur = cur; }
   const tp = Math.round(tempo() * 100), sm = semis();
-  const tuneKey = `${tp}|${sm}`;
+  const st0 = t?.structure, bpm = st0?.bpm ? Math.round(st0.bpm * tp / 100) : 0, kn = st0?.key ? keyName(st0.key, sm) : '';
+  const tuneKey = `${tp}|${sm}|${bpm}|${kn}`;
   if (last.tune !== tuneKey) {
     last.tune = tuneKey;
     $('tune-v').textContent = `${tp}% · ${sm > 0 ? '+' : ''}${sm}`;
     $('tune-v').classList.toggle('changed', tp !== 100 || sm !== 0);
-    $('t-out').textContent = `${tp}%`; $('t-range').value = String(tp); $('t-range').style.setProperty('--fill', `${tp - 50}%`);
-    $('k-out').textContent = `${sm > 0 ? '+' : ''}${sm}`; $('k-range').value = String(sm); $('k-range').style.setProperty('--fill', `${((sm + 12) / 24) * 100}%`);
+    $('t-out').textContent = bpm ? `${tp}% · ${bpm} BPM` : `${tp}%`; $('t-range').value = String(tp); $('t-range').style.setProperty('--fill', `${tp - 50}%`);
+    $('k-out').textContent = `${sm > 0 ? '+' : ''}${sm}${kn ? ` · ${kn}` : ''}`; $('k-range').value = String(sm); $('k-range').style.setProperty('--fill', `${((sm + 12) / 24) * 100}%`);
   }
   if (!t) return;
   const st = t.structure;

@@ -672,6 +672,7 @@ function applyPrefs(p) {
   }
   player._applyGains();
   player.setMaster(Number($('master').value) / 100);
+  $('master-out').textContent = `${$('master').value}%`;
   player.stems.forEach((s) => {
     const v = document.querySelector(`.stem[data-stem="${s.name}"] .vol`);
     if (v) { v.value = Math.round(s.volume * 100); setPct(v); }
@@ -789,7 +790,7 @@ $('key-down').addEventListener('click', () => player.setSemitones(player.semiton
 $('key-up').addEventListener('click', () => player.setSemitones(player.semitones + 1));
 $('cents').addEventListener('input', (e) => player.setCents(Number(e.target.value)));
 $('formants').addEventListener('change', (e) => player.setFormants(e.target.checked));
-$('master').addEventListener('input', (e) => player.setMaster(e.target.value / 100));
+$('master').addEventListener('input', (e) => { player.setMaster(e.target.value / 100); $('master-out').textContent = `${e.target.value}%`; });
 $('tempo-reset').addEventListener('click', () => player.setTempo(1));
 $('key-reset').addEventListener('click', () => player.setSemitones(0));
 $('tempo-out').addEventListener('dblclick', () => player.setTempo(1));
