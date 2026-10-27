@@ -48,6 +48,7 @@ class ProcessRequest(BaseModel):
     url: str
     model: str = DEFAULT_MODEL
     tasks: Literal["all", "stems", "chords"] = "all"
+    urgent: bool = False
 
 
 class PlaylistItem(BaseModel):
@@ -388,9 +389,9 @@ def create_app() -> FastAPI:
             wants_analysis = req.tasks == "all" and not analysis.read_structure(video_id)
             if not wants_analysis:
                 return {"cached": True, "videoId": video_id, "model": model}
-            job = jobs.submit(video_id, model, "analyze")
+            job = jobs.submit(video_id, model, "analyze", req.urgent)
         else:
-            job = jobs.submit(video_id, model, "stems" if req.tasks == "stems" else "split")
+            job = jobs.submit(video_id, model, "stems" if req.tasks == "stems" else "split", req.urgent)
         return {"cached": False, "videoId": video_id, "model": model, "job": job.snapshot()}
 
     def _start(video_id: str, model: str, tasks: str):

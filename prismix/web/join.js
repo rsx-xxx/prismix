@@ -1,6 +1,5 @@
 // Join another desktop's band: pick a host found on the network (or type one) and open its library in this window.
 export function createJoin({ $ }) {
-  const dlg = $('join');
   const err = (m) => { $('join-err').textContent = m || ''; };
 
   async function join(address) {
@@ -35,7 +34,13 @@ export function createJoin({ $ }) {
     } catch { err('Could not search the network.'); }
   }
 
-  $('join-btn').addEventListener('click', () => { dlg.showModal(); scan(); });
-  $('join-close').addEventListener('click', () => dlg.close());
+  $('band-mode').addEventListener('click', (e) => {
+    const pane = e.target.dataset?.pane;
+    if (!pane) return;
+    document.querySelectorAll('#band-mode button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
+    $('pane-host').hidden = pane !== 'host';
+    $('pane-join').hidden = pane !== 'join';
+    if (pane === 'join') scan();
+  });
   $('join-form').addEventListener('submit', (e) => { e.preventDefault(); join($('join-addr').value); });
 }
