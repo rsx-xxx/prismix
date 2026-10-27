@@ -62,6 +62,7 @@ class Band:
         self.locked = False
         self.token = ""
         self.state: dict = {}
+        self.speaker: int | None = None  # a phone that plays the room's sound; the host then stays silent
         self.share_url = ""
         self._ids = itertools.count(1)
 
@@ -77,6 +78,7 @@ class Band:
             "locked": self.locked,
             "token": bool(self.token),
             "hostOnline": self.host is not None,
+            "speaker": self.speaker,
             "clients": [c.info() for c in self.clients.values() if not c.host],
         }
 
@@ -153,6 +155,8 @@ class Band:
             log.exception("band client %s crashed", c.id)
         finally:
             self.clients.pop(c.id, None)
+            if self.speaker == c.id:
+                self.speaker = None
             await self.roster()
 
     async def _handle(self, c: Client, msg: dict, local: bool) -> None:
@@ -175,6 +179,12 @@ class Band:
                 return
             if msg.get("op") in CMD_OPS and (h := self.host) is not None:
                 await self._send(h, {"t": "cmd", "op": msg["op"], "v": msg.get("v"), "from": c.name})
+        elif kind == "speaker" and not c.host:
+            if msg.get("on"):
+                self.speaker = c.id
+            elif self.speaker == c.id:
+                self.speaker = None
+            await self.roster()
         elif kind == "admin" and local:
             if "locked" in msg:
                 self.locked = bool(msg["locked"])
