@@ -29,6 +29,7 @@
     <input id="up-file" type="file" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.wma,.aif,.aiff,.mkv,.m4b" hidden>
     <button class="btn ghost" id="pl-btn" type="button" data-ico="list" title="Pick from YouTube or Spotify playlists">Playlists</button>
     <button class="btn ghost" id="band-btn" type="button" title="Phones on this Wi-Fi can follow and control the player">Band</button>
+    <button class="btn ghost" id="join-btn" type="button" title="Use another Prismix computer on this network as the host">Join</button>
     <button class="icon-btn" id="theme-btn" type="button" aria-label="Theme"></button>
     <button class="icon-btn" id="help-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
   </header>
@@ -332,6 +333,18 @@
     <label class="band-row"><input type="checkbox" id="band-lock"> Lock phones to view only</label>
     <label class="band-row">PIN <input id="band-pin" type="text" inputmode="numeric" maxlength="12" placeholder="none"></label>
     <ul id="band-clients" class="band-clients"></ul>
+  </dialog>
+
+  <dialog id="join">
+    <div class="pl-head"><h3>Join a host</h3><button class="icon-btn" id="join-close" type="button" aria-label="Close">×</button></div>
+    <p class="muted">Play along with another Prismix computer on this Wi-Fi: its library and its player, like a phone does.</p>
+    <ul id="join-hosts" class="band-clients"></ul>
+    <p id="join-empty" class="muted" hidden>No other Prismix computer found.</p>
+    <form id="join-form" class="band-row">
+      <input id="join-addr" type="text" maxlength="300" placeholder="prismix.local or 192.168.1.20" spellcheck="false" autocomplete="off">
+      <button class="btn primary" type="submit">Join</button>
+    </form>
+    <p id="join-err" class="muted" role="alert"></p>
   </dialog>
 
   <div class="cheats" id="cheats" hidden role="dialog" aria-label="Keyboard shortcuts">

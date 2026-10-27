@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.26
+
+- A desktop can join another desktop's band: click Join, pick a host found on the network (or type its name or address), and the window shows that host's library and follows its player like a phone does. Leave from Controls, Joined host. The host's certificate is trusted for that session only, and a PIN or view-only lock set on the host applies.
+
 ## 0.0.25
 
 - The app checks GitHub for a newer release and shows Update to vX.Y.Z next to the version label; it downloads the installer for your system, or opens the release page where there is none.
