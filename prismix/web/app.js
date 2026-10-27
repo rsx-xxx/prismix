@@ -1176,11 +1176,17 @@ window.addEventListener('keyup', (e) => {
   e.preventDefault();
 });
 
-$('settings-btn').addEventListener('click', () => $('settings').showModal());
-$('settings-close').addEventListener('click', () => $('settings').close());
+// a popover hung under the button: no backdrop, light-dismiss (outside click, Esc), the page behind stays usable
+$('settings').addEventListener('beforetoggle', (e) => {
+  if (e.newState !== 'open') return;
+  const r = $('settings-btn').getBoundingClientRect(), box = $('settings').style;
+  box.top = `${Math.round(r.bottom + 8)}px`;
+  box.right = `${Math.max(8, Math.round(innerWidth - r.right))}px`;
+});
+$('settings-close').addEventListener('click', () => $('settings').hidePopover());
 $('acc-sel').value = getAccidentals();
 $('acc-sel').addEventListener('change', () => { setAccidentals($('acc-sel').value); window.dispatchEvent(new Event('accidentals')); });
-$('help-btn').addEventListener('click', () => { $('settings').close(); cheats.toggle(); });
+$('help-btn').addEventListener('click', () => { $('settings').hidePopover(); cheats.toggle(); });
 window.addEventListener('beforeunload', savePrefs);
 
 // ── boot ──

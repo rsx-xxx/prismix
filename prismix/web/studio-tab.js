@@ -182,7 +182,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     const kinds = KINDS.filter((k) => keys.some((x) => cur.tab.tracks[x].kind === k));
     pick.replaceChildren(...kinds.map((k) => {
       const n = keys.filter((x) => cur.tab.tracks[x].kind === k).length;
-      const b = el('button', { type: 'button', className: 'btn small ghost', textContent: n > 1 ? `${cap(k)} · ${n}` : cap(k) });
+      const b = el('button', { type: 'button', className: 'btn small ghost', textContent: k === 'other' ? 'Others' : cap(k) });
       b.setAttribute('aria-pressed', String(k === kind));
       b.addEventListener('click', () => {
         if (k === kind) return;
@@ -193,14 +193,14 @@ export function createTab({ player, chordsIn = () => [] }) {
     }));
     pick.hidden = kinds.length < 2;
     const same = keys.filter((x) => cur.tab.tracks[x].kind === kind);
-    variants.replaceChildren(...same.map((k, i) => {
-      const t = cur.tab.tracks[k];
-      const b = el('button', { type: 'button', className: 'btn small ghost', textContent: `${i + 1}`, title: shortName(t, k) + (t.edited ? ' (edited)' : '') });
-      b.setAttribute('aria-pressed', String(k === part));
-      if (t.edited) b.classList.add('edited');
-      b.addEventListener('click', () => choose(k));
-      return b;
-    }));
+    const names = same.map((k) => cur.tab.tracks[k].name.replaceAll(' | ', ' · ') || cap(kind));
+    const sel = el('select', { className: 'tab-sel', ariaLabel: `${cap(kind)} part` });
+    same.forEach((k, i) => {
+      const t = cur.tab.tracks[k], dup = names.filter((x) => x === names[i]).length > 1;
+      sel.append(el('option', { value: k, selected: k === part, textContent: `${dup ? `${i + 1}. ` : ''}${names[i]}${t.edited ? ' ✎' : ''}` }));
+    });
+    sel.addEventListener('change', () => choose(sel.value));
+    variants.replaceChildren(sel);
     variants.hidden = same.length < 2;
   }
 

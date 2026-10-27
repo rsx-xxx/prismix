@@ -164,16 +164,18 @@ export function createLyrics({ player, api, chords = () => [] }) {
       for (let k = i + 1; k < lines.length; k++) if (lines[k].t != null) { next = lines[k].t; break; }
       return timeLine(ln.text, ln.t, next, ln.ws, ln.we);
     });
-    let ci = 0;
+    let ci = 0, sounding = null; // sounding: the last chord that started before the current line
     lines.forEach((ln, i) => {
       const tl = cur.timed[i], n = nodes[i];
       if (!tl) return;
       const lastLine = !cur.timed.slice(i + 1).some(Boolean);
       const firstLine = !cur.timed.slice(0, i).some(Boolean);
       const lo = firstLine ? ln.t - 0.15 : ln.t, hi = lastLine ? tl.end + 0.5 : tl.end;
-      while (ci < cs.length && cs[ci].t < lo) ci++; // chords in an earlier gap belong to no lyric
+      while (ci < cs.length && cs[ci].t < lo) sounding = cs[ci++]; // chords in an earlier gap belong to no lyric, but the last one may still ring
       const here = [];
       while (ci < cs.length && cs[ci].t < hi) here.push(cs[ci++]);
+      if (sounding && (!here.length || here[0].t > lo + 0.4)) here.unshift({ ...sounding, carry: true }); // the line starts over a chord that began earlier
+      sounding = here.findLast((c) => !c.carry) ?? sounding;
       splitAt(tl, here.filter((c) => !c.carry).map((c) => c.t));
       const pieces = tl.syl;
       pieces.forEach((o) => { o.ch = []; });
