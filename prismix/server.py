@@ -32,6 +32,7 @@ from . import (
     spotify,
     tabdata,
     tabs,
+    updates,
     uploads,
 )
 from . import band as band_mod
@@ -222,6 +223,10 @@ def create_app() -> FastAPI:
     @app.get("/api/version")
     def app_version():
         return {"version": __version__, "url": f"{REPO}/releases/tag/v{__version__}"}
+
+    @app.get("/api/update")
+    def update_info():
+        return updates.check()
 
     @app.get("/api/models")
     def models():
