@@ -48,9 +48,22 @@ export function createQueue({ $, api }) {
     $('queue-empty').hidden = jobs.length > 0;
   }
 
+  const WHAT = { chords: 'chords', lyrics: 'lyrics', tabs: 'tabs' };
+  async function prefetch() {
+    const box = $('prefetch');
+    let st;
+    try { st = await api('/api/prefetch'); } catch { return; }
+    box.hidden = !st.active;
+    if (!st.active) return;
+    $('prefetch-title').textContent = `Preparing songs · ${st.done + 1} of ${st.total}`;
+    $('prefetch-now').textContent = st.current ? `${st.current.title}: ${WHAT[st.current.step] || st.current.step}` : '';
+    $('prefetch-bar').style.width = `${Math.round((st.done / Math.max(st.total, 1)) * 100)}%`;
+  }
+
   $('queue-btn').addEventListener('click', () => { dlg.showModal(); refresh(); });
   $('queue-close').addEventListener('click', () => dlg.close());
-  timer = setInterval(() => { if (!document.hidden) refresh(); }, 3000);
+  timer = setInterval(() => { if (!document.hidden) { refresh(); prefetch(); } }, 3000);
   refresh();
+  prefetch();
   return { refresh, stop: () => clearInterval(timer) };
 }
