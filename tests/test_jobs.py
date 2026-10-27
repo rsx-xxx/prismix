@@ -35,3 +35,4 @@ def test_urgent_job_pauses_running_one_and_resumes_it_after():
     ends, err = asyncio.run(run())
     assert err is None
     assert ends == [("end", "c"), ("end", "a"), ("end", "b")]
+
