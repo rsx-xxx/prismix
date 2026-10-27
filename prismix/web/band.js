@@ -151,6 +151,5 @@ export function createBand({ player, current, open, $ }) {
 
   ['state', 'seek', 'tune', 'loop', 'mix'].forEach((t) => player.addEventListener(t, publish));
   timer = setInterval(() => { if (player.playing) publish(); }, 2000);
-  connect();
   return { publish, stop() { clearInterval(timer); net.stop(); } };
 }
