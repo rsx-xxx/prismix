@@ -788,3 +788,13 @@ body.dragging * { cursor: grabbing !important; }
 .band-pane[hidden] { display: none; }
 #settings-btn { position: relative; }
 #settings-btn[data-update]::after { content: ""; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #4c8dff); }
+
+/* processing queue */
+#queue-btn[data-count]:not([data-count=""])::after { content: attr(data-count); margin-left: 6px; font-size: 11px; opacity: .8; }
+.queue-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; min-width: min(420px, 80vw); }
+.queue-list li { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
+.queue-list li:first-child { border-top: 0; }
+.q-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.q-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-list .btn { justify-self: start; }
+#queue-btn[hidden] { display: none; }
