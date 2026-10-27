@@ -12,7 +12,7 @@ WEB_DIR = Path(__file__).resolve().parent / "web"
 
 
 def _user_data_dir() -> Path:
-    """The bundle is read-only, so the desktop build keeps its library in the user's profile."""
+    """The desktop build and a source checkout share this folder, so both see the same library and playlists."""
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / "Prismix"
     if sys.platform == "win32":
@@ -20,7 +20,7 @@ def _user_data_dir() -> Path:
     return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "prismix"
 
 
-DATA_DIR = Path(os.environ.get("PRISMIX_DATA", _user_data_dir() if FROZEN else ROOT / "data")).resolve()
+DATA_DIR = Path(os.environ.get("PRISMIX_DATA", _user_data_dir())).resolve()
 LIBRARY_DIR = DATA_DIR / "library"
 
 # Hard cap so a pasted 10-hour stream does not lock the worker for hours.

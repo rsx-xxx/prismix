@@ -2,6 +2,12 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.22
+
+- Desktop app and `uv run prismix` now share one library and one set of playlists (the per-user app folder), so a song split in one is already there in the other. Existing `./data` libraries are merged into it.
+- The phone's Stem volumes dialog controls the host's stems in Follow mode (volume, mute, reset); in Hear here and Solo it still shapes only the phone's own sound.
+- The phone's position bar follows your finger and seeks once on release instead of jumping back mid-drag. Tapping a lyric line or bar seeks in every mode, not only Solo.
+
 ## 0.0.21
 
 - Mashup covers: the new Sources button in the lyrics header names the song the words come from and the song the chords come from. Lyrics are fetched for the first and laid onto these vocals, online chords for the second are matched in any key, and wherever the recording goes its own way the detected chords stay.

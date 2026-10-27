@@ -48,7 +48,7 @@ The link uses `prismix.local` (or `prismix-<computer>.local` if another host has
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PRISMIX_DATA` | `./data` | Library location |
+| `PRISMIX_DATA` | per-user app folder | Library location, shared by the desktop app and `uv run` |
 | `PRISMIX_MAX_DURATION` | `1200` | Longest track, in seconds |
 | `PRISMIX_MAX_UPLOAD_MB` | `500` | Largest uploaded file |
 | `PRISMIX_COOKIES` | `cookies.txt` if present | Netscape cookies file for age-gated or bot-checked YouTube videos |
