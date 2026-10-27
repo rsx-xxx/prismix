@@ -44,6 +44,8 @@ Paste a YouTube link or search by name, then press **Split**. Press `?` in the a
 
 The link uses `prismix.local` (or `prismix-<computer>.local` if another host has it, or your own via `PRISMIX_HOST_NAME`), with the IP address as a fallback. The Android app finds the host on its own (mDNS, then a Wi-Fi sweep) and reconnects by name if the address changes. You can also type a name or address in the app. It pins its traffic to Wi-Fi, so a VPN on the phone does not get in the way (unless the VPN blocks all non-VPN traffic). Use `prismix --share` to offer band mode from the CLI. You can lock playback and set a PIN in the Band panel.
 
+Another desktop can join as well: click **Join** in the toolbar, pick the host that appears (or type its name or address) and enter its PIN if it has one. The window then shows the host's library and follows its player, view-only if the host locked playback. Leave with Controls, Joined host, Leave.
+
 ## Configuration
 
 | Variable | Default | Meaning |

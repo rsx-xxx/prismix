@@ -20,6 +20,7 @@ from . import (
     __version__,
     analysis,
     browser,
+    client,
     export,
     lan,
     library,
@@ -70,6 +71,10 @@ class PlaylistImport(BaseModel):
     url: str = Field(min_length=8, max_length=400)
     model: str = DEFAULT_MODEL
     tasks: Literal["all", "stems"] = "all"
+
+
+class JoinRequest(BaseModel):
+    host: str = Field(min_length=1, max_length=300)
 
 
 class BandConfig(BaseModel):
@@ -166,6 +171,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="Prismix", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.state.band = band = Band()
+    app.state.upstream = None  # the host this desktop has joined, if any
 
     @app.middleware("http")
     async def lan_guard(request: Request, call_next):
@@ -183,6 +189,18 @@ def create_app() -> FastAPI:
         return await call_next(request)
 
     @app.middleware("http")
+    async def joined(request: Request, call_next):
+        # Joined to another host: this window's own data calls go there; LAN visitors still get this computer.
+        up = app.state.upstream
+        if up and band_mod.is_loopback(request.client.host if request.client else None):
+            path = request.url.path
+            if path == "/" and request.method == "GET":
+                return RedirectResponse("/remote", status_code=307)
+            if client.wants(path):
+                return await client.forward(request, up)
+        return await call_next(request)
+
+    @app.middleware("http")
     async def fresh_api(request: Request, call_next):
         # a phone browser or the app's WebView must never replay an old library list
         response = await call_next(request)
@@ -192,6 +210,10 @@ def create_app() -> FastAPI:
 
     @app.websocket("/ws")
     async def band_ws(ws: WebSocket):
+        up = app.state.upstream
+        if up and band_mod.is_loopback(ws.client.host if ws.client else None):
+            await client.relay_ws(ws, up)
+            return
         await band.serve(ws)
 
     @app.get("/api/band")
@@ -206,6 +228,45 @@ def create_app() -> FastAPI:
         if body.name is not None:
             lan.set_display_name(body.name)
         return band_status()
+
+    def own_window(request: Request) -> None:
+        """Joining a host is for the window on this computer, and never for a page in another tab or site."""
+        if not band_mod.is_loopback(request.client.host if request.client else None):
+            raise HTTPException(403, "Only on this computer")
+        origin = request.headers.get("origin")
+        if origin and urlparse(origin).netloc != request.headers.get("host"):
+            raise HTTPException(403, "Cross-site request")
+
+    @app.get("/api/client")
+    def client_status(request: Request):
+        own_window(request)
+        up = app.state.upstream
+        return up.status() if up else {"connected": False}
+
+    @app.get("/api/client/hosts")
+    def client_hosts(request: Request):
+        own_window(request)
+        return client.discover()
+
+    @app.post("/api/client/connect")
+    async def client_connect(body: JoinRequest, request: Request):
+        own_window(request)
+        try:
+            up = await client.connect(body.host)
+        except client.ConnectError as e:
+            raise HTTPException(400, str(e)) from None
+        old, app.state.upstream = app.state.upstream, up
+        if old:
+            await old.http.aclose()
+        return up.status()
+
+    @app.post("/api/client/disconnect")
+    async def client_disconnect(request: Request):
+        own_window(request)
+        old, app.state.upstream = app.state.upstream, None
+        if old:
+            await old.http.aclose()
+        return {"connected": False}
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
