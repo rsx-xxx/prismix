@@ -1,10 +1,11 @@
 """Guitar and bass tablature from Songsterr or a Soundslice link, aligned bar by bar with the recording.
 
 Nothing is transcribed here. The best matching song is looked up on Songsterr (its site API, no key),
-its best guitar and bass parts are downloaded, and the tab's bars are matched against the bars and chords
-we detected. A tab that does not fit the recording is dropped, so a song without a trustworthy tab has none.
+its pitched parts (every guitar, bass, keys and other melodic part) are downloaded, and the tab's bars are matched
+against the bars and chords we detected. A tab that does not fit the recording is dropped, so a song without a trustworthy tab has none.
 A Soundslice slice the user links is read from the same notation data its public player loads, and goes through the
-same fit. The result is cached in `library/<id>/tabdata.json`.
+same fit. The result is cached in `library/<id>/tabdata.json`; hand edits live beside it in `tabedits.json`,
+so a re-download never loses them.
 """
 from __future__ import annotations
 
@@ -33,7 +34,12 @@ MIN_COVERAGE = 0.6  # share of the tab's playing bars that found a bar in the re
 CANDIDATES = 3
 SLICE_DATA = "https://www.soundslice.com/slices/{code}/scoredata/"
 SLICE_URL = re.compile(r"^(?:https?://)?(?:www\.)?soundslice\.com/slices/([A-Za-z0-9]{3,12})(?:[/?#]|$)")
-_SLICE_KINDS = {"guitar": "guitar", "bass-guitar": "bass"}
+FORMAT = 2  # 2: every pitched part, each with a "kind"
+KINDS = ("guitar", "bass", "keys", "other")
+MAX_PARTS = {"guitar": 6, "bass": 3, "keys": 4, "other": 5}
+MAX_BARS, MAX_STRINGS = 1500, 12
+_KEYS = re.compile(r"piano|keys|keyboard|organ|harpsichord|clav|celesta|accordion|harmonium|rhodes|synth|pad\b")
+_KEY = re.compile(r"^(guitar|bass|keys|other)([1-9]\d?)?$")
 
 
 class TabDataError(RuntimeError):
@@ -79,14 +85,28 @@ def _slice_json(url: str):
         raise TabDataError("Soundslice sent something unreadable") from e
 
 
+def classify(instrument: str, name: str = "") -> str | None:
+    """guitar | bass | keys | other for a pitched part; None for drums and vocals."""
+    ins, nm = (instrument or "").casefold(), (name or "").casefold()
+    if "drum" in ins or "percussion" in ins or "vocal" in nm or "voice" in ins:
+        return None
+    if "bass" in ins:
+        return "bass"
+    if "guitar" in ins:
+        return "guitar"
+    if _KEYS.search(ins):
+        return "keys"
+    return "bass" if "bass" in nm else "guitar" if "guitar" in nm else "other"
+
+
+def part_key(kind: str, n: int) -> str:
+    return kind if n == 1 else f"{kind}{n}"
+
+
 def _slice_kind(track: dict) -> str | None:
     if track.get("smp") or track.get("midi", 0) >= 1000:  # drums and other sampled kits
         return None
-    kind = _SLICE_KINDS.get(track.get("i") or "")
-    if kind:
-        return kind
-    name = (track.get("name") or "").casefold()
-    return "bass" if "bass" in name else "guitar" if "guitar" in name else None
+    return classify(track.get("i") or "", track.get("name") or "")
 
 
 def compact_slice(data: dict, track: int) -> list[dict]:
@@ -117,15 +137,19 @@ def compact_slice(data: dict, track: int) -> list[dict]:
 
 
 def slice_parts(data: dict) -> dict[str, dict]:
-    """The first guitar and the first bass part of a slice that have any notes."""
+    """Every pitched part of a slice that has notes: guitar, guitar2, bass, keys, other, ..."""
     parts: dict[str, dict] = {}
+    count = dict.fromkeys(KINDS, 0)
     for i, t in enumerate(data.get("tracks", [])):
         kind = _slice_kind(t)
-        if not kind or kind in parts:
+        if not kind or count[kind] >= MAX_PARTS[kind] or not t.get("pitches"):
             continue
         bars = compact_slice(data, i)
         if any(b["n"] for b in bars):
-            parts[kind] = {"name": " ".join((t.get("name") or kind).split()), "tuning": t["pitches"], "bars": bars}
+            count[kind] += 1
+            parts[part_key(kind, count[kind])] = {
+                "kind": kind, "name": " ".join((t.get("name") or kind).split()), "tuning": t["pitches"], "bars": bars,
+            }
     return parts
 
 
@@ -146,12 +170,13 @@ def import_soundslice(video_id: str, url: str) -> dict:
     if not fitted:
         raise TabDataError("That tab does not look like this recording")
     result = {
-        "found": True, "source": "soundslice", "songId": code, "url": f"https://www.soundslice.com/slices/{code}/",
+        "found": True, "v": FORMAT, "source": "soundslice", "songId": code, "url": f"https://www.soundslice.com/slices/{code}/",
         "artist": " ".join((head.get("a") or "").split()), "title": " ".join((head.get("name") or "").split()), **fitted,
-        "tracks": {k: {"name": p["name"], "tuning": p["tuning"], "bars": p["bars"]} for k, p in parts.items()},
+        "tracks": parts,
     }
     _save(video_id, result)
-    return result
+    _edits_path(video_id).unlink(missing_ok=True)  # edits belonged to the tab this one replaces
+    return read(video_id) or result
 
 
 # ───────────────────────── lookup ─────────────────────────
@@ -183,22 +208,24 @@ def candidates(info: dict) -> list[dict]:
 
 
 def _kind(track: dict) -> str | None:
-    name = (track.get("instrument") or "").casefold()
-    if track.get("isVocalTrack") or track.get("isEmpty") or "drum" in name:
+    if track.get("isVocalTrack") or track.get("isEmpty"):
         return None
-    if "bass" in name:
-        return "bass"
-    return "guitar" if "guitar" in name else None
+    return classify(track.get("instrument") or "", track.get("name") or "")
 
 
 def pick_tracks(tracks: list[dict]) -> dict[str, int]:
-    """Index of the most played guitar and bass part (the part id on Songsterr is the track index)."""
-    best: dict[str, tuple[int, int]] = {}
+    """Part key -> track index (the part id on Songsterr is the track index), most played first within a kind:
+    {"guitar": 1, "guitar2": 0, "bass": 2, "keys": 5}."""
+    by_kind: dict[str, list[tuple[int, int]]] = {k: [] for k in KINDS}
     for i, t in enumerate(tracks):
-        k = _kind(t)
-        if k and t.get("views", 0) >= best.get(k, (-1, 0))[0]:
-            best[k] = (t.get("views", 0), i)
-    return {k: i for k, (_, i) in best.items()}
+        if k := _kind(t):
+            by_kind[k].append((t.get("views", 0), i))
+    picks: dict[str, int] = {}
+    for kind in KINDS:
+        ranked = sorted(by_kind[kind], key=lambda x: (-x[0], x[1]))[:MAX_PARTS[kind]]
+        for n, (_, i) in enumerate(ranked, 1):
+            picks[part_key(kind, n)] = i
+    return picks
 
 
 def _image(song_id: int) -> str:
@@ -315,8 +342,15 @@ def align(tab: list[list[float]], rec: list[list[float]], t: int) -> tuple[float
     return sim, len(hit) / len(playing), pair
 
 
+def _lead_parts(parts: dict[str, dict]) -> dict[str, dict]:
+    """The parts the fit is judged on: the main guitar and bass (any single part when there are neither)."""
+    lead = {k: p for k, p in parts.items() if k in ("guitar", "bass")}
+    return lead or dict(list(parts.items())[:1])
+
+
 def fit(parts: dict[str, dict], structure: dict) -> dict | None:
     """Pick the transposition and bar mapping that fit best; None when the tab is not this recording."""
+    parts = _lead_parts(parts)
     rec = _bar_chroma(structure)
     if len(rec) < 4:
         return None
@@ -342,18 +376,105 @@ def _path(video_id: str):
     return library.video_dir(video_id) / "tabdata.json"
 
 
-def read(video_id: str) -> dict | None:
+def _edits_path(video_id: str):
+    return library.video_dir(video_id) / "tabedits.json"
+
+
+def _read_edits(video_id: str) -> dict:
+    try:
+        edits = json.loads(_edits_path(video_id).read_text())
+    except (OSError, ValueError):
+        return {}
+    return edits if isinstance(edits, dict) else {}
+
+
+def _raw(video_id: str) -> dict | None:
     try:
         return json.loads(_path(video_id).read_text())
     except (OSError, ValueError):
         return None
 
 
-def _save(video_id: str, data: dict) -> None:
-    path = _path(video_id)
+def _upgrade(tab: dict) -> dict:
+    for key, p in tab.get("tracks", {}).items():
+        p.setdefault("kind", _KEY.match(key).group(1) if _KEY.match(key) else "other")
+    return tab
+
+
+def read(video_id: str) -> dict | None:
+    """The cached tab with the user's edits laid over it (each edited part is flagged `edited`)."""
+    tab = _raw(video_id)
+    if tab is None or not tab.get("found"):
+        return tab
+    _upgrade(tab)
+    for key, edit in _read_edits(video_id).items():
+        base = tab["tracks"].get(key, {})
+        tab["tracks"][key] = {**base, **edit, "edited": True}
+    return tab
+
+
+def _clean_bars(bars, strings: int) -> list[dict]:
+    """Validate a part's bars from the client; raises TabDataError for anything that is not a tab."""
+    if not isinstance(bars, list) or not 0 < len(bars) <= MAX_BARS:
+        raise TabDataError("Bad tab")
+    out = []
+    for b in bars:
+        try:
+            length = float(b["len"])
+            notes = []
+            for pos, dur, frets in b["n"]:
+                fl = []
+                for s_, f in frets:
+                    if not (isinstance(s_, int) and isinstance(f, int) and 0 <= s_ < strings and 0 <= f <= 36):
+                        raise ValueError
+                    fl.append([s_, f])
+                if not fl or not 0 <= float(pos) < 1.0001:
+                    raise ValueError
+                notes.append([round(float(pos), 4), round(max(0.0, float(dur)), 4), fl])
+        except (KeyError, TypeError, ValueError) as e:
+            raise TabDataError("Bad tab") from e
+        if not 0 < length <= 8:
+            raise TabDataError("Bad tab")
+        bar = {"len": round(length, 4), "n": sorted(notes, key=lambda x: x[0])}
+        for k in ("sig", "mark"):
+            if k in b:
+                bar[k] = b[k]
+        out.append(bar)
+    return out
+
+
+def save_edit(video_id: str, key: str, bars) -> dict:
+    """Keep the user's version of one part; returns the whole tab as the viewers now see it."""
+    base = _raw(video_id)
+    if not _KEY.match(key) or not base or not base.get("found"):
+        raise ValueError("no such part")
+    p = _upgrade(base)["tracks"].get(key)
+    if not p:
+        raise ValueError("no such part")
+    edits = _read_edits(video_id)
+    edits[key] = {"kind": p["kind"], "name": p["name"], "tuning": p["tuning"], "bars": _clean_bars(bars, len(p["tuning"]))}
+    _write(_edits_path(video_id), edits)
+    return read(video_id)
+
+
+def revert_edit(video_id: str, key: str) -> dict | None:
+    edits = _read_edits(video_id)
+    if edits.pop(key, None) is not None:
+        if edits:
+            _write(_edits_path(video_id), edits)
+        else:
+            _edits_path(video_id).unlink(missing_ok=True)
+    return read(video_id)
+
+
+def _write(path, data) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     tmp.replace(path)
+
+
+def _save(video_id: str, data: dict) -> None:
+    _write(_path(video_id), data)
 
 
 def _download(song: dict) -> dict[str, dict]:
@@ -364,11 +485,16 @@ def _download(song: dict) -> dict[str, dict]:
         return {}
     image = _image(sid)
     parts = {}
-    for kind, idx in picks.items():
-        part = _json(PART.format(id=sid, rev=meta["revisionId"], image=image, part=idx))
-        bars = compact(part)
-        if any(b["n"] for b in bars):
-            parts[kind] = {
+    for key, idx in picks.items():
+        try:
+            part = _json(PART.format(id=sid, rev=meta["revisionId"], image=image, part=idx))
+            bars = compact(part)
+        except (TabDataError, KeyError, ValueError) as e:  # one broken part must not lose the others
+            log.info("songsterr %s part %s skipped: %s", sid, idx, e)
+            continue
+        if any(b["n"] for b in bars) and (part.get("tuning") or meta["tracks"][idx].get("tuning")):
+            parts[key] = {
+                "kind": _KEY.match(key).group(1),
                 "name": part.get("name") or meta["tracks"][idx].get("name", ""),
                 "tuning": part.get("tuning") or meta["tracks"][idx].get("tuning", []),
                 "bars": bars,
@@ -376,9 +502,25 @@ def _download(song: dict) -> dict[str, dict]:
     return parts
 
 
+def _refresh(video_id: str, hit: dict) -> dict:
+    """A tab cached before every part was kept: download the song's parts again, keeping its bar mapping."""
+    try:
+        parts = _download({"songId": hit["songId"]})
+    except (TabDataError, KeyError, ValueError, OSError) as e:
+        log.info("tab refresh skipped: %s", e)
+        return hit
+    if not parts:
+        return hit
+    raw = {**_raw(video_id), "v": FORMAT, "tracks": parts}
+    _save(video_id, raw)
+    return read(video_id) or hit
+
+
 def lookup(video_id: str, *, force: bool = False) -> dict:
     """Find, align and cache the tab. Always returns a result; {"found": False} when no tab fits."""
     if not force and (hit := read(video_id)) is not None:
+        if hit.get("found") and hit.get("source") == "songsterr" and hit.get("v", 1) < FORMAT:
+            return _refresh(video_id, hit)
         return hit
     info = library.read_info(video_id)
     structure = analysis.read_structure(video_id)
@@ -398,12 +540,14 @@ def lookup(video_id: str, *, force: bool = False) -> dict:
         fitted = fit(parts, structure)
         if fitted:
             result = {
-                "found": True, "source": "songsterr", "songId": song["songId"],
+                "found": True, "v": FORMAT, "source": "songsterr", "songId": song["songId"],
                 "url": f"https://www.songsterr.com/a/wsa/x-tab-s{song['songId']}",
                 "artist": song["artist"], "title": song["title"], **fitted,
-                "tracks": {k: {"name": p["name"], "tuning": p["tuning"], "bars": p["bars"]} for k, p in parts.items()},
+                "tracks": parts,
             }
             break
     if result["found"] or not flaky:
         _save(video_id, result)
-    return result
+        if result["found"] and not force:
+            _edits_path(video_id).unlink(missing_ok=True)
+    return read(video_id) or result

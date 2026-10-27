@@ -245,7 +245,8 @@ async function loadTrack(id, model) {
         t.tabDone = true;
         if (!d?.found) { chrome(); if (S.view === 'tab') render(); return; }
         t.tab = d;
-        if (!S.part || !d.tracks[S.part]) S.part = d.tracks[roleKey()] ? roleKey() : d.tracks.guitar ? 'guitar' : 'bass';
+        for (const [k, p] of Object.entries(d.tracks)) p.kind ||= k.replace(/\d+$/, '');
+        if (!S.part || !d.tracks[S.part]) S.part = firstOf(d, roleKey()) || Object.keys(d.tracks)[0];
         chrome();
         if (S.view === 'tab') render();
       }).catch(() => { t.tabDone = true; });
@@ -327,18 +328,36 @@ let last = {};
 let nodes = { chords: [] }; // per-view handles for cheap per-frame updates
 const scrollLock = { until: 0 };
 
-const roleKey = () => (store.role === 'bass' ? 'bass' : 'guitar');
+const roleKey = () => (store.role === 'bass' ? 'bass' : store.role === 'keys' ? 'keys' : 'guitar');
+const KINDS = ['guitar', 'bass', 'keys', 'other'];
+const firstOf = (tab, kind) => Object.keys(tab.tracks).find((k) => tab.tracks[k].kind === kind);
+const cap = (k) => k[0].toUpperCase() + k.slice(1);
+
+function paintParts() {
+  const tab = S.track?.tab, on = !!tab && S.view === 'tab';
+  const kinds = on ? KINDS.filter((k) => firstOf(tab, k)) : [];
+  const kind = tab?.tracks[S.part]?.kind;
+  const mk = (text, data, pressed) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    Object.assign(b.dataset, data);
+    b.setAttribute('aria-selected', String(pressed));
+    return b;
+  };
+  $('tab-part').replaceChildren(...kinds.map((k) => mk(cap(k), { kind: k }, k === kind)));
+  $('tab-part').hidden = kinds.length < 2;
+  const same = on ? Object.keys(tab.tracks).filter((k) => tab.tracks[k].kind === kind) : [];
+  $('tab-variant').replaceChildren(...same.map((k, i) => mk(String(i + 1), { part: k }, k === S.part)));
+  $('tab-variant').hidden = same.length < 2;
+}
 
 function chrome() {
   if (S.view === 'tab' && S.track?.tabDone && !S.track.tab) S.view = 'lyrics'; // this song has no tab
   document.querySelectorAll('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === S.view)));
   const tab = !!S.track?.tab;
   $('tab-btn').hidden = !tab;
-  $('tab-part').hidden = !(tab && S.view === 'tab' && Object.keys(S.track.tab.tracks).length > 1);
-  document.querySelectorAll('#tab-part button').forEach((b) => {
-    b.hidden = !S.track?.tab?.tracks[b.dataset.part];
-    b.setAttribute('aria-selected', String(b.dataset.part === S.part));
-  });
+  paintParts();
   $('chord-sw').hidden = S.view === 'chords';
   $('chord-lbl').textContent = S.view === 'tab' ? 'Chords above tab' : 'Chords on lyrics';
   $('with-chords').checked = S.view === 'tab' ? S.tabChords : S.withChords;
@@ -772,12 +791,20 @@ $('with-chords').onchange = (e) => {
   render();
 };
 $('tab-part').onclick = (e) => {
-  const v = e.target.dataset?.part;
+  const k = e.target.dataset?.kind, tab = S.track?.tab;
+  if (!k || !tab || tab.tracks[S.part]?.kind === k) return;
+  const last = store['part:' + k];
+  pickPart(tab.tracks[last]?.kind === k ? last : firstOf(tab, k));
+};
+$('tab-variant').onclick = (e) => pickPart(e.target.dataset?.part);
+function pickPart(v) {
   if (!v || v === S.part) return;
+  store['part:' + S.track.tab.tracks[v].kind] = v;
   S.part = store.part = v;
   save();
+  chrome();
   render();
-};
+}
 let tabCols = 0;
 addEventListener('resize', () => { // a rotated phone fits a different number of bars per row
   if (S.view !== 'tab') return;
