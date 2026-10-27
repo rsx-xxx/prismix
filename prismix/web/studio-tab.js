@@ -10,6 +10,10 @@ import { glide, cancelGlide, offsetIn, lockstep } from './scroll.js';
 const NOTES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const BAR_MIN = 11; // rem a bar needs before a row takes one more
 const PART_KEY = 'stems:tab-part';
+const KINDS = ['guitar', 'bass', 'keys', 'other'];
+const GRID = 16; // editing slots per whole note
+const kindOf = (k) => k.replace(/\d+$/, '');
+const cap = (k) => k[0].toUpperCase() + k.slice(1);
 
 function floorIndex(arr, x) {
   let lo = 0, hi = arr.length - 1, r = -1;
@@ -21,12 +25,18 @@ function floorIndex(arr, x) {
 }
 
 export function createTab({ player, chordsIn = () => [] }) {
-  const root = $('tabview'), body = $('tab-body'), credit = $('tab-credit'), pick = $('tab-part');
+  const root = $('tabview'), body = $('tab-body'), credit = $('tab-credit'), pick = $('tab-part'), variants = $('tab-variant'), tools = $('tab-tools');
   let cur = null; // { id, tab, st, secs: bar start seconds, cells: [], row: -1 }
   let part = null;
   let holdUntil = 0;
   let width = 0;
   let follow = true;
+  let editing = false;
+  let sel = null; // { i: tab bar, slot, s: string } while editing
+  let typed = { at: 0, fret: 0 };
+  const hist = []; // [{ key, bars }] snapshots for undo
+  let saveTimer = 0;
+  let status = '';
 
   const beatSec = (beats, b) => {
     if (b <= 0) return beats[0] + b * (beats[1] - beats[0]);
@@ -36,10 +46,16 @@ export function createTab({ player, chordsIn = () => [] }) {
   };
 
   function close() {
+    flush();
     cur = null;
+    editing = false;
+    sel = null;
+    hist.length = 0;
     root.hidden = true;
     body.replaceChildren();
     pick.replaceChildren();
+    variants.replaceChildren();
+    tools.replaceChildren();
     credit.replaceChildren();
   }
 
@@ -54,6 +70,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     if (!tab?.found || !st?.bars?.length) return;
     cur = { id, tab, st, secs: st.bars.map((b) => beatSec(st.beats, b)), cells: [], rows: [], row: -1 };
     if (!tab.tracks[part]) part = tab.tracks[localStorage.getItem(PART_KEY)] ? localStorage.getItem(PART_KEY) : Object.keys(tab.tracks)[0];
+    for (const [k, t] of Object.entries(tab.tracks)) t.kind ||= kindOf(k);
     root.hidden = false;
     render();
   }
@@ -62,14 +79,9 @@ export function createTab({ player, chordsIn = () => [] }) {
     if (!cur) return;
     const { tab, st, secs } = cur;
     const p = tab.tracks[part];
-    credit.replaceChildren(`${p.name.split('|').at(-1).trim() || part} · tab by `, el('a', { href: tab.url, target: '_blank', rel: 'noopener', textContent: tab.source === 'soundslice' ? 'Soundslice' : 'Songsterr' }));
-    pick.replaceChildren(...Object.keys(tab.tracks).map((k) => {
-      const b = el('button', { type: 'button', className: 'btn small ghost', textContent: k[0].toUpperCase() + k.slice(1) });
-      b.setAttribute('aria-pressed', String(k === part));
-      b.addEventListener('click', () => { part = k; try { localStorage.setItem(PART_KEY, k); } catch { /* ignore */ } render(); });
-      return b;
-    }));
-    pick.hidden = Object.keys(tab.tracks).length < 2;
+    credit.replaceChildren(`${shortName(p, part)} · tab by `, el('a', { href: tab.url, target: '_blank', rel: 'noopener', textContent: tab.source === 'soundslice' ? 'Soundslice' : 'Songsterr' }), p.edited ? ' · edited' : '');
+    paintPicker();
+    paintTools();
 
     const per = Math.max(1, Math.floor(body.clientWidth / (BAR_MIN * parseFloat(getComputedStyle(document.documentElement).fontSize))));
     width = body.clientWidth;
@@ -102,21 +114,230 @@ export function createTab({ player, chordsIn = () => [] }) {
       }
       cell.append(chs);
       const stf = el('div', { className: 'stf' });
-      if (tb) {
-        for (const [pos, , frets] of tb.n) for (const [s, f] of frets) {
-          stf.append(el('span', { className: 'f', textContent: String(f), style: `left:${pos * 100}%;top:calc(${s} * var(--row))` }));
-        }
-      }
-      stf.append(el('span', { className: 'cursor' }));
       cell.append(stf);
-      cell.addEventListener('click', () => document.dispatchEvent(new CustomEvent('tab:seek', { detail: secs[j] })));
-      row.append(cell);
       cur.cells[j] = cell;
+      cell.dataset.tb = tb ? String(of.get(j)) : '';
+      paintStaff(cell, tb);
+      cell.addEventListener('click', (e) => {
+        if (editing && tb && e.target.closest('.stf')) { pickSpot(cell, e); return; }
+        document.dispatchEvent(new CustomEvent('tab:seek', { detail: secs[j] }));
+      });
+      row.append(cell);
     }
     body.replaceChildren(box);
     cur.row = -1;
     cur.now = -1;
   }
+
+
+  const shortName = (p, key) => p.name.split('|').at(-1).trim() || `${cap(p.kind || kindOf(key))}`;
+
+  function paintPicker() {
+    const keys = Object.keys(cur.tab.tracks);
+    const kind = cur.tab.tracks[part].kind;
+    const kinds = KINDS.filter((k) => keys.some((x) => cur.tab.tracks[x].kind === k));
+    pick.replaceChildren(...kinds.map((k) => {
+      const n = keys.filter((x) => cur.tab.tracks[x].kind === k).length;
+      const b = el('button', { type: 'button', className: 'btn small ghost', textContent: n > 1 ? `${cap(k)} · ${n}` : cap(k) });
+      b.setAttribute('aria-pressed', String(k === kind));
+      b.addEventListener('click', () => {
+        if (k === kind) return;
+        const last = localStorage.getItem(`${PART_KEY}:${k}`);
+        choose(cur.tab.tracks[last]?.kind === k ? last : keys.find((x) => cur.tab.tracks[x].kind === k));
+      });
+      return b;
+    }));
+    pick.hidden = kinds.length < 2;
+    const same = keys.filter((x) => cur.tab.tracks[x].kind === kind);
+    variants.replaceChildren(...same.map((k, i) => {
+      const t = cur.tab.tracks[k];
+      const b = el('button', { type: 'button', className: 'btn small ghost', textContent: `${i + 1}`, title: shortName(t, k) + (t.edited ? ' (edited)' : '') });
+      b.setAttribute('aria-pressed', String(k === part));
+      if (t.edited) b.classList.add('edited');
+      b.addEventListener('click', () => choose(k));
+      return b;
+    }));
+    variants.hidden = same.length < 2;
+  }
+
+  function choose(k) {
+    if (!k || k === part) return;
+    flush();
+    part = k;
+    sel = null;
+    hist.length = 0;
+    try { localStorage.setItem(PART_KEY, k); localStorage.setItem(`${PART_KEY}:${cur.tab.tracks[k].kind}`, k); } catch { /* ignore */ }
+    render();
+  }
+
+  function paintTools() {
+    const p = cur.tab.tracks[part];
+    const btn = (text, title, on) => {
+      const b = el('button', { type: 'button', className: 'btn small ghost', textContent: text, title });
+      b.addEventListener('click', on);
+      return b;
+    };
+    const edit = btn(editing ? 'Done' : 'Edit', 'Edit this tab: click a spot on the staff, type a fret number. Arrows move, Backspace deletes, Ctrl/⌘+Z undoes. Changes are saved.', () => { editing = !editing; if (!editing) { flush(); sel = null; } render(); });
+    edit.setAttribute('aria-pressed', String(editing));
+    const kids = [edit];
+    if (editing) {
+      const u = btn('Undo', 'Undo (Ctrl/⌘+Z)', undo);
+      u.disabled = !hist.length;
+      kids.push(u);
+      if (p.edited) kids.push(btn('Original', 'Throw away your edits of this part', revert));
+      kids.push(el('span', { className: 'muted tab-status', textContent: status }));
+    }
+    tools.replaceChildren(...kids);
+    tools.hidden = false;
+    body.classList.toggle('editing', editing);
+  }
+
+  function paintStaff(cell, tb) {
+    const stf = cell.querySelector('.stf');
+    stf.replaceChildren();
+    if (tb) {
+      for (const [pos, , frets] of tb.n) for (const [s, f] of frets) {
+        stf.append(el('span', { className: 'f', textContent: String(f), style: `left:${pos * 100}%;top:calc(${s} * var(--row))` }));
+      }
+    }
+    if (editing && sel && tb && Number(cell.dataset.tb) === sel.i) {
+      const slots = slotsOf(tb);
+      stf.append(el('span', { className: 'selmark', style: `left:${(sel.slot / slots) * 100}%;top:calc(${sel.s} * var(--row))` }));
+    }
+    stf.append(el('span', { className: 'cursor' }));
+  }
+
+  // ── editing ──
+  const slotsOf = (tb) => Math.max(1, Math.round(tb.len * GRID));
+  const part_ = () => cur.tab.tracks[part];
+  const cellOf = (i) => cur.cells.find((c) => c && c.dataset.tb === String(i));
+  const repaint = (i) => { const c = cellOf(i); if (c) paintStaff(c, part_().bars[i]); };
+  const beatAt = (tb, slot) => tb.n.findIndex((b) => Math.abs(b[0] - slot / slotsOf(tb)) < 0.4 / slotsOf(tb));
+
+  function pickSpot(cell, e) {
+    const i = Number(cell.dataset.tb), tb = part_().bars[i], r = cell.querySelector('.stf').getBoundingClientRect();
+    const slots = slotsOf(tb);
+    const slot = Math.min(slots - 1, Math.max(0, Math.round(((e.clientX - r.left) / r.width) * slots)));
+    const s = Math.min(part_().tuning.length - 1, Math.max(0, Math.floor(((e.clientY - r.top) / r.height) * part_().tuning.length)));
+    moveSel({ i, slot, s });
+  }
+
+  function moveSel(next) {
+    const old = sel;
+    sel = next;
+    typed = { at: 0, fret: 0 };
+    if (old && old.i !== next.i) repaint(old.i);
+    repaint(next.i);
+  }
+
+  function remember() {
+    hist.push({ key: part, bars: JSON.stringify(part_().bars) });
+    if (hist.length > 100) hist.shift();
+  }
+
+  function changed(i) {
+    part_().edited = true;
+    repaint(i);
+    queueSave();
+    paintTools();
+  }
+
+  function setFret(fret) {
+    const tb = part_().bars[sel.i], slots = slotsOf(tb);
+    remember();
+    let k = beatAt(tb, sel.slot);
+    if (k < 0) {
+      const pos = sel.slot / slots, nxt = tb.n.find((b) => b[0] > pos + 1e-6);
+      tb.n.push([pos, Math.min(nxt ? nxt[0] - pos : 1, 2 / slots), []]);
+      tb.n.sort((a, b) => a[0] - b[0]);
+      k = beatAt(tb, sel.slot);
+    }
+    const frets = tb.n[k][2], ex = frets.find((x) => x[0] === sel.s);
+    if (ex) ex[1] = fret; else frets.push([sel.s, fret]);
+    changed(sel.i);
+  }
+
+  function clearNote() {
+    const tb = part_().bars[sel.i], k = beatAt(tb, sel.slot);
+    if (k < 0 || !tb.n[k][2].some((x) => x[0] === sel.s)) return;
+    remember();
+    tb.n[k][2] = tb.n[k][2].filter((x) => x[0] !== sel.s);
+    if (!tb.n[k][2].length) tb.n.splice(k, 1);
+    changed(sel.i);
+  }
+
+  function step(dSlot, dString) {
+    const bars = part_().bars;
+    let { i, slot, s } = sel;
+    s = Math.min(part_().tuning.length - 1, Math.max(0, s + dString));
+    slot += dSlot;
+    if (slot < 0 && i > 0) { i--; slot = slotsOf(bars[i]) - 1; } else if (slot >= slotsOf(bars[i]) && i + 1 < bars.length) { i++; slot = 0; } else slot = Math.min(slotsOf(bars[i]) - 1, Math.max(0, slot));
+    moveSel({ i, slot, s });
+    cellOf(i)?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function undo() {
+    const h = hist.pop();
+    if (!h || h.key !== part) { paintTools(); return; }
+    part_().bars = JSON.parse(h.bars);
+    part_().edited = true;
+    queueSave();
+    render();
+  }
+
+  async function revert() {
+    if (!confirm('Throw away your edits of this part and go back to the downloaded tab?')) return;
+    clearTimeout(saveTimer);
+    try {
+      const r = await fetch(`/api/tabdata/${cur.id}/tracks/${part}`, { method: 'DELETE' });
+      if (!r.ok) throw new Error();
+      cur.tab = await r.json();
+      for (const [k, t] of Object.entries(cur.tab.tracks)) t.kind ||= kindOf(k);
+      hist.length = 0;
+      sel = null;
+      status = '';
+      render();
+    } catch { status = 'Could not revert'; paintTools(); }
+  }
+
+  function queueSave() {
+    status = 'Editing…';
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, 700);
+  }
+
+  function flush() {
+    if (!saveTimer || !cur) return;
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    const { id } = cur, key = part, bars = part_().bars;
+    status = 'Saving…';
+    fetch(`/api/tabdata/${id}/tracks/${key}`, { method: 'PUT', keepalive: true, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ bars }) })
+      .then((r) => { status = r.ok ? 'Saved' : 'Not saved'; })
+      .catch(() => { status = 'Not saved'; })
+      .finally(() => { if (cur?.id === id && editing) { const s = tools.querySelector('.tab-status'); if (s) s.textContent = status; } });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (!editing || !sel || !cur || root.hidden || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+    const mod = e.ctrlKey || e.metaKey;
+    let used = true;
+    if (mod && e.key.toLowerCase() === 'z') undo();
+    else if (mod || e.altKey) used = false;
+    else if (/^\d$/.test(e.key)) {
+      const now = Date.now(), two = typed.fret * 10 + Number(e.key);
+      const fret = now - typed.at < 900 && typed.fret > 0 && two <= 36 ? two : Number(e.key);
+      typed = { at: now, fret };
+      setFret(fret);
+    } else if (e.key === 'Backspace' || e.key === 'Delete') clearNote();
+    else if (e.key === 'ArrowLeft') step(-1, 0);
+    else if (e.key === 'ArrowRight') step(1, 0);
+    else if (e.key === 'ArrowUp') step(0, -1);
+    else if (e.key === 'ArrowDown') step(0, 1);
+    else if (e.key === 'Escape') { const i = sel.i; sel = null; repaint(i); } else used = false;
+    if (used) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+  addEventListener('beforeunload', flush);
 
   const centre = (cell, soft) => {
     const r = cell.parentElement, want = r.offsetTop - body.clientHeight * 0.4 + r.offsetHeight / 2;

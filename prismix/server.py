@@ -99,6 +99,10 @@ class TabsRequest(BaseModel):
     url: str | None = Field(default=None, max_length=300)
 
 
+class TabEditRequest(BaseModel):
+    bars: list[dict] = Field(max_length=1500)
+
+
 class MashupRequest(BaseModel):
     lyrics: str | None = Field(default=None, max_length=200)
     chords: str | None = Field(default=None, max_length=200)
@@ -453,6 +457,23 @@ def create_app() -> FastAPI:
             raise HTTPException(404, "Not found") from None
         except tabdata.TabDataError:
             return {"found": False}
+
+    @app.put("/api/tabdata/{video_id}/tracks/{key}")
+    async def edit_tab_part(video_id: str, key: str, req: TabEditRequest):
+        # The user's hand-edited bars for one part; kept beside the cached tab so a re-download never loses them
+        try:
+            return await asyncio.to_thread(tabdata.save_edit, video_id, key, req.bars)
+        except ValueError:
+            raise HTTPException(404, "Not found") from None
+        except tabdata.TabDataError as e:
+            raise HTTPException(422, str(e)) from e
+
+    @app.delete("/api/tabdata/{video_id}/tracks/{key}")
+    async def revert_tab_part(video_id: str, key: str):
+        try:
+            return await asyncio.to_thread(tabdata.revert_edit, video_id, key)
+        except ValueError:
+            raise HTTPException(404, "Not found") from None
 
     @app.get("/api/lyrics/{video_id}")
     async def get_lyrics(video_id: str, q: str | None = Query(default=None, max_length=200), listen: bool = False):

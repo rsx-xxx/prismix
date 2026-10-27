@@ -773,3 +773,9 @@ body.dragging * { cursor: grabbing !important; }
 .ly-body::-webkit-scrollbar, .chart::-webkit-scrollbar, .tab-body::-webkit-scrollbar, .fing-side::-webkit-scrollbar { width: 0; }
 .ly-body.manual, .chart.manual, .tab-body.manual, .fing-side.manual { scrollbar-width: thin; }
 .ly-body.manual::-webkit-scrollbar, .chart.manual::-webkit-scrollbar, .tab-body.manual::-webkit-scrollbar, .fing-side.manual::-webkit-scrollbar { width: 8px; }
+
+.seg-btns button.edited::after { content: "•"; margin-left: 2px; color: var(--accent, currentColor); }
+.tab-status { font-size: 0.75rem; margin-left: 0.4rem; align-self: center; }
+.tab-body.editing .stf { cursor: crosshair; }
+.tab-body.editing .stf .f { pointer-events: none; }
+.stf .selmark { position: absolute; width: 1.1em; height: var(--row); transform: translate(-50%, 0); border: 1px solid var(--accent, #7aa2ff); border-radius: 3px; pointer-events: none; }
