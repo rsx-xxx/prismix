@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.40
+
+- Chords, lyrics and tabs are now fetched in the background for every library song that lacks them, so songs open with everything ready. A translucent panel shows the progress and hides itself when all is done.
+
 ## 0.0.39
 
 - Fixes 0.0.38, where the page stopped starting: Settings did nothing and the library never finished loading.
