@@ -56,7 +56,7 @@ export function createBand({ player, current, open, $ }) {
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data);
       if (m.t === 'cmd') commands[m.op]?.(m.v);
-      else if (m.t === 'roster' || m.t === 'welcome') { Object.assign(status, m); render(); }
+      else if (m.t === 'roster' || m.t === 'welcome') { Object.assign(status, m); player.setHeld?.(m.speaker != null); render(); }
     };
     ws.onclose = () => setTimeout(connect, 1500);
   }
@@ -94,6 +94,8 @@ export function createBand({ player, current, open, $ }) {
       return li;
     }));
     if (!status.clients.length) list.innerHTML = '<li class="muted">Nobody connected yet</li>';
+    const sp = status.clients.find((c) => c.id === status.speaker);
+    $('band-hint').textContent += sp ? ` ${sp.name} is playing the sound, so this computer is silent.` : '';
     $('band-btn').dataset.count = status.clients.length || '';
     $('band-btn').title = `Band: ${status.clients.length} connected`;
     if (!dlg.open) return;

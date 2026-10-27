@@ -12,7 +12,7 @@
 - **Tempo and key:** 50–150 % tempo and ±12 semitones plus fine tune without the robotic sound, A-B loop, and export of the mix or single stems (mp3, m4a, flac, wav, ogg, opus).
 - **Chords and bars:** beats, bars, key and chords are detected once per track. Chord chart, fingering diagrams, capo suggestions, PDF export, and a check against Songsterr chord sheets.
 - **Lyrics:** synced lyrics from Genius and LRCLIB, timed to the vocals word by word.
-- **Band mode:** phones scan a QR code and follow the host's player. Each picks a part (vocals, guitar, bass, keys, drums), sees the current bar, chord and lyric line, and can control playback. No outside server.  Phones can simplify chords for themselves, and the song shows in the system media controls. The Android app can save songs on the phone (about 25 MB each) and play them in Solo with no host at all.
+- **Band mode:** phones scan a QR code and follow the host's player. Each picks a part (vocals, guitar, bass, keys, drums), sees the current bar, chord and lyric line, and can control playback. No outside server.  A phone in Hear here mode can take over the room's sound (the host goes silent), so the Mac needs no speakers. Phones can simplify chords for themselves, and the song shows in the system media controls. The Android app can save songs on the phone (about 25 MB each) and play them in Solo with no host at all.
 - **Sources:** a YouTube or Spotify link (track, album, playlist, artist), a search, a playlist, or a local audio or video file (up to 500 MB). Every split is cached, so nothing is processed twice.
 
 ## Install
