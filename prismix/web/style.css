@@ -797,4 +797,6 @@ body.dragging * { cursor: grabbing !important; }
 .q-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
 .q-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .queue-list .btn { justify-self: start; }
+#band-note { position: fixed; left: 50%; bottom: 1.2rem; transform: translate(-50%, 12px); padding: .5rem 1rem; border-radius: 999px; background: var(--ink, #222); color: var(--bg, #fff); font-size: .85rem; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 60; }
+#band-note.on { opacity: 1; transform: translate(-50%, 0); }
 #queue-btn[hidden] { display: none; }

@@ -364,10 +364,23 @@ def fit(parts: dict[str, dict], structure: dict) -> dict | None:
         tab.append(_unit(v))
     best = max(((*align(tab, rec, t), t) for t in range(12)), key=lambda x: x[0] * x[1])
     sim, cover, pair, t = best
-    if t != 0 or sim < MIN_SCORE or cover < MIN_COVERAGE:
+    if sim < MIN_SCORE + (0.05 if t else 0) or cover < MIN_COVERAGE:
         log.info("tab rejected: similarity %.2f, coverage %.2f, transpose %d", sim, cover, t)
         return None
-    return {"similarity": round(sim, 3), "coverage": round(cover, 3), "map": pair}
+    # the tab is written in another key than the audio at hand (a karaoke cut, a lowered cover): follow the audio
+    return {"similarity": round(sim, 3), "coverage": round(cover, 3), "map": pair, "shift": -t if t <= 6 else 12 - t}
+
+
+def retune(parts: dict[str, dict], semitones: int) -> None:
+    """Move every note by `semitones` in place, an octave back where the fret would leave the neck."""
+    if not semitones:
+        return
+    for p in parts.values():
+        for bar in p["bars"]:
+            for note in bar["n"]:
+                for fret in note[2]:
+                    f = fret[1] + semitones
+                    fret[1] = f + 12 if f < 0 else f - 12 if f > 24 else f
 
 
 # ───────────────────────── entry points ─────────────────────────
@@ -539,6 +552,7 @@ def lookup(video_id: str, *, force: bool = False) -> dict:
             continue
         fitted = fit(parts, structure)
         if fitted:
+            retune(parts, fitted["shift"])
             result = {
                 "found": True, "v": FORMAT, "source": "songsterr", "songId": song["songId"],
                 "url": f"https://www.songsterr.com/a/wsa/x-tab-s{song['songId']}",
