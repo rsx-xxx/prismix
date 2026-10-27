@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.24
+
+- Offline mode in the Android app: tap Save next to a song (or Save all in a playlist) while connected, and its stems, lyrics, chords and tab are kept on the phone. Without the host, the app offers Play saved songs, which opens the same page in Solo with the saved songs only, so the band can rehearse anywhere. Tap Saved, then Remove?, to free the space. The menu's Offline switch, Keep every song I open, saves each song as you open it.
+
 ## 0.0.23
 
 - Songsterr and Soundslice tabs now keep every instrument of a song: all guitars, basses, keys and other parts, each switchable (instrument buttons, then 1/2/3 within one). Cached tabs refresh on their own.

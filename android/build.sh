@@ -19,7 +19,10 @@ case "$VN" in
     rm -f build/AndroidManifest.xml.bak ;;
 esac
 $BT/aapt2 compile --dir res -o build/res.zip
-$BT/aapt2 link -o build/base.apk -I "$JAR" --manifest build/AndroidManifest.xml build/res.zip
+# The phone page ships inside the app: it is what runs when no host is around (offline songs).
+mkdir -p build/assets/web && cp -R ../prismix/web/. build/assets/web/
+rm -rf build/assets/web/vendor/jspdf.umd.min.js
+$BT/aapt2 link -o build/base.apk -I "$JAR" -A build/assets --manifest build/AndroidManifest.xml build/res.zip
 (cd build && zip -q -j base.apk classes.dex)
 $BT/zipalign -f 4 build/base.apk build/aligned.apk
 KS=${PRISMIX_KEYSTORE:-$HOME/.android/debug.keystore}
