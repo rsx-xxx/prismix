@@ -78,6 +78,8 @@ function applyLook() {
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyLook);
 applyLook();
 
+let seekDrag = false, seekHold = 0; // see the seek bar handlers
+
 // ── connection + clock ──
 let ws;
 let samples = [];
@@ -637,7 +639,7 @@ function update() {
   const dur = t?.meta.duration || 1;
   const pl = playing();
   if (last.pl !== pl) { $('play-i').setAttribute('href', pl ? '#i-pause' : '#i-play'); last.pl = pl; }
-  if (document.activeElement !== $('seek')) { $('seek').value = String(Math.round((p / dur) * 1000)); $('seek').style.setProperty('--fill', `${(p / dur) * 100}%`); }
+  if (!seekDrag && performance.now() > seekHold) { $('seek').value = String(Math.round((p / dur) * 1000)); $('seek').style.setProperty('--fill', `${(p / dur) * 100}%`); }
   const cur = fmt(p);
   if (last.cur !== cur) { $('t-cur').textContent = cur; last.cur = cur; }
   const tp = Math.round(tempo() * 100), sm = semis();
@@ -698,16 +700,16 @@ function update() {
 }
 ['touchstart', 'wheel', 'pointerdown'].forEach((ev) => $('stage').addEventListener(ev, () => { scrollLock.until = Date.now() + 4000; }, { passive: true }));
 
-// Solo: tap a lyric line or a bar to jump there, as on the desktop.
+// Tap a lyric line or a bar to jump there, as on the desktop (follow modes ask the host).
 $('stage').addEventListener('click', (e) => {
-  if (S.mode !== 'solo' || !S.track) return;
+  if (!S.track) return;
   const row = e.target.closest('.ln'), bar = e.target.closest('.bar');
   let at = null;
   if (row && nodes.lines) at = nodes.lines.find((n) => n.el === row)?.t;
   else if (bar && nodes.bars) { const j = nodes.bars.indexOf(bar); if (j >= 0) at = S.track.barT[j]; }
   if (at == null || !Number.isFinite(at)) return;
   act.seek(Math.max(0, at - 0.05));
-  if (!S.local?.playing) S.local?.play();
+  if (S.mode === 'solo' && !S.local?.playing) S.local?.play();
 });
 
 // ── controls ──
@@ -717,7 +719,7 @@ const act = {
   seek: (s) => {
     s = clamp(s, 0, S.track?.meta.duration ?? s);
     scrollLock.until = 0;
-    if (S.mode === 'solo') S.local?.seek(s); else send('seek', s);
+    if (S.mode === 'solo') S.local?.seek(s); else { if (S.host) { S.host = { ...S.host, pos: s, s: serverNow() }; clock.at = 0; } send('seek', s); }
   },
   tempo: (v) => {
     v = clamp(Math.round(v * 20) / 20, 0.5, 1.5);
@@ -742,8 +744,15 @@ $('k-up').onclick = () => act.key(semis() + 1);
 $('k-reset').onclick = () => act.key(0);
 $('k-range').oninput = throttle((e) => act.key(+e.target.value), 90);
 $('k-range').onchange = (e) => act.key(+e.target.value);
+// The bar follows the finger while it is down and seeks once on release; touch WebViews do not focus a range input,
+// so a drag flag (not activeElement) keeps the ticker from pulling the thumb back.
+const seekStart = () => { seekDrag = true; };
+const seekEnd = () => { if (!seekDrag) return; seekDrag = false; seekHold = performance.now() + 1200; };
+$('seek').addEventListener('pointerdown', seekStart);
+$('seek').addEventListener('touchstart', seekStart, { passive: true });
+['pointerup', 'pointercancel', 'touchend', 'touchcancel'].forEach((ev) => $('seek').addEventListener(ev, seekEnd));
 $('seek').oninput = (e) => { $('t-cur').textContent = fmt((e.target.value / 1000) * (S.track?.meta.duration || 0)); e.target.style.setProperty('--fill', `${e.target.value / 10}%`); };
-$('seek').onchange = (e) => act.seek((e.target.value / 1000) * (S.track?.meta.duration || 0));
+$('seek').onchange = (e) => { seekDrag = false; seekHold = performance.now() + 1200; act.seek((e.target.value / 1000) * (S.track?.meta.duration || 0)); };
 $('tabs').onclick = (e) => {
   const v = e.target.dataset?.view;
   if (!v) return;
@@ -809,7 +818,7 @@ document.addEventListener('pointerdown', (e) => {
   dot.addEventListener('animationend', () => dot.remove());
 }, { passive: true });
 
-// ── stem volumes (this phone only; they shape what it plays in "Hear here" and "Solo") ──
+// ── stem volumes (on the host in "Follow"; on this phone in "Hear here" and "Solo") ──
 const mixer = $('mixer');
 const mix = store.mix || {};
 const mixOf = (n) => mix[n] || (mix[n] = { v: 1, m: false });
@@ -820,25 +829,40 @@ function applyMix() {
   for (const s of p.stems) p.setVolume(s.name, mixOf(s.name).v);
   if (S.mode === 'solo') p.setMuteSet(mixMuted());
 }
+// "Follow" has no sound on the phone, so the mixer drives the host's stems (the room hears it); the other modes
+// shape this phone's own sound.
+const mixRemote = () => S.mode === 'follow';
 function paintMixer() {
   const names = (S.track?.meta.stems || []).map((s) => s.name);
-  const live = S.mode !== 'follow';
-  $('mix-note').textContent = !names.length ? 'No song yet.' : live ? 'Changes apply to the sound on this phone only.' : 'Switch to "Hear here" or "Solo" in Controls to play the song on this phone, then set the levels here.';
+  const remote = mixRemote();
+  $('mix-note').textContent = !names.length ? 'No song yet.' : remote ? 'Changes apply to the host, so everyone hears them.' : 'Changes apply to the sound on this phone only.';
   $('mix-list').replaceChildren(...names.map((n) => {
-    const m = mixOf(n);
+    const m = remote ? { v: S.host?.volumes?.[n] ?? 1, m: !!S.host?.muted?.includes(n) } : mixOf(n);
     const out = el('output', { textContent: `${Math.round(m.v * 100)}%` });
     const range = el('input', { type: 'range', min: 0, max: 150, step: 5, value: Math.round(m.v * 100), ariaLabel: `${n} volume` });
     const btn = el('button', { type: 'button', className: 'mute', textContent: m.m ? 'Muted' : 'On', ariaPressed: String(m.m) });
     const row = el('div', { className: `mrow${m.m ? ' off' : ''}` }, el('b', { textContent: n[0].toUpperCase() + n.slice(1) }), btn, range, out);
-    range.oninput = () => { m.v = range.value / 100; out.textContent = `${range.value}%`; store.mix = mix; save(); applyMix(); };
-    btn.onclick = () => { m.m = !m.m; btn.textContent = m.m ? 'Muted' : 'On'; btn.ariaPressed = String(m.m); row.classList.toggle('off', m.m); store.mix = mix; save(); applyMix(); syncLocal(false); };
+    const setVol = throttle((v) => send('volume', { name: n, v }), 90);
+    range.oninput = () => {
+      m.v = range.value / 100; out.textContent = `${range.value}%`;
+      if (remote) { setVol(m.v); return; }
+      store.mix = mix; save(); applyMix();
+    };
+    range.onchange = () => { if (remote) send('volume', { name: n, v: range.value / 100 }); };
+    btn.onclick = () => {
+      m.m = !m.m; btn.textContent = m.m ? 'Muted' : 'On'; btn.ariaPressed = String(m.m); row.classList.toggle('off', m.m);
+      if (remote) { send('mute', { name: n, on: m.m }); return; }
+      store.mix = mix; save(); applyMix(); syncLocal(false);
+    };
     return row;
   }));
 }
 $('mix-btn').onclick = () => { paintMixer(); mixer.showModal(); };
 $('mixer-close').onclick = () => mixer.close();
 mixer.addEventListener('click', (e) => { if (e.target === mixer) mixer.close(); });
-$('mix-reset').onclick = () => { for (const k of Object.keys(mix)) delete mix[k]; store.mix = mix; save(); applyMix(); syncLocal(false); paintMixer(); };
+$('mix-reset').onclick = () => {
+  if (mixRemote()) { for (const s of S.track?.meta.stems || []) { send('volume', { name: s.name, v: 1 }); send('mute', { name: s.name, on: false }); } setTimeout(paintMixer, 300); return; }
+  for (const k of Object.keys(mix)) delete mix[k]; store.mix = mix; save(); applyMix(); syncLocal(false); paintMixer(); };
 
 // ── save to this phone (Android app only) ──
 if (droid?.download) {

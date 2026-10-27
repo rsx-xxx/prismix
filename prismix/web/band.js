@@ -23,6 +23,7 @@ export function createBand({ player, current, open, $ }) {
       loop: q ? { a: q.a, b: q.b } : null,
       muted: player.stems.filter((s) => s.muted).map((s) => s.name),
       solo: player.stems.filter((s) => s.solo).map((s) => s.name),
+      volumes: Object.fromEntries(player.stems.map((s) => [s.name, s.volume])),
     };
   };
 
@@ -40,6 +41,7 @@ export function createBand({ player, current, open, $ }) {
     loop: (v) => (v ? player.setLoop(+v.a, +v.b) : player.setLoop(null, null)),
     mute: (v) => player._stem(v?.name) && player.setMuted(v.name, !!v.on),
     solo: (v) => player._stem(v?.name) && player.setSolo(v.name, !!v.on),
+    volume: (v) => player._stem(v?.name) && player.setVolume(v.name, +v.v),
     load: (v) => { if (/^[\w-]{1,64}$/.test(v?.id) && /^[\w.-]{1,64}$/.test(v?.model)) location.hash = `#/v/${v.id}/${v.model}`; },
   };
 

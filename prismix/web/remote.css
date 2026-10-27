@@ -106,7 +106,7 @@ main { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; height:
 .ly .sec { color: var(--accent); font-size: .72rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; margin-bottom: -.9rem; }
 .ln { display: flex; flex-wrap: wrap; align-items: flex-end; row-gap: .2rem; font-size: 1.7rem; font-weight: 720; line-height: 1.22; letter-spacing: -.015em; color: var(--ink-2); scroll-margin-top: 20dvh; }
 .ln { cursor: default; }
-body.solo .ln, body.solo .bar { cursor: pointer; }
+.ln, .bar { cursor: pointer; }
 .switch small { display: block; font-weight: 400; font-size: .75rem; color: var(--ink-2); }
 .ln .tx { transition: none; } /* a colour fade into the transparent karaoke text flashes on every syllable */
 .ln:not(.on) .chord { opacity: .8; }
