@@ -350,6 +350,11 @@
     </div>
   </dialog>
 
+  <aside id="prefetch" role="status" aria-live="polite" hidden>
+    <b id="prefetch-title">Preparing songs</b>
+    <span id="prefetch-now" class="muted"></span>
+    <div class="bar"><i id="prefetch-bar"></i></div>
+  </aside>
   <dialog id="queue">
     <div class="pl-head"><h3>Processing queue</h3><button class="icon-btn" id="queue-close" type="button" aria-label="Close">×</button></div>
     <ul id="queue-list" class="queue-list"></ul>
