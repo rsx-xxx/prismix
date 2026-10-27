@@ -17,7 +17,7 @@ cask "prismix" do
   auto_updates true # the app updates itself; `brew upgrade --greedy` still works
 
   depends_on arch: :arm64
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "Prismix.app"
 
