@@ -11,6 +11,7 @@ import { linkScroll, linkFollow } from './scroll.js';
 import { createMarkers } from './markers.js';
 import { createSplit } from './split.js';
 import { initCheatsheet } from './cheatsheet.js';
+import { getAccidentals, setAccidentals } from './theory.js';
 import { createBand } from './band.js';
 import { createJoin } from './join.js';
 import { createQueue } from './queue.js';
@@ -1177,6 +1178,8 @@ window.addEventListener('keyup', (e) => {
 
 $('settings-btn').addEventListener('click', () => $('settings').showModal());
 $('settings-close').addEventListener('click', () => $('settings').close());
+$('acc-sel').value = getAccidentals();
+$('acc-sel').addEventListener('change', () => { setAccidentals($('acc-sel').value); window.dispatchEvent(new Event('accidentals')); });
 $('help-btn').addEventListener('click', () => { $('settings').close(); cheats.toggle(); });
 window.addEventListener('beforeunload', savePrefs);
 

@@ -14,10 +14,19 @@ export function fifthsFor(key, semitones = 0) {
   return MAJOR_FIFTHS[tonic];
 }
 
+let accidentals = (() => { try { return localStorage.getItem('stems:accidentals') || 'auto'; } catch { return 'auto'; } })();
+/** 'auto' follows the key signature; 'flat' and 'sharp' force one spelling everywhere. */
+export const getAccidentals = () => accidentals;
+export function setAccidentals(v) {
+  accidentals = v === 'flat' || v === 'sharp' ? v : 'auto';
+  try { localStorage.setItem('stems:accidentals', accidentals); } catch { /* ignore */ }
+}
+export const useFlats = (key, semitones = 0) => (accidentals === 'auto' ? fifthsFor(key, semitones) < 0 : accidentals === 'flat');
+
 export const keyName = (key, semitones = 0) => {
   if (!key) return '';
   const pc = mod12(key.tonic + semitones);
-  const names = fifthsFor(key, semitones) < 0 ? FLAT : SHARP;
+  const names = useFlats(key, semitones) ? FLAT : SHARP;
   return `${names[pc]}${key.mode === 'minor' ? ' minor' : ' major'}`;
 };
 
