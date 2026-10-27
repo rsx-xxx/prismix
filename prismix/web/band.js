@@ -94,6 +94,9 @@ export function createBand({ player, current, open, $ }) {
       return li;
     }));
     if (!status.clients.length) list.innerHTML = '<li class="muted">Nobody connected yet</li>';
+    const out = $('band-out');
+    out.replaceChildren(new Option('This computer', ''), ...status.clients.map((c) => new Option(c.name, String(c.id))));
+    out.value = status.speaker != null ? String(status.speaker) : '';
     const sp = status.clients.find((c) => c.id === status.speaker);
     $('band-hint').textContent += sp ? ` ${sp.name} is playing the sound, so this computer is silent.` : '';
     $('band-btn').dataset.count = status.clients.length || '';
@@ -103,6 +106,7 @@ export function createBand({ player, current, open, $ }) {
 
   $('band-btn').addEventListener('click', () => { render(); $('band').showModal(); });
   $('band-close').addEventListener('click', () => $('band').close());
+  $('band-out').addEventListener('change', (e) => ws.send(JSON.stringify({ t: 'admin', speaker: e.target.value === '' ? null : +e.target.value })));
   $('band-lock').addEventListener('change', (e) => {
     localStorage.setItem(LS, JSON.stringify({ ...saved(), locked: e.target.checked }));
     ws.send(JSON.stringify({ t: 'admin', locked: e.target.checked }));

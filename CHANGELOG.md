@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.32
+
+- Hear here on a phone now makes the phone play and the computer go quiet. In the Band dialog the computer can pick which device plays the sound: itself or any connected phone. Phone sound errors now show a message instead of failing silently, and a phone wakes its audio on the next touch.
+
 ## 0.0.31
 
 - Settings moved behind a gear button (theme, shortcuts, version and update), and Band and Join are now one Band dialog with two tabs. Clicking a queued song in a playlist now processes it right away: the song being processed pauses and continues after it.
