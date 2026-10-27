@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.28
+
+- A phone in Hear here mode can play the room's sound while the host goes silent. The phone's tempo and key controls now show the song's BPM and key name, the master volume shows a percentage, and tab chord names no longer overlap.
+
 ## 0.0.27
 
 - `prismix` in the terminal now offers band mode by default, so the Band panel shows its QR code in the browser version too. Add `--no-share` to keep it local.

@@ -119,3 +119,16 @@ def test_host_name_is_editable_and_announced(client, tmp_path, monkeypatch):
     again = client.get("/remote/hello").json()
     assert again["name"] == "Studio A" and again["id"] == first["id"]
     assert client.post("/api/band", json={"name": ""}).json()["name"] == first["name"]
+
+
+def test_phone_speaker_is_announced_and_cleared_on_leave(client):
+    with client.websocket_connect("/ws") as host, client.websocket_connect("/ws") as phone:
+        host.send_json({"t": "hello", "host": True})
+        phone.send_json({"t": "hello", "name": "Ann"})
+        me = phone.receive_json()["id"]
+        phone.send_json({"t": "speaker", "on": True})
+        while (m := host.receive_json())["t"] != "roster" or m["speaker"] != me:
+            pass
+        phone.close()
+        while (m := host.receive_json())["t"] != "roster" or m["speaker"] is not None:
+            pass
