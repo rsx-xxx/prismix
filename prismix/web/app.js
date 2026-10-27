@@ -549,6 +549,15 @@ api('/api/version').then((v) => {
   a.hidden = false;
 }).catch(() => { /* the version label is optional */ });
 
+api('/api/update').then((u) => {
+  if (!u.available) return;
+  const a = $('upd');
+  a.textContent = `Update to v${u.latest}`;
+  a.href = u.download || u.url;
+  a.title = u.download ? 'Download the new installer, then run it' : 'Open the release page';
+  a.hidden = false;
+}).catch(() => { /* the update notice is optional */ });
+
 function renderModelSwitch(id, current, available) {
   const box = $('th-models');
   box.replaceChildren(...state.models.filter((m) => (m.legacy ? m.id === current : available.includes(m.id) || m.id !== 'mix')).map((m) => {
