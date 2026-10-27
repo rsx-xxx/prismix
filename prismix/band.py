@@ -188,6 +188,9 @@ class Band:
         elif kind == "admin" and local:
             if "locked" in msg:
                 self.locked = bool(msg["locked"])
+            if "speaker" in msg:  # the host picks the device that plays: a phone's id, or null for this computer
+                sp = msg["speaker"]
+                self.speaker = sp if isinstance(sp, int) and sp in self.clients and not self.clients[sp].host else None
             if isinstance(msg.get("kick"), int):
                 await self.kick(msg["kick"])
             await self.roster()

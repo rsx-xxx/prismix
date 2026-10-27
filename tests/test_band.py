@@ -132,3 +132,17 @@ def test_phone_speaker_is_announced_and_cleared_on_leave(client):
         phone.close()
         while (m := host.receive_json())["t"] != "roster" or m["speaker"] is not None:
             pass
+
+
+def test_host_picks_the_device_that_plays(client):
+    with client.websocket_connect("/ws") as host, client.websocket_connect("/ws") as phone:
+        host.send_json({"t": "hello", "host": True})
+        phone.send_json({"t": "hello", "name": "Ann"})
+        me = phone.receive_json()["id"]
+        host.send_json({"t": "admin", "speaker": me})
+        while (m := host.receive_json())["t"] != "roster" or m["speaker"] != me:
+            pass
+        host.send_json({"t": "admin", "speaker": 9999})
+        while (m := host.receive_json())["t"] != "roster" or m["speaker"] is not None:
+            pass
+        phone.close()
