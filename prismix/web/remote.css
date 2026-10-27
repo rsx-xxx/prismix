@@ -207,7 +207,11 @@ dialog[open]::backdrop { opacity: 1; }
 .sheet-body #song-tabs { margin-bottom: .6rem; }
 .pls { display: grid; gap: .5rem; }
 .pl-top { display: flex; align-items: center; gap: .75rem; }
+.pl-top .btn-line:last-child:not(:first-child) { margin-left: auto; }
 .btn-line { min-height: 36px; padding: 0 .8rem; border-radius: 999px; background: var(--surface-2); color: var(--ink); font-weight: 600; }
+.lib .keep { margin-left: auto; flex: none; font: inherit; font-size: .78rem; padding: .3rem .7rem; border-radius: 999px; color: var(--ink-2); background: transparent; border: 1px solid color-mix(in oklch, var(--ink-2) 40%, transparent); }
+.lib .keep.on { color: var(--accent); border-color: color-mix(in oklch, var(--accent) 50%, transparent); }
+.lib .keep.arm { background: var(--accent); color: var(--surface-2); border-color: transparent; }
 .lib li.wait { opacity: .5; cursor: default; }
 
 /* press feedback */

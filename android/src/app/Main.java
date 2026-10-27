@@ -27,6 +27,7 @@ import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -70,7 +71,7 @@ import javax.net.ssl.X509TrustManager;
  */
 public class Main extends Activity {
     private static final String BG = "#121110";
-    private static final int PORT = 8443;
+    static final int PORT = 8443;
     private static final String SERVICE = "_prismix._tcp.";
 
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -206,6 +207,12 @@ public class Main extends Activity {
         if (m != null) m.ui.post(r);
     }
 
+    /** Runs a script in the page, if there is one. */
+    static void eval(final String script) {
+        Main m = current;
+        if (m != null) m.ui.post(() -> m.web.evaluateJavascript(script, null));
+    }
+
     static String hostName() {
         Main m = current;
         return m == null ? "" : m.host;
@@ -264,6 +271,12 @@ public class Main extends Activity {
         @JavascriptInterface public void download(String url, String folder) { Saver.save(m.getApplicationContext(), url, folder); }
         @JavascriptInterface public void mediaStop() { m.stopService(new Intent(m, MediaService.class)); m.ui.post(() -> m.keepAwake(false)); }
         @JavascriptInterface public void switchHost() { m.ui.post(() -> m.discover()); }
+        @JavascriptInterface public String offlineList() { return Offline.list(m.getApplicationContext()).toString(); }
+        @JavascriptInterface public void offlineSave(String id, String model, String pin) { Offline.save(m.getApplicationContext(), id, model, pin); }
+        @JavascriptInterface public void offlineRemove(String id) { Offline.remove(m.getApplicationContext(), id); }
+        /** The page's settings (name, part, theme...) live per origin: keep a copy so the offline page starts with them. */
+        @JavascriptInterface public void stash(String json) { if (json != null && json.length() < 16384) m.prefs.edit().putString("stash", json).apply(); }
+        @JavascriptInterface public String stashed() { return m.prefs.getString("stash", "{}"); }
     }
 
     private static class Chrome extends WebChromeClient {
@@ -302,6 +315,14 @@ public class Main extends Activity {
 
         @Override
         public void onPageFinished(WebView v, String url) { m.reveal(); }
+
+        /** The offline origin is answered from the phone itself; everything else goes to the host. */
+        @Override
+        public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
+            Uri u = r.getUrl();
+            if (!Offline.HOST.equals(u.getHost())) return null;
+            return Offline.serve(m.getApplicationContext(), u.getPath());
+        }
 
         @Override
         public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e) {
@@ -507,11 +528,32 @@ public class Main extends Activity {
         if (code == 5 && res == RESULT_OK && data != null) open(data);
     }
 
+    /** Songs saved on the phone can be played without any host. */
+    private void offlineButton() {
+        int n = Offline.list(getApplicationContext()).length();
+        if (n == 0) return;
+        Button b = button("Play saved songs (" + n + ")", false);
+        b.setOnClickListener(v -> goOffline());
+        panel.addView(b);
+    }
+
+    private void goOffline() {
+        stopSearch();
+        ++gen;
+        host = "";
+        wantName = null;
+        listing = false;
+        connecting = true;
+        web.setVisibility(View.INVISIBLE);
+        web.loadUrl("https://" + Offline.HOST + "/remote");
+    }
+
     private void showSearching() {
         screen(wantName != null ? "Looking for " + wantName + "…" : "Looking for your band's host…",
                 "Open Prismix on the computer and share to the network.");
         panel.addView(new ProgressBar(this));
         scanButton();
+        offlineButton();
     }
 
     private void showList() {
@@ -535,6 +577,7 @@ public class Main extends Activity {
         again.setOnClickListener(v -> discover());
         panel.addView(again);
         scanButton();
+        offlineButton();
         manualEntry();
     }
 
@@ -546,6 +589,7 @@ public class Main extends Activity {
         retry.setOnClickListener(v -> discover());
         panel.addView(retry);
         scanButton();
+        offlineButton();
         manualEntry();
     }
 
