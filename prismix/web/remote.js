@@ -129,6 +129,9 @@ function onMessage(m) {
     $('join').hidden = true;
     $('app').hidden = false;
     S.locked = m.locked;
+    S.id = m.id;
+    S.speaker = m.speaker;
+    paintSpeaker();
     $('locked').hidden = !m.locked;
     if (m.state?.t) setHost(m.state);
     chrome();
@@ -149,6 +152,8 @@ function onMessage(m) {
   } else if (m.t === 'roster') {
     S.locked = m.locked;
     S.hostOnline = m.hostOnline;
+    S.speaker = m.speaker;
+    paintSpeaker();
     $('locked').hidden = !m.locked;
     if (!m.hostOnline) { $('sub').textContent = 'Host offline'; setLink('bad', 'Host offline'); }
   } else if (m.t === 'locked') {
@@ -1143,10 +1148,17 @@ const MODE_NOTE = {
   listen: 'Sound plays here too, kept in step with the host.',
   solo: 'Plays only on this phone, on its own tempo and key.',
 };
+const sendSpeaker = (on) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'speaker', on }));
+function paintSpeaker() {
+  $('spk-row').hidden = S.mode !== 'listen';
+  $('spk').checked = S.speaker != null && S.speaker === S.id;
+}
+$('spk').onchange = (e) => sendSpeaker(e.target.checked);
 function modeUi(extra) {
   document.body.classList.toggle('solo', S.mode === 'solo');
   document.querySelectorAll('#mode-seg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === S.mode)));
   $('lat-row').hidden = S.mode !== 'listen';
+  paintSpeaker();
   if (extra !== undefined) $('m-note').textContent = extra;
   else if (!$('m-note').dataset.busy) $('m-note').textContent = MODE_NOTE[S.mode];
 }
@@ -1154,6 +1166,7 @@ async function setMode(mode) {
   const prev = S.mode;
   S.mode = mode;
   if (!OFFLINE) { store.mode = mode; save(); }
+  if (mode !== 'listen' && S.speaker === S.id) sendSpeaker(false);
   modeUi();
   if (mode === 'follow') { S.local?.pause(); }
   else {
