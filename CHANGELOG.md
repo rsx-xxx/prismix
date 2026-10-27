@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.39
+
+- Fixes 0.0.38, where the page stopped starting: Settings did nothing and the library never finished loading.
+
 ## 0.0.38
 
 - Android app: only local-network addresses are joined, so a link or QR from elsewhere cannot point it at the internet. It re-searches when Wi-Fi returns and the host is gone, and a name that nobody answers to now ends in "not found" instead of searching forever.
