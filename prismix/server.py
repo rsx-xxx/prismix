@@ -287,7 +287,15 @@ def create_app() -> FastAPI:
 
     @app.get("/api/update")
     def update_info():
-        return updates.check()
+        return {**updates.check(), **updates.status()}
+
+    @app.post("/api/update/install")
+    def update_install(request: Request):
+        own_window(request)
+        try:
+            return updates.install(lambda: os._exit(0))
+        except RuntimeError as e:
+            raise HTTPException(409, str(e)) from e
 
     @app.get("/api/models")
     def models():

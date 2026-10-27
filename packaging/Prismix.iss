@@ -34,3 +34,4 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Run]
 Filename: "{app}\Prismix.exe"; Description: "Launch Prismix"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Prismix.exe"; Flags: nowait skipifnotsilent
