@@ -20,7 +20,8 @@ from fastapi import WebSocket, WebSocketDisconnect
 log = logging.getLogger(__name__)
 
 ROLES = ("singer", "guitar", "bass", "drums", "keys", "other")
-CMD_OPS = {"play", "pause", "seek", "tempo", "pitch", "cents", "loop", "mute", "solo", "load"}
+CMD_OPS = {"play", "pause", "seek", "tempo", "pitch", "cents", "chordkey", "loop", "mute", "solo", "load"}
+SHARED_OPS = {"tempo", "pitch", "cents", "chordkey", "load"}
 MAX_MSG = 16_384
 
 
@@ -179,6 +180,8 @@ class Band:
                 return
             if msg.get("op") in CMD_OPS and (h := self.host) is not None:
                 await self._send(h, {"t": "cmd", "op": msg["op"], "v": msg.get("v"), "from": c.name})
+                if msg["op"] in SHARED_OPS:  # everyone sees who moved a shared setting
+                    await self.broadcast({"t": "changed", "who": c.name, "op": msg["op"], "v": msg.get("v")}, skip=c)
         elif kind == "speaker" and not c.host:
             if msg.get("on"):
                 self.speaker = c.id

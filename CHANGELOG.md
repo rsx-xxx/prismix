@@ -2,6 +2,12 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.34
+
+- Chords and tab can be read in another key without moving the audio (Chord key, on the computer and on phones).
+- A tab found for another key than the audio (a karaoke cut, a lowered cover) is now matched and shifted to the audio's key.
+- Changes to tempo, key, chord key and song show for everyone, with who made them.
+
 ## 0.0.33
 
 - A Queue button on the host opens the processing queue: the song being prepared with its progress, the ones waiting in order, and the latest finished. A waiting song has a Run next button that pauses the current one and starts it first.
