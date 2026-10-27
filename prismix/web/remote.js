@@ -152,8 +152,11 @@ function onMessage(m) {
   } else if (m.t === 'roster') {
     S.locked = m.locked;
     S.hostOnline = m.hostOnline;
+    const wasMe = S.speaker != null && S.speaker === S.id;
     S.speaker = m.speaker;
     paintSpeaker();
+    if (S.speaker === S.id && S.mode !== 'listen' && !OFFLINE) setMode('listen'); // the host picked this phone
+    else if (wasMe && S.speaker !== S.id && S.mode === 'listen') setMode('follow'); // the host took the sound back
     $('locked').hidden = !m.locked;
     if (!m.hostOnline) { $('sub').textContent = 'Host offline'; setLink('bad', 'Host offline'); }
   } else if (m.t === 'locked') {
@@ -284,7 +287,7 @@ async function loadTrack(id, model) {
     if (S.pl && !S.pl.items.some((x) => x.id === id)) S.pl = null;
     syncPlNav();
     render();
-    if (S.mode !== 'follow') ensureLocal();
+    if (S.mode !== 'follow') ensureLocal().then(claimSpeaker, () => {});
     if (store.autosave && !OFFLINE && !off.have.has(id)) keep(id, model);
   } catch (err) {
     if (mine !== loadToken) return;
@@ -1148,6 +1151,7 @@ const MODE_NOTE = {
   listen: 'Sound plays here too, kept in step with the host.',
   solo: 'Plays only on this phone, on its own tempo and key.',
 };
+const claimSpeaker = () => { if (S.mode === 'listen' && S.local && S.speaker !== S.id) sendSpeaker(true); };
 const sendSpeaker = (on) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'speaker', on }));
 function paintSpeaker() {
   $('spk-row').hidden = S.mode !== 'listen';
@@ -1175,7 +1179,13 @@ async function setMode(mode) {
       S.solo.tempo = S.host?.tempo ?? 1;
       S.solo.semitones = S.host?.semitones ?? 0;
     }
-    await ensureLocal();
+    try { await ensureLocal(); } catch (err) {
+      S.mode = 'follow'; if (!OFFLINE) { store.mode = 'follow'; save(); }
+      delete $('m-note').dataset.busy;
+      modeUi(`Could not start sound on this phone: ${err?.message || err}`);
+      return;
+    }
+    if (S.mode !== mode) return; // changed again while the audio loaded
     if (mode === 'solo' && S.local) {
       S.local.setTempo(S.solo.tempo); S.local.setSemitones(S.solo.semitones);
       S.local.seek(hostPos());
@@ -1183,7 +1193,7 @@ async function setMode(mode) {
       applyMix();
       if (prev === 'listen') S.local.pause();
     }
-    if (mode === 'listen') syncLocal(true);
+    if (mode === 'listen') { claimSpeaker(); syncLocal(true); }
   }
   last = { semis: semis() };
 }
@@ -1194,6 +1204,7 @@ async function ensureLocal() {
   if (!t) return;
   if (!window.AudioWorklet) {
     S.mode = 'follow';
+    sendSpeaker(false);
     modeUi('This browser cannot play the stems here (it needs a secure page). Open the host link over HTTPS or use the app.');
     return;
   }
@@ -1326,3 +1337,6 @@ function syncMedia() {
   } catch { setInterval(run, 500); }
 })();
 document.addEventListener('visibilitychange', () => { syncLocal(true); syncMedia(); });
+
+// A phone only lets a page make sound after a touch: wake the player on the next one if it was started without.
+addEventListener('pointerdown', () => { const c = S.local?.ctx; if (c?.state === 'suspended') c.resume().catch(() => {}); }, { capture: true });
