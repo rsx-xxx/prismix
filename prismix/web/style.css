@@ -801,6 +801,11 @@ body.dragging * { cursor: grabbing !important; }
 #band-note.on { opacity: 1; transform: translate(-50%, 0); }
 #queue-btn[hidden] { display: none; }
 
+/* background fill-in of lyrics, chords and tabs */
+#prefetch { position: fixed; right: 1rem; bottom: 1rem; width: min(300px, calc(100vw - 2rem)); display: grid; gap: 4px; padding: .7rem .9rem; border-radius: 14px; background: color-mix(in srgb, var(--bg, #fff) 72%, transparent); border: 1px solid var(--line); box-shadow: 0 8px 28px rgb(0 0 0 / .25); backdrop-filter: blur(14px); z-index: 50; font-size: .85rem; pointer-events: none; transition: opacity .3s; }
+#prefetch[hidden] { display: none; }
+#prefetch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ── states, touch targets, motion ── */
 button, .btn, .icon-btn, summary, select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .btn:disabled, .icon-btn:disabled, .btn[aria-disabled=true] { opacity: .45; cursor: not-allowed; transform: none; }

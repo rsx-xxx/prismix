@@ -40,6 +40,7 @@ from . import band as band_mod
 from .band import Band
 from .config import DEFAULT_CHANNEL, DEFAULT_MODEL, LIBRARY_DIR, MIX_MODEL, MODELS, WEB_DIR
 from .jobs import JobManager
+from .prefetch import Prefetcher
 
 log = logging.getLogger(__name__)
 
@@ -162,12 +163,15 @@ class WebFiles(StaticFiles):
 
 def create_app() -> FastAPI:
     jobs = JobManager()
+    prefetcher = Prefetcher(jobs)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
         jobs.start()
+        prefetcher.start()
         yield
+        await prefetcher.stop()
         await jobs.stop()
 
     app = FastAPI(title="Prismix", lifespan=lifespan, docs_url=None, redoc_url=None)
@@ -664,6 +668,10 @@ def create_app() -> FastAPI:
                 meta = None
             out.append({**j.snapshot(), "title": (meta or {}).get("title") or titles.get(j.video_id) or j.video_id})
         return out
+
+    @app.get("/api/prefetch")
+    def prefetch_status():
+        return prefetcher.status()
 
     @app.post("/api/jobs/{job_id}/promote")
     def jobs_promote(job_id: str):
