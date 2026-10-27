@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.31
+
+- Settings moved behind a gear button (theme, shortcuts, version and update), and Band and Join are now one Band dialog with two tabs. Clicking a queued song in a playlist now processes it right away: the song being processed pauses and continues after it.
+
 ## 0.0.29
 
 - The desktop app updates itself: when a newer release exists, click the update link and Prismix downloads it, replaces itself and reopens. Versions before this one need one manual update first.
