@@ -725,13 +725,14 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .seg-btns button[aria-pressed=true] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .tab-body { --row: 1.2rem; position: relative; height: var(--pane-h); overflow-y: auto; overscroll-behavior: contain; padding: 24px 4px; mask-image: linear-gradient(transparent, #000 10%, #000 90%, transparent); }
 .tabview #tab-credit a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
-.trow { display: grid; grid-template-columns: 1.1rem repeat(var(--cols, 2), minmax(0, 1fr)); gap: 6px; margin-bottom: 14px; align-items: end; }
+.trow { display: flex; gap: 6px; margin-bottom: 14px; align-items: flex-end; }
+.trow .strs { flex: 0 0 1.1rem; }
+.trow .tbar { min-width: 0; }
 .trow .strs { display: grid; grid-auto-rows: var(--row); padding-bottom: 6px; font-size: 10px; color: var(--muted); text-align: center; align-content: end; }
 .trow .strs span { display: grid; place-items: center; }
 .tbar { position: relative; padding: 22px 6px 6px; border-radius: 10px; cursor: pointer; background: var(--surface); border: 1px solid var(--line); }
 .tbar:hover { border-color: var(--line-strong); }
 .tbar.now { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.tbar.blank { opacity: .4; }
 .tbar .n { position: absolute; top: 3px; left: 7px; font-size: 10px; color: var(--muted); }
 .tbar .tag { position: absolute; top: 3px; right: 7px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .tbar .tch { position: absolute; top: 2px; left: 6px; right: 6px; height: 18px; pointer-events: none; }
@@ -740,7 +741,18 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .tbar.now .tch span { color: var(--accent); }
 .tbar .n { top: 6px; font-size: 9px; }
 .tbar .stf { position: relative; height: calc(var(--strings) * var(--row)); background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--row) / 2 - .5px), color-mix(in srgb, var(--muted) 55%, transparent) calc(var(--row) / 2 - .5px) calc(var(--row) / 2 + .5px), transparent calc(var(--row) / 2 + .5px) var(--row)); }
-.tbar.blank .stf { height: calc(var(--row) * 2); }
+.tbar .fx { position: relative; height: 26px; pointer-events: none; font-size: 10px; color: var(--muted); }
+.tbar .fx .tempo { position: absolute; top: 0; font-weight: 700; white-space: nowrap; color: var(--text); }
+.tbar .fx .ring { position: absolute; bottom: 0; border-bottom: 1px dashed var(--muted); border-left: 1px solid var(--muted); border-right: 1px solid var(--muted); font-style: italic; line-height: 11px; padding-left: 3px; white-space: nowrap; overflow: hidden; }
+.tbar .f.tied { color: var(--muted); }
+.tbar .sl { position: absolute; height: var(--row); width: 9px; pointer-events: none; background: linear-gradient(to bottom right, transparent calc(50% - .6px), var(--text) calc(50% - .6px) calc(50% + .6px), transparent calc(50% + .6px)); transform: translate(8px, 0) scale(.8); }
+.tbar .arc { position: absolute; height: 6px; margin-top: calc(var(--row) / 2 - 11px); border: 1px solid var(--muted); border-bottom: 0; border-radius: 50% 50% 0 0 / 100% 100% 0 0; pointer-events: none; transform: translateX(2px); }
+.tbar .arc.below { margin-top: calc(var(--row) / 2 + 5px); border: 1px solid var(--muted); border-top: 0; border-radius: 0 0 50% 50% / 0 0 100% 100%; }
+.tbar .rh { position: relative; height: 24px; pointer-events: none; }
+.tbar .rh .rstem { position: absolute; top: 3px; height: 14px; width: 1px; background: var(--text); opacity: .75; }
+.tbar .rh .beam { position: absolute; height: 2px; background: var(--text); opacity: .75; }
+.tbar .rh .beam.stub { width: 5px; }
+.tbar .rh .dot { position: absolute; top: 14px; width: 3px; height: 3px; margin-left: 3px; border-radius: 50%; background: var(--text); opacity: .75; }
 .tbar .f { position: absolute; height: var(--row); display: grid; place-items: center; transform: translateX(-30%); padding: 0 1px; font-size: 12px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; background: var(--surface); }
 .tbar .cursor { position: absolute; top: 0; bottom: 0; left: var(--x, 0); width: 2px; border-radius: 2px; background: var(--accent); opacity: 0; }
 .tbar.now .cursor { opacity: .85; }
@@ -802,7 +814,7 @@ body.dragging * { cursor: grabbing !important; }
 #queue-btn[hidden] { display: none; }
 
 /* background fill-in of lyrics, chords and tabs */
-#prefetch { position: fixed; right: 1rem; bottom: 1rem; width: min(300px, calc(100vw - 2rem)); display: grid; gap: 4px; padding: .7rem .9rem; border-radius: 14px; background: color-mix(in srgb, var(--bg, #fff) 72%, transparent); border: 1px solid var(--line); box-shadow: 0 8px 28px rgb(0 0 0 / .25); backdrop-filter: blur(14px); z-index: 50; font-size: .85rem; pointer-events: none; transition: opacity .3s; }
+#prefetch { position: fixed; right: 1rem; bottom: 9rem; width: min(300px, calc(100vw - 2rem)); display: grid; gap: 4px; padding: .7rem .9rem; border-radius: 14px; background: color-mix(in srgb, var(--bg, #fff) 72%, transparent); border: 1px solid var(--line); box-shadow: 0 8px 28px rgb(0 0 0 / .25); backdrop-filter: blur(14px); z-index: 50; font-size: .85rem; pointer-events: none; transition: opacity .3s; }
 #prefetch[hidden] { display: none; }
 #prefetch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

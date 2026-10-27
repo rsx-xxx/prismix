@@ -24,6 +24,25 @@ function floorIndex(arr, x) {
   return r;
 }
 
+// Start and end second of every tab bar. Bars the recording match skipped (repeats, an intro) are spread over the gap around them.
+function timeline(map, n, secs, recEnds) {
+  const starts = new Array(n).fill(null), ends = new Array(n).fill(null);
+  const anchors = [];
+  for (let i = 0; i < n; i++) if (map[i] != null && secs[map[i]] != null) { starts[i] = secs[map[i]]; ends[i] = recEnds[map[i]]; anchors.push(i); }
+  if (!anchors.length) return { starts: starts.map((_, i) => i), ends: starts.map((_, i) => i + 1) };
+  const first = anchors[0], last = anchors.at(-1);
+  for (let i = 0; i < first; i++) { starts[i] = starts[first]; ends[i] = starts[first]; }
+  for (let i = last + 1; i < n; i++) { starts[i] = ends[last]; ends[i] = ends[last]; }
+  for (let k = 0; k + 1 < anchors.length; k++) {
+    const a = anchors[k], b = anchors[k + 1], gap = b - a - 1;
+    if (!gap) continue;
+    const t0 = ends[a], t1 = Math.max(t0, starts[b]);
+    for (let m = 1; m <= gap; m++) { starts[a + m] = t0 + ((m - 1) / gap) * (t1 - t0); ends[a + m] = t0 + (m / gap) * (t1 - t0); }
+  }
+  for (let i = 1; i < n; i++) starts[i] = Math.max(starts[i], starts[i - 1]);
+  return { starts, ends: ends.map((e, i) => Math.max(e, starts[i])) };
+}
+
 export function createTab({ player, chordsIn = () => [] }) {
   const root = $('tabview'), body = $('tab-body'), credit = $('tab-credit'), pick = $('tab-part'), variants = $('tab-variant'), tools = $('tab-tools');
   let ro = null;
@@ -69,7 +88,7 @@ export function createTab({ player, chordsIn = () => [] }) {
       [tab, st] = [await a.json(), await b.json()];
     } catch { return; }
     if (!tab?.found || !st?.bars?.length) return;
-    cur = { id, tab, st, secs: st.bars.map((b) => beatSec(st.beats, b)), cells: [], rows: [], row: -1 };
+    cur = { id, tab, st, secs: [], ends: [], rec: st.bars.map((b) => beatSec(st.beats, b)), cells: [], rows: [], row: -1 };
     if (!tab.tracks[part]) part = tab.tracks[localStorage.getItem(PART_KEY)] ? localStorage.getItem(PART_KEY) : Object.keys(tab.tracks)[0];
     for (const [k, t] of Object.entries(tab.tracks)) t.kind ||= kindOf(k);
     root.hidden = false;
@@ -78,53 +97,58 @@ export function createTab({ player, chordsIn = () => [] }) {
 
   function render() {
     if (!cur) return;
-    const { tab, st, secs } = cur;
+    const { tab, st, rec: secs } = cur;
     const p = tab.tracks[part];
     credit.replaceChildren(`${shortName(p, part)} · tab by `, el('a', { href: tab.url, target: '_blank', rel: 'noopener', textContent: tab.source === 'soundslice' ? 'Soundslice' : 'Songsterr' }), p.edited ? ' · edited' : '');
     paintPicker();
     paintTools();
 
-    const per = Math.max(1, Math.floor(body.clientWidth / (BAR_MIN * parseFloat(getComputedStyle(document.documentElement).fontSize))));
     width = body.clientWidth;
-    const of = new Map(); // recording bar -> tab bar
-    tab.map.forEach((j, i) => { if (j != null && !of.has(j) && i < p.bars.length) of.set(j, i); });
-    const first = Math.min(...of.keys()), last = Math.max(...of.keys());
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
     const diffs = st.bars.slice(1).map((b, i) => b - st.bars[i]).sort((a, b) => a - b);
     const bpb = diffs.length ? diffs[diffs.length >> 1] : 4;
-    cur.ends = secs.map((_, j) => (j + 1 < secs.length ? secs[j + 1] : beatSec(st.beats, st.bars[j] + bpb)));
+    const recEnds = secs.map((_, j) => (j + 1 < secs.length ? secs[j + 1] : beatSec(st.beats, st.bars[j] + bpb)));
+    const { starts, ends } = timeline(tab.map, p.bars.length, secs, recEnds);
+    cur.secs = starts;
+    cur.ends = ends;
     cur.cells = [];
     cur.rows = [];
     const strings = p.tuning.length;
     const box = el('div', { className: 'tab', style: `--strings:${strings}` });
-    let row = null;
-    for (let j = Math.max(0, first - 1); j <= Math.min(secs.length - 1, last + 1); j++) {
-      if (!row || (cur.cells.filter(Boolean).length % per === 0)) {
-        row = el('div', { className: 'trow', style: `--cols:${per}` },
+    const need = (tb) => 3 + 1.5 * new Set(tb.n.map((b) => b[0])).size; // rem a bar wants: more notes, more room
+    const avail = Math.max(10, body.clientWidth / rem - 2);
+    let row = null, used = 0;
+    p.bars.forEach((tb, i) => {
+      const w = Math.max(need(tb), 5);
+      if (!row || (used + w > avail && used > 0)) {
+        row = el('div', { className: 'trow' },
           el('div', { className: 'strs', 'aria-hidden': 'true' }, ...p.tuning.map((m) => el('span', { textContent: NOTES[m % 12] }))));
         box.append(row);
-        cur.rows.push({ row, first: j });
+        cur.rows.push({ row, first: i });
+        used = 0;
       }
-      const tb = of.has(j) ? p.bars[of.get(j)] : null;
-      const cell = el('div', { className: `tbar${tb ? '' : ' blank'}` }, el('span', { className: 'n', textContent: String(j + (st.bars[0] > 0 ? 0 : 1)) }));
-      if (tb?.mark) cell.append(el('span', { className: 'tag', textContent: tb.mark }));
+      used += w;
+      const j = tab.map[i];
+      const cell = el('div', { className: 'tbar', style: `flex:${w} 1 0` }, el('span', { className: 'n', textContent: String(i + 1) }));
+      if (tb.mark) cell.append(el('span', { className: 'tag', textContent: tb.mark }));
       const chs = el('div', { className: 'tch' });
-      let before = j > 0 ? chordsIn(j - 1).at(-1)?.name : '';
-      for (const c of chordsIn(j)) {
-        chs.append(el('span', { className: c.name === before ? 'same' : '', textContent: c.name, style: `left:${c.f * 100}%` }));
-        before = c.name;
+      if (j != null) {
+        let before = j > 0 ? chordsIn(j - 1).at(-1)?.name : '';
+        for (const c of chordsIn(j)) {
+          chs.append(el('span', { className: c.name === before ? 'same' : '', textContent: c.name, style: `left:${c.f * 100}%` }));
+          before = c.name;
+        }
       }
-      cell.append(chs);
-      const stf = el('div', { className: 'stf' });
-      cell.append(stf);
-      cur.cells[j] = cell;
-      cell.dataset.tb = tb ? String(of.get(j)) : '';
+      cell.append(chs, el('div', { className: 'fx' }), el('div', { className: 'stf' }), el('div', { className: 'rh' }));
+      cur.cells[i] = cell;
+      cell.dataset.tb = String(i);
       paintStaff(cell, tb);
       cell.addEventListener('click', (e) => {
-        if (editing && tb && e.target.closest('.stf')) { pickSpot(cell, e); return; }
-        document.dispatchEvent(new CustomEvent('tab:seek', { detail: secs[j] }));
+        if (editing && e.target.closest('.stf')) { pickSpot(cell, e); return; }
+        document.dispatchEvent(new CustomEvent('tab:seek', { detail: starts[i] }));
       });
       row.append(cell);
-    }
+    });
     body.replaceChildren(box);
     cur.row = -1;
     cur.now = -1;
@@ -212,19 +236,68 @@ export function createTab({ player, chordsIn = () => [] }) {
     body.classList.toggle('editing', editing);
   }
 
+  // Whole-note value of a beat: its length in whole notes, undotted.
+  const valueOf = (tb, beat) => {
+    const v = beat[1] * tb.len;
+    let base = 1;
+    while (base > 1 / 64 && base > v * 1.01) base /= 2;
+    return base;
+  };
+
+  const arc = (x1, x2, s, below) => el('span', { className: `arc${below ? ' below' : ''}`, style: `left:${x1 * 100}%;width:${Math.max(0.02, x2 - x1) * 100}%;top:calc(${s} * var(--row))` });
+
   function paintStaff(cell, tb) {
-    const stf = cell.querySelector('.stf');
+    const stf = cell.querySelector('.stf'), rh = cell.querySelector('.rh'), fx = cell.querySelector('.fx');
     stf.replaceChildren();
+    rh.replaceChildren();
+    fx.replaceChildren();
     if (tb) {
-      for (const [pos, , frets] of tb.n) for (const [s, f] of frets) {
-        stf.append(el('span', { className: 'f', textContent: String(f), style: `left:${pos * 100}%;top:calc(${s} * var(--row))` }));
-      }
+      const last = new Map(); // string -> position of the note before, for ties and hammer-ons
+      let ring = null;
+      tb.n.forEach((beat, k) => {
+        const [pos, dur, frets, extra = {}] = beat;
+        for (const [s, f, flags = ''] of frets) {
+          const dead = flags.includes('x'), tied = flags.includes('t');
+          stf.append(el('span', { className: `f${tied ? ' tied' : ''}`, textContent: dead ? 'x' : tied ? `(${f})` : String(f), style: `left:${pos * 100}%;top:calc(${s} * var(--row))` }));
+          if (flags.includes('s')) stf.append(el('span', { className: 'sl', style: `left:${(pos + 0.012) * 100}%;top:calc(${s} * var(--row))` }));
+          if (tied && last.has(s)) stf.append(arc(last.get(s), pos, s, true));
+          if (last.has(s) && flags.includes('h')) stf.append(arc(last.get(s), pos, s, false));
+          last.set(s, pos);
+        }
+        if (extra.bpm) fx.append(el('span', { className: 'tempo', textContent: `♩ = ${extra.bpm}`, style: `left:${pos * 100}%` }));
+        if (extra.lr) { ring ||= { from: pos }; ring.to = Math.min(1, pos + dur); } else if (ring) { drawRing(fx, ring); ring = null; }
+      });
+      if (ring) drawRing(fx, ring);
+      paintRhythm(rh, tb);
     }
     if (editing && sel && tb && Number(cell.dataset.tb) === sel.i) {
       const slots = slotsOf(tb);
       stf.append(el('span', { className: 'selmark', style: `left:${(sel.slot / slots) * 100}%;top:calc(${sel.s} * var(--row))` }));
     }
     stf.append(el('span', { className: 'cursor' }));
+  }
+
+  const drawRing = (fx, r) => fx.append(el('span', { className: 'ring', textContent: 'let ring', style: `left:${r.from * 100}%;width:${(r.to - r.from) * 100}%` }));
+
+  // Stems under the staff, joined by beams within a quarter-note group, like printed tab.
+  function paintRhythm(rh, tb) {
+    const beams = (b) => { const v = valueOf(tb, b); return v <= 1 / 32 ? 3 : v <= 1 / 16 ? 2 : v <= 1 / 8 ? 1 : 0; };
+    const group = (b) => Math.floor(b[0] * tb.len * 4 + 1e-6);
+    const beats = tb.n;
+    beats.forEach((b, k) => {
+      if (valueOf(tb, b) >= 1) return;
+      const x = `${b[0] * 100}%`, nb = beams(b);
+      rh.append(el('span', { className: 'rstem', style: `left:${x}` }));
+      const dotted = b[1] * tb.len > valueOf(tb, b) * 1.25;
+      if (dotted) rh.append(el('span', { className: 'dot', style: `left:${x}` }));
+      const next = beats[k + 1], prev = beats[k - 1];
+      const joinNext = next && beams(next) && nb && group(next) === group(b);
+      const joinPrev = prev && beams(prev) && nb && group(prev) === group(b);
+      for (let n = 1; n <= nb; n++) {
+        if (joinNext && n <= Math.min(nb, beams(next))) rh.append(el('span', { className: 'beam', style: `left:${x};width:${(next[0] - b[0]) * 100}%;top:${15 - (n - 1) * 3}px` }));
+        else if (!joinPrev || n > beams(prev)) rh.append(el('span', { className: 'beam stub', style: `left:${x};top:${15 - (n - 1) * 3}px` }));
+      }
+    });
   }
 
   // ── editing ──
@@ -378,7 +451,7 @@ export function createTab({ player, chordsIn = () => [] }) {
         if (m < body.clientHeight * 0.3 || m > body.clientHeight * 0.6) centre(cell, true);
       }
     }
-    if (cell) cell.querySelector('.cursor').style.setProperty('--x', `${Math.min(1, Math.max(0, (pos - cur.secs[j]) / (cur.ends[j] - cur.secs[j]))) * 100}%`);
+    if (cell) cell.querySelector('.cursor').style.setProperty('--x', `${Math.min(1, Math.max(0, (pos - cur.secs[j]) / Math.max(1e-6, cur.ends[j] - cur.secs[j]))) * 100}%`);
   }
 
   const manual = () => { holdUntil = Date.now() + 4000; follow = false; cancelGlide(body); };

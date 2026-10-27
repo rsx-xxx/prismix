@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.41
+
+- Tabs now look like printed tab: every bar of the tab in its own order (none dropped when the recording match skips one), section names, tempo, rhythm stems and beams, ties, slides, hammer-ons, dead notes and let-ring brackets, with bars sized to their content. Cached tabs refresh once to pick this up. The background-fetch panel no longer covers the player.
+
 ## 0.0.40
 
 - Chords, lyrics and tabs are now fetched in the background for every library song that lacks them, so songs open with everything ready. A translucent panel shows the progress and hides itself when all is done.

@@ -171,3 +171,14 @@ def test_old_cache_without_kinds_is_upgraded(tmp_path, monkeypatch):
     (tmp_path / "abcdefghijk").mkdir()
     tabdata._save("abcdefghijk", {"found": True, "tracks": {"bass": {"name": "B", "tuning": [43], "bars": []}}})
     assert tabdata.read("abcdefghijk")["tracks"]["bass"]["kind"] == "bass"
+
+
+def test_compact_keeps_techniques_and_clean_bars_preserves_them():
+    part = {"measures": [{"signature": [4, 4], "voices": [{"beats": [
+        {"duration": [1, 4], "letRing": True, "tempo": {"bpm": 70}, "notes": [{"string": 0, "fret": 3, "slide": "below"}]},
+        {"duration": [1, 4], "notes": [{"string": 0, "fret": 3, "tie": True}, {"string": 1, "fret": 0, "dead": True}]},
+    ]}]}]}
+    bar = tabdata.compact(part)[0]
+    assert bar["n"][0] == [0.0, 0.25, [[0, 3, "s"]], {"lr": 1, "bpm": 70}]
+    assert bar["n"][1][2] == [[0, 3, "t"], [1, 0, "x"]]
+    assert tabdata._clean_bars([bar], 6)[0]["n"] == bar["n"]
