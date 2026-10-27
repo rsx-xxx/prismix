@@ -24,6 +24,10 @@ STAGES = {
 }
 
 
+class Preempted(BaseException):
+    """Raised inside a running job to hand the worker to an urgent one; BaseException so no stage swallows it."""
+
+
 @dataclass
 class Job:
     video_id: str
@@ -36,6 +40,8 @@ class Job:
     error: str | None = None
     created: float = field(default_factory=time.time)
     version: int = 0
+    rush: bool = False
+    preempt: bool = False
 
     @property
     def finished(self) -> bool:
@@ -54,6 +60,8 @@ class Job:
         }
 
     def update(self, stage: str, frac: float, message: str) -> None:
+        if self.preempt and stage != "analyze":  # analysis is short and a retry would skip it
+            raise Preempted
         lo, hi = (0.0, 1.0) if stage == "analyze" and self.kind in ("analyze", "reanalyze") else STAGES.get(
             stage, (self.progress, self.progress))
         self.stage = stage
@@ -65,7 +73,9 @@ class Job:
 class JobManager:
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
-        self._queue: asyncio.Queue[Job] = asyncio.Queue()
+        self._pending: list[Job] = []
+        self._wake = asyncio.Event()
+        self._running: Job | None = None
         self._worker: asyncio.Task | None = None
 
     def start(self) -> None:
@@ -81,15 +91,38 @@ class JobManager:
     def active(self, video_id: str) -> Job | None:
         return next((j for j in self._jobs.values() if j.video_id == video_id and not j.finished), None)
 
-    def submit(self, video_id: str, model: str, kind: str = "split") -> Job:
-        for job in self._jobs.values():  # same song + model already in flight: share it
-            if (job.video_id, job.model) == (video_id, model) and not job.finished:
-                return job
-        job = Job(video_id, model, kind)
-        self._jobs[job.id] = job
-        self._prune()
-        self._queue.put_nowait(job)
+    def submit(self, video_id: str, model: str, kind: str = "split", urgent: bool = False) -> Job:
+        job = next((j for j in self._jobs.values()
+                    if (j.video_id, j.model) == (video_id, model) and not j.finished), None)
+        if not job:
+            job = Job(video_id, model, kind)
+            self._jobs[job.id] = job
+            self._prune()
+            self._pending.append(job)
+            self._wake.set()
+        if urgent:
+            self._promote(job)
         return job
+
+    def _rush_end(self) -> int:
+        return next((i for i, j in enumerate(self._pending) if not j.rush), len(self._pending))
+
+    def _promote(self, job: Job) -> None:
+        """Run `job` next. A different running job is paused at its next progress report and requeued behind it."""
+        if job is self._running:
+            return
+        if job in self._pending:
+            self._pending.remove(job)
+            job.rush = True
+            self._pending.insert(self._rush_end(), job)
+        if self._running and not self._running.preempt:
+            self._running.preempt = True
+
+    def _requeue(self, job: Job) -> None:
+        job.preempt = False
+        job.stage, job.progress, job.message = "queued", 0.0, "Paused, waiting for its turn"
+        job.version += 1
+        self._pending.insert(self._rush_end(), job)
 
     def _prune(self) -> None:
         done = sorted((j for j in self._jobs.values() if j.finished), key=lambda j: j.created)
@@ -99,15 +132,25 @@ class JobManager:
     async def _run(self) -> None:
         loop = asyncio.get_running_loop()
         while True:
-            job = await self._queue.get()
+            while not self._pending:
+                self._wake.clear()
+                await self._wake.wait()
+            job = self._pending.pop(0)
+            job.rush = False
+            self._running = job
             job.update("analyze" if job.kind in ("analyze", "reanalyze") else "download", 0.0, "Starting")
             try:
                 await loop.run_in_executor(None, self._execute, job)
+            except Preempted:
+                self._running = None
+                self._requeue(job)
+                continue
             except (pipeline.PipelineError, analysis.AnalysisError) as e:
                 job.error = str(e)
             except Exception as e:
                 log.exception("job %s failed", job.id)
                 job.error = f"Unexpected error: {type(e).__name__}: {str(e).splitlines()[0][:200] if str(e) else 'no details'}"
+            self._running = None
             job.version += 1
 
     @staticmethod

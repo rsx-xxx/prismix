@@ -780,3 +780,11 @@ body.dragging * { cursor: grabbing !important; }
 .tab-body.editing .stf { cursor: crosshair; }
 .tab-body.editing .stf .f { pointer-events: none; }
 .stf .selmark { position: absolute; width: 1.1em; height: var(--row); transform: translate(-50%, 0); border: 1px solid var(--accent, #7aa2ff); border-radius: 3px; pointer-events: none; }
+
+/* settings dialog, band panes */
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; border-top: 1px solid var(--line); }
+.set-row:first-of-type { border-top: 0; }
+.band-pane { margin-top: 14px; }
+.band-pane[hidden] { display: none; }
+#settings-btn { position: relative; }
+#settings-btn[data-update]::after { content: ""; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #4c8dff); }

@@ -16,8 +16,6 @@
       <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="9" fill="currentColor" opacity=".14"/><path d="M8 20v-8M13 24V8M18 18v-4M23 22V10" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"/></svg>
       <span>Prismix</span>
     </a>
-    <a class="ver" id="ver" href="https://github.com/rsx-xxx/prismix/releases" target="_blank" rel="noopener" title="Release notes" hidden></a>
-    <a class="ver upd" id="upd" href="https://github.com/rsx-xxx/prismix/releases/latest" target="_blank" rel="noopener" hidden></a>
     <form id="omni" class="omni" autocomplete="off">
       <svg class="omni-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <input id="q" type="text" placeholder="Paste a YouTube or Spotify link, or search for a song" aria-label="YouTube or Spotify link, or search" spellcheck="false" enterkeyhint="go">
@@ -28,10 +26,8 @@
     <button class="btn ghost" id="up-btn" type="button" data-ico="upload" title="Upload an audio or video file from this computer">Upload</button>
     <input id="up-file" type="file" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.wma,.aif,.aiff,.mkv,.m4b" hidden>
     <button class="btn ghost" id="pl-btn" type="button" data-ico="list" title="Pick from YouTube or Spotify playlists">Playlists</button>
-    <button class="btn ghost" id="band-btn" type="button" title="Phones on this Wi-Fi can follow and control the player">Band</button>
-    <button class="btn ghost" id="join-btn" type="button" title="Use another Prismix computer on this network as the host">Join</button>
-    <button class="icon-btn" id="theme-btn" type="button" aria-label="Theme"></button>
-    <button class="icon-btn" id="help-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
+    <button class="btn ghost" id="band-btn" type="button" title="Play with phones or another Prismix computer on this Wi-Fi">Band</button>
+    <button class="icon-btn" id="settings-btn" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
   </header>
 
   <main>
@@ -322,29 +318,41 @@
 
   <dialog id="band">
     <div class="pl-head"><h3>Band</h3><button class="icon-btn" id="band-close" type="button" aria-label="Close">×</button></div>
-    <p class="muted" id="band-hint"></p>
-    <div class="band-tabs" id="band-tabs" role="tablist">
-      <button type="button" role="tab" data-kind="app" aria-selected="true">Prismix Band app</button>
-      <button type="button" role="tab" data-kind="web" aria-selected="false">Browser</button>
+    <div class="band-tabs" id="band-mode" role="tablist">
+      <button type="button" role="tab" data-pane="host" aria-selected="true">Phones join me</button>
+      <button type="button" role="tab" data-pane="join" aria-selected="false">I join a computer</button>
     </div>
-    <div id="band-qr" class="band-qr" hidden></div>
-    <p id="band-url" class="band-url"></p>
-    <label class="band-row">Name on phones <input id="band-name" type="text" maxlength="40" placeholder="This computer"></label>
-    <label class="band-row"><input type="checkbox" id="band-lock"> Lock phones to view only</label>
-    <label class="band-row">PIN <input id="band-pin" type="text" inputmode="numeric" maxlength="12" placeholder="none"></label>
-    <ul id="band-clients" class="band-clients"></ul>
+    <div id="pane-host" class="band-pane">
+      <p class="muted" id="band-hint"></p>
+      <div class="band-tabs" id="band-tabs" role="tablist">
+        <button type="button" role="tab" data-kind="app" aria-selected="true">Prismix Band app</button>
+        <button type="button" role="tab" data-kind="web" aria-selected="false">Browser</button>
+      </div>
+      <div id="band-qr" class="band-qr" hidden></div>
+      <p id="band-url" class="band-url"></p>
+      <label class="band-row">Name on phones <input id="band-name" type="text" maxlength="40" placeholder="This computer"></label>
+      <label class="band-row"><input type="checkbox" id="band-lock"> Lock phones to view only</label>
+      <label class="band-row">PIN <input id="band-pin" type="text" inputmode="numeric" maxlength="12" placeholder="none"></label>
+      <ul id="band-clients" class="band-clients"></ul>
+    </div>
+    <div id="pane-join" class="band-pane" hidden>
+      <p class="muted">Play along with another Prismix computer on this Wi-Fi: its library and its player, like a phone does.</p>
+      <ul id="join-hosts" class="band-clients"></ul>
+      <p id="join-empty" class="muted" hidden>No other Prismix computer found.</p>
+      <form id="join-form" class="band-row">
+        <input id="join-addr" type="text" maxlength="300" placeholder="prismix.local or 192.168.1.20" spellcheck="false" autocomplete="off">
+        <button class="btn primary" type="submit">Join</button>
+      </form>
+      <p id="join-err" class="muted" role="alert"></p>
+    </div>
   </dialog>
 
-  <dialog id="join">
-    <div class="pl-head"><h3>Join a host</h3><button class="icon-btn" id="join-close" type="button" aria-label="Close">×</button></div>
-    <p class="muted">Play along with another Prismix computer on this Wi-Fi: its library and its player, like a phone does.</p>
-    <ul id="join-hosts" class="band-clients"></ul>
-    <p id="join-empty" class="muted" hidden>No other Prismix computer found.</p>
-    <form id="join-form" class="band-row">
-      <input id="join-addr" type="text" maxlength="300" placeholder="prismix.local or 192.168.1.20" spellcheck="false" autocomplete="off">
-      <button class="btn primary" type="submit">Join</button>
-    </form>
-    <p id="join-err" class="muted" role="alert"></p>
+  <dialog id="settings">
+    <div class="pl-head"><h3>Settings</h3><button class="icon-btn" id="settings-close" type="button" aria-label="Close">×</button></div>
+    <div class="set-row"><span>Theme</span><button class="icon-btn" id="theme-btn" type="button" aria-label="Theme"></button></div>
+    <div class="set-row"><span>Keyboard shortcuts</span><button class="btn small ghost" id="help-btn" type="button">Show</button></div>
+    <div class="set-row"><span>Version</span><a class="ver" id="ver" href="https://github.com/rsx-xxx/prismix/releases" target="_blank" rel="noopener" title="Release notes" hidden></a></div>
+    <div class="set-row"><span>Update</span><a class="ver upd" id="upd" href="https://github.com/rsx-xxx/prismix/releases/latest" target="_blank" rel="noopener" hidden></a><span class="muted" id="upd-none">Up to date</span></div>
   </dialog>
 
   <div class="cheats" id="cheats" hidden role="dialog" aria-label="Keyboard shortcuts">
