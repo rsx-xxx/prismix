@@ -554,9 +554,37 @@ api('/api/update').then((u) => {
   if (!u.available) return;
   const a = $('upd');
   a.textContent = `Update to v${u.latest}`;
-  a.href = u.download || u.url;
-  a.title = u.download ? 'Download the new installer, then run it' : 'Open the release page';
   a.hidden = false;
+  if (!u.installable) {
+    a.href = u.download || u.url;
+    a.title = u.download ? 'Download the new installer, then run it' : 'Open the release page';
+    return;
+  }
+  // Packaged app: one click downloads the release, swaps the app and reopens it.
+  a.removeAttribute('target');
+  a.href = u.url;
+  a.title = 'Download and install the update, then restart Prismix';
+  const label = { downloading: 'Downloading', installing: 'Installing', restarting: 'Restarting' };
+  let busy = false;
+  const fail = (why) => { busy = false; a.textContent = 'Update failed, open download'; a.href = u.download || u.url; a.target = '_blank'; a.title = why; };
+  const poll = async () => {
+    const st = await api('/api/update').catch(() => null);
+    if (!st) { a.textContent = 'Restarting…'; return setTimeout(poll, 800); } // server gone: the app is swapping itself
+    if (st.state === 'error') return fail(st.error);
+    a.textContent = st.state === 'downloading' && st.progress ? `Downloading ${Math.round(st.progress * 100)}%` : `${label[st.state] || 'Updating'}…`;
+    setTimeout(poll, 600);
+  };
+  a.addEventListener('click', async (e) => {
+    if (a.target === '_blank') return; // after a failure it is a plain download link
+    e.preventDefault();
+    if (busy) return;
+    busy = true;
+    a.textContent = 'Starting…';
+    const r = await fetch('/api/update/install', { method: 'POST' });
+    if (!r.ok) return fail(await r.text());
+    poll();
+  });
+  if (label[u.state]) { busy = true; poll(); }
 }).catch(() => { /* the update notice is optional */ });
 
 function renderModelSwitch(id, current, available) {
