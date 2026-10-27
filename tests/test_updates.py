@@ -22,11 +22,19 @@ def test_check_picks_platform_asset(monkeypatch):
     reset()
     monkeypatch.setattr(updates, "__version__", "0.0.1")
     monkeypatch.setattr(updates.sys, "platform", "darwin")
-    release = {"tag_name": "v9.0.0", "html_url": "https://x/r", "assets": [
+    release = [{"tag_name": "v9.0.0", "html_url": "https://x/r", "assets": [
         {"name": "Prismix.dmg", "browser_download_url": "https://x/d.dmg"},
-        {"name": "Prismix-Setup.exe", "browser_download_url": "https://x/s.exe"}]}
+        {"name": "Prismix-Setup.exe", "browser_download_url": "https://x/s.exe"}]}]
     got = updates.check(client=client(lambda r: httpx.Response(200, json=release)))
     assert got == {"available": True, "latest": "9.0.0", "url": "https://x/r", "download": "https://x/d.dmg"}
+
+
+def test_check_ignores_the_rolling_latest_release(monkeypatch):
+    reset()
+    monkeypatch.setattr(updates, "__version__", "0.0.1")
+    releases = [{"tag_name": "latest", "assets": []}, {"tag_name": "v0.0.10", "assets": []}, {"tag_name": "v0.0.9", "assets": []}]
+    got = updates.check(client=client(lambda r: httpx.Response(200, json=releases)))
+    assert got["available"] is True and got["latest"] == "0.0.10"
 
 
 def test_check_survives_failure_and_caches(monkeypatch):
