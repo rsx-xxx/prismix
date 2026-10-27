@@ -101,7 +101,7 @@ function openFrom(id, plId) {
   if (!it) {
     const tag = document.querySelector(`#pp-list .pp-row[data-id="${id}"] .pl-tag`);
     if (tag) { tag.textContent = 'Starting…'; tag.className = 'pl-tag p'; }
-    startProcess(id, $('quality').value).then(() => plview.refresh());
+    startProcess(id, $('quality').value, $('task').value, true).then(() => plview.refresh());
     return;
   }
   location.hash = `#/v/${id}/${it.models.includes(state.defaultModel) ? state.defaultModel : it.models[0]}`;
@@ -340,11 +340,11 @@ window.addEventListener('drop', (e) => {
   uploadFile(e.dataTransfer.files[0]);
 });
 
-async function startProcess(urlOrId, model, tasks = $('task').value) {
+async function startProcess(urlOrId, model, tasks = $('task').value, urgent = false) {
   try {
     const r = await api('/api/process', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: urlOrId, model, tasks }),
+      body: JSON.stringify({ url: urlOrId, model, tasks, urgent }),
     });
     if (r.cached) { location.hash = `#/v/${r.videoId}/${r.model}`; return; }
     trackJob(r.job);
@@ -555,6 +555,9 @@ api('/api/update').then((u) => {
   const a = $('upd');
   a.textContent = `Update to v${u.latest}`;
   a.hidden = false;
+  $('upd-none').hidden = true;
+  $('settings-btn').dataset.update = '1';
+  $('settings-btn').title = `Settings · update to v${u.latest} available`;
   if (!u.installable) {
     a.href = u.download || u.url;
     a.title = u.download ? 'Download the new installer, then run it' : 'Open the release page';
@@ -1170,7 +1173,9 @@ window.addEventListener('keyup', (e) => {
   e.preventDefault();
 });
 
-$('help-btn').addEventListener('click', () => cheats.toggle());
+$('settings-btn').addEventListener('click', () => $('settings').showModal());
+$('settings-close').addEventListener('click', () => $('settings').close());
+$('help-btn').addEventListener('click', () => { $('settings').close(); cheats.toggle(); });
 window.addEventListener('beforeunload', savePrefs);
 
 // ── boot ──
