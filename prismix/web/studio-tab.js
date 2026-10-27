@@ -26,6 +26,7 @@ function floorIndex(arr, x) {
 
 export function createTab({ player, chordsIn = () => [] }) {
   const root = $('tabview'), body = $('tab-body'), credit = $('tab-credit'), pick = $('tab-part'), variants = $('tab-variant'), tools = $('tab-tools');
+  let ro = null;
   let cur = null; // { id, tab, st, secs: bar start seconds, cells: [], row: -1 }
   let part = null;
   let holdUntil = 0;
@@ -127,6 +128,25 @@ export function createTab({ player, chordsIn = () => [] }) {
     body.replaceChildren(box);
     cur.row = -1;
     cur.now = -1;
+    declutter();
+    if (!ro && window.ResizeObserver) { ro = new ResizeObserver(() => declutter()); ro.observe(body); }
+  }
+
+  // Chord names sit at their beat position; when two would collide (or run into the bar tag), hide the later one.
+  function declutter() {
+    for (const cell of cur?.cells || []) {
+      if (!cell) continue;
+      const spans = [...cell.querySelectorAll('.tch span')];
+      spans.forEach((x) => { x.style.visibility = ''; });
+      let edge = -Infinity;
+      const tag = cell.querySelector('.tag');
+      const limit = tag ? tag.offsetLeft - 4 : Infinity;
+      for (const x of spans) {
+        const l = x.offsetLeft, r = l + x.offsetWidth;
+        if (l < edge || r > limit) { x.style.visibility = 'hidden'; continue; }
+        edge = r + 4;
+      }
+    }
   }
 
 
