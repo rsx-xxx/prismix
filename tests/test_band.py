@@ -146,3 +146,17 @@ def test_host_picks_the_device_that_plays(client):
         while (m := host.receive_json())["t"] != "roster" or m["speaker"] is not None:
             pass
         phone.close()
+
+
+def test_shared_change_is_announced_to_everyone_else(client):
+    with client.websocket_connect("/ws") as host, client.websocket_connect("/ws") as a, client.websocket_connect("/ws") as b:
+        host.send_json({"t": "hello", "host": True})
+        a.send_json({"t": "hello", "name": "Ann"})
+        b.send_json({"t": "hello", "name": "Bob"})
+        a.send_json({"t": "cmd", "op": "chordkey", "v": 2})
+        while (m := b.receive_json())["t"] != "changed":
+            pass
+        assert (m["who"], m["op"], m["v"]) == ("Ann", "chordkey", 2)
+        while (m := host.receive_json())["t"] != "changed":
+            pass
+        assert m["who"] == "Ann"
