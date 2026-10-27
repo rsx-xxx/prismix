@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.27
+
+- `prismix` in the terminal now offers band mode by default, so the Band panel shows its QR code in the browser version too. Add `--no-share` to keep it local.
+
 ## 0.0.26
 
 - A desktop can join another desktop's band: click Join, pick a host found on the network (or type its name or address), and the window shows that host's library and follows its player like a phone does. Leave from Controls, Joined host. The host's certificate is trusted for that session only, and a PIN or view-only lock set on the host applies.
