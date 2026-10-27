@@ -41,3 +41,20 @@ def test_check_survives_failure_and_caches(monkeypatch):
     assert got["available"] is False
     updates.check(client=client(boom))
     assert len(calls) == 1
+
+
+def test_install_refuses_outside_the_packaged_app():
+    import pytest
+
+    assert not updates.installable()
+    with pytest.raises(RuntimeError):
+        updates.install(lambda: None)
+
+
+def test_install_only_takes_assets_from_own_releases(monkeypatch):
+    import pytest
+
+    monkeypatch.setattr(updates, "installable", lambda: True)
+    monkeypatch.setattr(updates, "check", lambda force=False: {"available": True, "download": "https://evil.example/Prismix.dmg"})
+    with pytest.raises(RuntimeError):
+        updates.install(lambda: None)

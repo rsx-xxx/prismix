@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.29
+
+- The desktop app updates itself: when a newer release exists, click the update link and Prismix downloads it, replaces itself and reopens. Versions before this one need one manual update first.
+
 ## 0.0.28
 
 - A phone in Hear here mode can play the room's sound while the host goes silent. The phone's tempo and key controls now show the song's BPM and key name, the master volume shows a percentage, and tab chord names no longer overlap.
