@@ -605,6 +605,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .ver { align-self: center; padding: 1px 7px; border-radius: 999px; font: 600 11px/18px system-ui, sans-serif; color: var(--muted); border: 1px solid var(--line, rgba(255,255,255,.12)); text-decoration: none; }
 .ver:hover { color: var(--text); border-color: var(--accent); }
 .ver[hidden] { display: none; }
+.ver.upd { color: var(--accent); border-color: var(--accent); }
 
 /* shortcut cheatsheet */
 .cheats { position: fixed; top: 76px; right: 16px; z-index: 60; }
