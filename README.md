@@ -25,7 +25,7 @@
 | macOS (Apple Silicon) | `Prismix.dmg` |
 | Android (band phone) | `Prismix-Band.apk` |
 
-On macOS, `brew tap rsx-xxx/prismix && brew install --cask prismix` installs it, and `brew upgrade --cask prismix` updates it.
+On macOS, `brew tap rsx-xxx/prismix && brew install --cask prismix` installs it, The installed desktop app also updates itself from the update link in the toolbar.
 
 Desktop builds are unsigned (signing is paid; see `packaging/SIGNING.md`), so expect a SmartScreen or Gatekeeper prompt on first launch. The Android APK is signed with a fixed key and updates in place. The library lives in `%LOCALAPPDATA%\Prismix` (Windows) or `~/Library/Application Support/Prismix` (macOS).
 
