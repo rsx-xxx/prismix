@@ -1,4 +1,5 @@
-// Guitar and bass tab (Songsterr or a Soundslice link, matched to the recording's bars on the server): bar by bar, with the chord above each bar,
+// Guitar and bass tab, staff notation for keys and other instruments, a drum score for drums (Songsterr or a Soundslice link, matched to the
+// recording's bars on the server): bar by bar, with the chord above each bar,
 // taking the place of the Chords box beside the lyrics and scrolling in step with them.
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -7,10 +8,11 @@ const el = (tag, props = {}, ...kids) => {
   return n;
 };
 import { glide, cancelGlide, offsetIn, lockstep } from './scroll.js';
+import { SCORE_KINDS, scoreLayout, paintScore, clefColumn } from './studio-staff.js';
 const NOTES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const BAR_MIN = 11; // rem a bar needs before a row takes one more
 const PART_KEY = 'stems:tab-part';
-const KINDS = ['guitar', 'bass', 'keys', 'other'];
+const KINDS = ['guitar', 'bass', 'keys', 'other', 'drums'];
 const GRID = 16; // editing slots per whole note
 const kindOf = (k) => k.replace(/\d+$/, '');
 const cap = (k) => k[0].toUpperCase() + k.slice(1);
@@ -114,6 +116,8 @@ export function createTab({ player, chordsIn = () => [] }) {
     cur.cells = [];
     cur.rows = [];
     const strings = p.tuning.length;
+    const lay = SCORE_KINDS.has(p.kind) ? scoreLayout(p, st.key) : null;
+    cur.lay = lay;
     const box = el('div', { className: 'tab', style: `--strings:${strings}` });
     const need = (tb) => 3 + 1.5 * new Set(tb.n.map((b) => b[0])).size; // rem a bar wants: more notes, more room
     const avail = Math.max(10, body.clientWidth / rem - 2);
@@ -121,8 +125,8 @@ export function createTab({ player, chordsIn = () => [] }) {
     p.bars.forEach((tb, i) => {
       const w = Math.max(need(tb), 5);
       if (!row || (used + w > avail && used > 0)) {
-        row = el('div', { className: 'trow' },
-          el('div', { className: 'strs', 'aria-hidden': 'true' }, ...p.tuning.map((m) => el('span', { textContent: NOTES[m % 12] }))));
+        row = el('div', { className: 'trow' }, lay ? clefColumn(lay)
+          : el('div', { className: 'strs', 'aria-hidden': 'true' }, ...p.tuning.map((m) => el('span', { textContent: NOTES[m % 12] }))));
         box.append(row);
         cur.rows.push({ row, first: i });
         used = 0;
@@ -139,7 +143,8 @@ export function createTab({ player, chordsIn = () => [] }) {
           before = c.name;
         }
       }
-      cell.append(chs, el('div', { className: 'fx' }), el('div', { className: 'stf' }), el('div', { className: 'rh' }));
+      cell.append(chs, el('div', { className: 'fx' }), el('div', { className: lay ? 'stf score' : 'stf', style: lay ? `height:calc(${lay.height} * var(--hs))` : '' }));
+      if (!lay) cell.append(el('div', { className: 'rh' }));
       cur.cells[i] = cell;
       cell.dataset.tb = String(i);
       paintStaff(cell, tb);
@@ -210,6 +215,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     part = k;
     sel = null;
     hist.length = 0;
+    if (SCORE_KINDS.has(cur.tab.tracks[k].kind)) editing = false;
     try { localStorage.setItem(PART_KEY, k); localStorage.setItem(`${PART_KEY}:${cur.tab.tracks[k].kind}`, k); } catch { /* ignore */ }
     render();
   }
@@ -223,7 +229,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     };
     const edit = btn(editing ? 'Done' : 'Edit', 'Edit this tab: click a spot on the staff, type a fret number. Arrows move, Backspace deletes, Ctrl/⌘+Z undoes. Changes are saved.', () => { editing = !editing; if (!editing) { flush(); sel = null; } render(); });
     edit.setAttribute('aria-pressed', String(editing));
-    const kids = [edit];
+    const kids = SCORE_KINDS.has(p.kind) ? [] : [edit];
     if (editing) {
       const u = btn('Undo', 'Undo (Ctrl/⌘+Z)', undo);
       u.disabled = !hist.length;
@@ -249,8 +255,13 @@ export function createTab({ player, chordsIn = () => [] }) {
   function paintStaff(cell, tb) {
     const stf = cell.querySelector('.stf'), rh = cell.querySelector('.rh'), fx = cell.querySelector('.fx');
     stf.replaceChildren();
-    rh.replaceChildren();
+    rh?.replaceChildren();
     fx.replaceChildren();
+    if (cur.lay) {
+      for (const [pos,, , extra = {}] of tb?.n ?? []) if (extra.bpm) fx.append(el('span', { className: 'tempo', textContent: `♩ = ${extra.bpm}`, style: `left:${pos * 100}%` }));
+      paintScore(stf, Number(cell.dataset.tb), cur.lay);
+      return;
+    }
     if (tb) {
       const last = new Map(); // string -> position of the note before, for ties and hammer-ons
       let ring = null;

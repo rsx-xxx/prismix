@@ -789,6 +789,33 @@ body.dragging * { cursor: grabbing !important; }
 
 .seg-btns button.edited::after { content: "•"; margin-left: 2px; color: var(--accent, currentColor); }
 .tab-status { font-size: 0.75rem; margin-left: 0.4rem; align-self: center; }
+/* staff notation (keys, other instruments) and drum score */
+.tab-body { --hs: 0.3rem; }
+.trow .clefs { flex: 0 0 auto; position: relative; margin-bottom: 7px; color: var(--text); }
+.clefs .s { position: absolute; line-height: 1; white-space: nowrap; }
+.clefs .clef { font-family: "Noto Music", "Apple Symbols", "Segoe UI Symbol", serif; font-size: calc(9.5 * var(--hs)); transform: translateY(-50%); }
+.clefs .ksig { font-size: calc(3.4 * var(--hs)); line-height: calc(3.6 * var(--hs)); }
+.clefs .pbar { width: 3px; background: currentColor; border-radius: 1px; }
+.tbar .stf.score { background: none; margin: 0 .5rem 0 1rem; color: var(--text); }
+.stf.score .s { position: absolute; pointer-events: none; }
+.stf.score .lines { position: absolute; left: -.5rem; right: -.4rem; height: calc(8 * var(--hs) + 1px); background: repeating-linear-gradient(to bottom, color-mix(in srgb, var(--muted) 70%, transparent) 0 1px, transparent 1px calc(2 * var(--hs))); }
+.stf.score .nh { width: calc(2.7 * var(--hs)); box-sizing: border-box; border-radius: 50%; background: currentColor; transform: translateX(-50%) rotate(-18deg); }
+.stf.score .nh.open { background: transparent; border: 1.5px solid currentColor; }
+.stf.score .nh.cross { background: none; border: 0; transform: translateX(-50%); text-align: center; font-size: calc(3.4 * var(--hs)); line-height: calc(2 * var(--hs)); font-weight: 700; }
+.stf.score .ho { transform: translateX(-50%); font-size: calc(2.2 * var(--hs)); line-height: calc(2 * var(--hs)); }
+.stf.score .sstem { width: 1.2px; background: currentColor; opacity: .85; }
+.stf.score .beam { background: currentColor; opacity: .9; border-radius: 1px; }
+.stf.score .flag { height: 0; border-top: 2px solid currentColor; transform-origin: 0 0; opacity: .9; }
+.stf.score .flag.up { transform: rotate(52deg); }
+.stf.score .flag.dn { transform: rotate(-52deg); }
+.stf.score .acc { font-size: calc(3.4 * var(--hs)); line-height: calc(3.6 * var(--hs)); }
+.stf.score .led { height: 1px; background: color-mix(in srgb, var(--muted) 85%, transparent); }
+.stf.score .dot { width: calc(.6 * var(--hs)); border-radius: 50%; background: currentColor; }
+.stf.score .rest { color: var(--text); opacity: .85; }
+.stf.score .rest svg { display: block; width: 100%; height: 100%; }
+.stf.score .rest.r1, .stf.score .rest.r2 { background: currentColor; }
+.stf.score .arc { border: 1px solid var(--muted); border-bottom: 0; border-radius: 50% 50% 0 0 / 100% 100% 0 0; }
+.stf.score .arc.below { border: 1px solid var(--muted); border-top: 0; border-radius: 0 0 50% 50% / 0 0 100% 100%; }
 .tab-body.editing .stf { cursor: crosshair; }
 .tab-body.editing .stf .f { pointer-events: none; }
 .stf .selmark { position: absolute; width: 1.1em; height: var(--row); transform: translate(-50%, 0); border: 1px solid var(--accent, #7aa2ff); border-radius: 3px; pointer-events: none; }
