@@ -1,7 +1,7 @@
 // Band mode, phone side. Follows the host's player over a WebSocket (server clock as the shared
 // timeline), shows lyrics (optionally with chords above the syllables they land on) or the bar chart,
 // and can drive the host, hear it locally, or go solo.
-import { chordName, chordPaint, fifthsFor, keyName, simplify } from './theory.js';
+import { chordName, chordPaint, keyName, useFlats, getAccidentals, setAccidentals, simplify } from './theory.js';
 import { createMedia } from './media.js';
 import { describe } from './band.js';
 import { timeLine, splitAt } from './lyrics.js';
@@ -317,7 +317,7 @@ async function loadTrack(id, model) {
 }
 
 // ── rendering ──
-const flats = () => S.track?.structure && fifthsFor(S.track.structure.key, semis() + chordKey()) < 0;
+const flats = () => S.track?.structure && useFlats(S.track.structure.key, semis() + chordKey());
 const cname = (c) => chordName(c, semis() + chordKey(), flats());
 const hueOf = (c) => chordPaint(c, semis() + chordKey()).hue;
 function pill(c, i) {
@@ -964,6 +964,9 @@ $('resync').onclick = () => { samples = []; for (let i = 0; i < 8; i++) setTimeo
 $('fs-down').onclick = () => { store.fs = clamp(Math.round(((store.fs || 1) - 0.1) * 10) / 10, 0.8, 1.6); save(); applyLook(); fit(); };
 $('fs-up').onclick = () => { store.fs = clamp(Math.round(((store.fs || 1) + 0.1) * 10) / 10, 0.8, 1.6); save(); applyLook(); fit(); };
 $('theme-seg').onclick = (e) => { const v = e.target.dataset?.theme; if (v) { store.theme = v; save(); applyLook(); } };
+const paintAccidentals = () => document.querySelectorAll('#acc-seg button').forEach((b) => b.setAttribute('aria-checked', String(getAccidentals() === b.dataset.acc)));
+$('acc-seg').onclick = (e) => { const v = e.target.dataset?.acc; if (v) { setAccidentals(v); paintAccidentals(); last.tune = null; relabel(); } };
+paintAccidentals();
 $('mode-seg').onclick = (e) => { const v = e.target.dataset?.mode; if (v) setMode(v); };
 $('change-me').onclick = () => { sheet.close(); showJoin(); };
 if (droid?.switchHost) { $('host-row').hidden = false; $('switch-host').onclick = () => droid.switchHost(); }
