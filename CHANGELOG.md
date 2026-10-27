@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.33
+
+- A Queue button on the host opens the processing queue: the song being prepared with its progress, the ones waiting in order, and the latest finished. A waiting song has a Run next button that pauses the current one and starts it first.
+
 ## 0.0.32
 
 - Hear here on a phone now makes the phone play and the computer go quiet. In the Band dialog the computer can pick which device plays the sound: itself or any connected phone. Phone sound errors now show a message instead of failing silently, and a phone wakes its audio on the next touch.
