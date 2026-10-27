@@ -2,7 +2,7 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
-## Unreleased
+## 0.0.38
 
 - Android app: only local-network addresses are joined, so a link or QR from elsewhere cannot point it at the internet. It re-searches when Wi-Fi returns and the host is gone, and a name that nobody answers to now ends in "not found" instead of searching forever.
 - Android app: the notification and battery prompts are asked once instead of on every media update, the cover no longer reloads every few seconds, and the connect screens scroll, with rounded buttons that react to touch.
