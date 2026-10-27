@@ -35,12 +35,12 @@ CANDIDATES = 3
 SLICE_DATA = "https://www.soundslice.com/slices/{code}/scoredata/"
 SLICE_URL = re.compile(r"^(?:https?://)?(?:www\.)?soundslice\.com/slices/([A-Za-z0-9]{3,12})(?:[/?#]|$)")
 FLAGS = "tshxm"  # a note's flags: tie, slide, hammer/pull, dead, palm mute
-FORMAT = 3  # 3: notes carry flags (tie, slide, hammer, dead, palm mute), beats let-ring and tempo
-KINDS = ("guitar", "bass", "keys", "other")
-MAX_PARTS = {"guitar": 6, "bass": 3, "keys": 4, "other": 5}
+FORMAT = 4  # 4: drum parts ([staff line, MIDI note] per hit); 3: notes carry flags (tie, slide, hammer, dead, palm mute), beats let-ring and tempo
+KINDS = ("guitar", "bass", "keys", "other", "drums")
+MAX_PARTS = {"guitar": 6, "bass": 3, "keys": 4, "other": 5, "drums": 2}
 MAX_BARS, MAX_STRINGS = 1500, 12
 _KEYS = re.compile(r"piano|keys|keyboard|organ|harpsichord|clav|celesta|accordion|harmonium|rhodes|synth|pad\b")
-_KEY = re.compile(r"^(guitar|bass|keys|other)([1-9]\d?)?$")
+_KEY = re.compile(r"^(guitar|bass|keys|other|drums)([1-9]\d?)?$")
 
 
 class TabDataError(RuntimeError):
@@ -87,10 +87,12 @@ def _slice_json(url: str):
 
 
 def classify(instrument: str, name: str = "") -> str | None:
-    """guitar | bass | keys | other for a pitched part; None for drums and vocals."""
+    """guitar | bass | keys | other for a pitched part, drums for a kit; None for vocals."""
     ins, nm = (instrument or "").casefold(), (name or "").casefold()
-    if "drum" in ins or "percussion" in ins or "vocal" in nm or "voice" in ins:
+    if "vocal" in nm or "voice" in ins:
         return None
+    if "drum" in ins or "percussion" in ins:
+        return "drums"
     if "bass" in ins:
         return "bass"
     if "guitar" in ins:
@@ -107,7 +109,8 @@ def part_key(kind: str, n: int) -> str:
 def _slice_kind(track: dict) -> str | None:
     if track.get("smp") or track.get("midi", 0) >= 1000:  # drums and other sampled kits
         return None
-    return classify(track.get("i") or "", track.get("name") or "")
+    kind = classify(track.get("i") or "", track.get("name") or "")
+    return None if kind == "drums" else kind
 
 
 def compact_slice(data: dict, track: int) -> list[dict]:
@@ -359,16 +362,17 @@ def align(tab: list[list[float]], rec: list[list[float]], t: int) -> tuple[float
 
 
 def _lead_parts(parts: dict[str, dict]) -> dict[str, dict]:
-    """The parts the fit is judged on: the main guitar and bass (any single part when there are neither)."""
-    lead = {k: p for k, p in parts.items() if k in ("guitar", "bass")}
-    return lead or dict(list(parts.items())[:1])
+    """The parts the fit is judged on: the main guitar and bass (any single pitched part when there are neither)."""
+    pitched = {k: p for k, p in parts.items() if p.get("kind") != "drums"}
+    lead = {k: p for k, p in pitched.items() if k in ("guitar", "bass")}
+    return lead or dict(list(pitched.items())[:1])
 
 
 def fit(parts: dict[str, dict], structure: dict) -> dict | None:
     """Pick the transposition and bar mapping that fit best; None when the tab is not this recording."""
     parts = _lead_parts(parts)
     rec = _bar_chroma(structure)
-    if len(rec) < 4:
+    if len(rec) < 4 or not parts:
         return None
     n = max(len(p["bars"]) for p in parts.values())
     tab = []
@@ -392,6 +396,8 @@ def retune(parts: dict[str, dict], semitones: int) -> None:
     if not semitones:
         return
     for p in parts.values():
+        if p.get("kind") == "drums":
+            continue
         for bar in p["bars"]:
             for note in bar["n"]:
                 for fret in note[2]:
@@ -529,11 +535,13 @@ def _download(song: dict) -> dict[str, dict]:
         except (TabDataError, KeyError, ValueError) as e:  # one broken part must not lose the others
             log.info("songsterr %s part %s skipped: %s", sid, idx, e)
             continue
-        if any(b["n"] for b in bars) and (part.get("tuning") or meta["tracks"][idx].get("tuning")):
+        kind = _KEY.match(key).group(1)
+        tuning = [] if kind == "drums" else part.get("tuning") or meta["tracks"][idx].get("tuning", [])
+        if any(b["n"] for b in bars) and (tuning or kind == "drums"):
             parts[key] = {
-                "kind": _KEY.match(key).group(1),
+                "kind": kind,
                 "name": part.get("name") or meta["tracks"][idx].get("name", ""),
-                "tuning": part.get("tuning") or meta["tracks"][idx].get("tuning", []),
+                "tuning": tuning,
                 "bars": bars,
             }
     return parts

@@ -30,7 +30,7 @@ def test_pick_tracks_prefers_most_played():
         {"instrument": "Drums", "views": 99},
         {"instrument": "Voice", "views": 99, "isVocalTrack": True},
     ]
-    assert tabdata.pick_tracks(tracks) == {"guitar": 1, "guitar2": 0, "bass": 2}
+    assert tabdata.pick_tracks(tracks) == {"guitar": 1, "guitar2": 0, "bass": 2, "drums": 3}
 
 
 def test_pick_tracks_keeps_every_pitched_part():
@@ -42,7 +42,13 @@ def test_pick_tracks_keeps_every_pitched_part():
         {"instrument": "Organ", "views": 9},
         {"instrument": "Drums", "views": 99},
     ]
-    assert tabdata.pick_tracks(tracks) == {"guitar": 3, "keys": 4, "keys2": 0, "other": 1}
+    assert tabdata.pick_tracks(tracks) == {"guitar": 3, "keys": 4, "keys2": 0, "other": 1, "drums": 5}
+
+
+def test_classify_drums_and_vocals():
+    assert tabdata.classify("Drums") == "drums"
+    assert tabdata.classify("Percussion") == "drums"
+    assert tabdata.classify("Tenor Sax", "Lead Vocals") is None
 
 
 def _structure(roots):
