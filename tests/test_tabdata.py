@@ -30,7 +30,19 @@ def test_pick_tracks_prefers_most_played():
         {"instrument": "Drums", "views": 99},
         {"instrument": "Voice", "views": 99, "isVocalTrack": True},
     ]
-    assert tabdata.pick_tracks(tracks) == {"guitar": 1, "bass": 2}
+    assert tabdata.pick_tracks(tracks) == {"guitar": 1, "guitar2": 0, "bass": 2}
+
+
+def test_pick_tracks_keeps_every_pitched_part():
+    tracks = [
+        {"instrument": "Electric Piano 1", "name": "Keys (RH)", "views": 4},
+        {"instrument": "Recorder", "name": "Recorders", "views": 8},
+        {"instrument": "Tenor Sax", "name": "Robert Plant | Lead Vocals", "views": 90},
+        {"instrument": "Overdriven Guitar", "views": 7},
+        {"instrument": "Organ", "views": 9},
+        {"instrument": "Drums", "views": 99},
+    ]
+    assert tabdata.pick_tracks(tracks) == {"guitar": 3, "keys": 4, "keys2": 0, "other": 1}
 
 
 def _structure(roots):
@@ -102,3 +114,50 @@ def test_slice_parts_converts_notes_and_skips_drums():
     assert list(parts) == ["guitar"] and parts["guitar"]["name"] == "Distortion Guitar"
     bar = parts["guitar"]["bars"][0]
     assert bar["mark"] == "Intro" and bar["n"] == [[0.75, 0.25, [[5, 3]]]]
+
+
+def _cached(tmp_path, monkeypatch):
+    from prismix import library
+    monkeypatch.setattr(library, "LIBRARY_DIR", tmp_path)
+    (tmp_path / "abcdefghijk").mkdir()
+    base = {"found": True, "v": 2, "source": "songsterr", "map": [0], "tracks": {
+        "guitar": {"kind": "guitar", "name": "G", "tuning": TUNING, "bars": [{"len": 1.0, "n": []}]},
+        "keys": {"kind": "keys", "name": "K", "tuning": TUNING, "bars": [{"len": 1.0, "n": []}]},
+    }}
+    tabdata._save("abcdefghijk", base)
+    return base
+
+
+def test_edit_overlays_one_part_and_reverts(tmp_path, monkeypatch):
+    _cached(tmp_path, monkeypatch)
+    bars = [{"len": 1.0, "n": [[0.5, 0.25, [[5, 3]]], [0.0, 0.25, [[4, 2]]]]}]
+    got = tabdata.save_edit("abcdefghijk", "keys", bars)
+    assert got["tracks"]["keys"]["edited"] and got["tracks"]["keys"]["bars"][0]["n"][0][0] == 0.0
+    assert "edited" not in got["tracks"]["guitar"]
+    assert tabdata.read("abcdefghijk")["tracks"]["keys"]["name"] == "K"
+    assert "edited" not in tabdata.revert_edit("abcdefghijk", "keys")["tracks"]["keys"]
+    assert not (tmp_path / "abcdefghijk" / "tabedits.json").exists()
+
+
+@pytest.mark.parametrize("bars", [
+    [], [{"len": 1.0, "n": [[0.0, 0.25, [[6, 3]]]]}], [{"len": 1.0, "n": [[0.0, 0.25, [[0, 99]]]]}],
+    [{"len": 0, "n": []}], [{"n": []}],
+])
+def test_edit_rejects_bad_tabs(tmp_path, monkeypatch, bars):
+    _cached(tmp_path, monkeypatch)
+    with pytest.raises(tabdata.TabDataError):
+        tabdata.save_edit("abcdefghijk", "guitar", bars)
+
+
+def test_edit_unknown_part(tmp_path, monkeypatch):
+    _cached(tmp_path, monkeypatch)
+    with pytest.raises(ValueError):
+        tabdata.save_edit("abcdefghijk", "bass", [{"len": 1.0, "n": []}])
+
+
+def test_old_cache_without_kinds_is_upgraded(tmp_path, monkeypatch):
+    from prismix import library
+    monkeypatch.setattr(library, "LIBRARY_DIR", tmp_path)
+    (tmp_path / "abcdefghijk").mkdir()
+    tabdata._save("abcdefghijk", {"found": True, "tracks": {"bass": {"name": "B", "tuning": [43], "bars": []}}})
+    assert tabdata.read("abcdefghijk")["tracks"]["bass"]["kind"] == "bass"

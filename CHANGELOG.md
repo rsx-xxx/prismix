@@ -2,6 +2,12 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.23
+
+- Songsterr and Soundslice tabs now keep every instrument of a song: all guitars, basses, keys and other parts, each switchable (instrument buttons, then 1/2/3 within one). Cached tabs refresh on their own.
+- Tabs can be edited in place: Edit, click a spot on the staff, type a fret, arrows move, Backspace deletes, Undo. Edits save automatically per part, survive re-downloads, and Original restores the downloaded tab.
+- The phone shows the same instrument and part pickers.
+
 ## 0.0.22
 
 - Desktop app and `uv run prismix` now share one library and one set of playlists (the per-user app folder), so a song split in one is already there in the other. Existing `./data` libraries are merged into it.
