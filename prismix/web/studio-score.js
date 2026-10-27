@@ -34,7 +34,7 @@ export function createScore({ player, api, notice }) {
   const alts = new Map(); // chord shape -> which alternative fingering is showing
   const remember = (k) => { try { localStorage.setItem(`stems:sc-${k}`, opts[k] ? '1' : '0'); } catch { /* ignore */ } };
 
-  const shift = () => player.semitones;
+  const shift = () => player.semitones + player.chordKey;
   const flats = () => cur?.data && fifthsFor(cur.data.structure.key, shift() - capoFret()) < 0;
   const shown = (c) => (opts.simple ? simplify(c) : c);
   const name = (c) => chordName(shown(c), shift() - capoFret(), flats());
@@ -497,8 +497,21 @@ export function createScore({ player, api, notice }) {
     const row = el('div', { className: 'fing-opts' },
       toggle('easy', 'Easiest fingering', 'Pick the voicing with the fewest fingers and no stretch'),
       toggle('simple', 'Simpler chords', 'Play 7ths and 6ths as plain major/minor'));
-    row.append(capoPicker());
+    row.append(chordKeyPicker(), capoPicker());
     return row;
+  }
+
+  /** Move the chords and tab alone, the audio stays in its key. */
+  function chordKeyPicker() {
+    const k = player.chordKey;
+    const sel = el('select', { 'aria-label': 'Chord key', title: 'Read the chords in another key without changing the sound' });
+    for (let v = -12; v <= 12; v++) {
+      const key = cur.data?.structure.key;
+      const label = `${v > 0 ? '+' : ''}${v}${key ? ` · ${keyName(key, player.semitones + v)}` : ''}`;
+      sel.append(el('option', { value: String(v), textContent: v === 0 ? `Chord key: with the audio${key ? ` (${keyName(key, player.semitones)})` : ''}` : `Chord key: ${label}`, selected: v === k }));
+    }
+    sel.addEventListener('change', () => player.setChordKey(+sel.value));
+    return sel;
   }
 
   function capoPicker() {

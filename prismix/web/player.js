@@ -13,6 +13,7 @@ export class StemPlayer extends EventTarget {
     this.duration = 0;
     this.tempo = 1;
     this.semitones = 0;
+    this.chordKey = 0; // chords and tab are read this far from the audio's key; the sound does not move
     this.cents = 0;
     this.formants = true;
     this.loop = null; // {a, b} seconds
@@ -171,6 +172,7 @@ export class StemPlayer extends EventTarget {
   }
 
   setTempo(rate) { this.tempo = clamp(rate, 0.5, 1.5); this._retune(); this._emit('tune'); }
+  setChordKey(n) { this.chordKey = clamp(Math.round(n), -12, 12); this._emit('tune'); }
   setSemitones(n) { this.semitones = clamp(Math.round(n), -12, 12); this._retune(); this._emit('tune'); }
   setCents(c) { this.cents = clamp(Math.round(c), -50, 50); this._retune(); this._emit('tune'); }
   setFormants(on) { this.formants = !!on; this._retune(); this._emit('tune'); }

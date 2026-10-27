@@ -2,6 +2,19 @@
 // applies the commands phones send, and drives the Band panel (QR, roster, lock, PIN).
 const LS = 'prismix.band';
 
+const signed = (v) => `${v > 0 ? '+' : ''}${v}`;
+/** "Anna: key +2" for a `changed` message. */
+export function describe(m) {
+  const what = {
+    tempo: `tempo ${Math.round(m.v * 100)}%`,
+    pitch: `key ${signed(m.v)}`,
+    cents: `fine tune ${signed(m.v)}`,
+    chordkey: `chord key ${signed(m.v)}`,
+    load: 'song',
+  }[m.op];
+  return what ? `${m.who}: ${what}` : '';
+}
+
 export function createBand({ player, current, open, $ }) {
   let ws;
   let timer = 0;
@@ -19,6 +32,7 @@ export function createBand({ player, current, open, $ }) {
       pos: Math.max(0, player.position - player.outLatency * player.tempo), // what the room hears
       tempo: player.tempo,
       semitones: player.semitones,
+      chordKey: player.chordKey,
       cents: player.cents,
       loop: q ? { a: q.a, b: q.b } : null,
       muted: player.stems.filter((s) => s.muted).map((s) => s.name),
@@ -38,12 +52,24 @@ export function createBand({ player, current, open, $ }) {
     tempo: (v) => player.setTempo(+v),
     pitch: (v) => player.setSemitones(+v),
     cents: (v) => player.setCents(+v),
+    chordkey: (v) => player.setChordKey(+v),
     loop: (v) => (v ? player.setLoop(+v.a, +v.b) : player.setLoop(null, null)),
     mute: (v) => player._stem(v?.name) && player.setMuted(v.name, !!v.on),
     solo: (v) => player._stem(v?.name) && player.setSolo(v.name, !!v.on),
     volume: (v) => player._stem(v?.name) && player.setVolume(v.name, +v.v),
     load: (v) => { if (/^[\w-]{1,64}$/.test(v?.id) && /^[\w.-]{1,64}$/.test(v?.model)) location.hash = `#/v/${v.id}/${v.model}`; },
   };
+
+  let noteTimer = 0;
+  /** Say, for a moment, who changed what: the host sees what phones do, as phones see each other. */
+  function note(text) {
+    let n = document.getElementById('band-note');
+    if (!n) { n = document.createElement('div'); n.id = 'band-note'; n.setAttribute('role', 'status'); document.body.append(n); }
+    n.textContent = text;
+    n.classList.add('on');
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => n.classList.remove('on'), 2600);
+  }
 
   function connect() {
     ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
@@ -56,6 +82,7 @@ export function createBand({ player, current, open, $ }) {
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data);
       if (m.t === 'cmd') commands[m.op]?.(m.v);
+      else if (m.t === 'changed') note(describe(m));
       else if (m.t === 'roster' || m.t === 'welcome') { Object.assign(status, m); player.setHeld?.(m.speaker != null); render(); }
     };
     ws.onclose = () => setTimeout(connect, 1500);

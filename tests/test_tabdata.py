@@ -66,9 +66,19 @@ def test_fit_accepts_matching_progression():
     assert got and got["map"] == list(range(8))
 
 
-def test_fit_rejects_other_song():
+def test_fit_follows_a_recording_in_another_key():
     got = tabdata.fit({"guitar": _tab([1, 6, 8, 1, 6, 8, 1, 6])}, _structure([0, 5, 7, 0, 5, 7, 0, 5]))
-    assert got is None
+    assert got and got["shift"] == -1
+
+
+def test_fit_rejects_a_too_short_recording():
+    assert tabdata.fit({"guitar": _tab([1, 6, 8, 1])}, _structure([0, 5])) is None
+
+
+def test_retune_keeps_frets_on_the_neck():
+    parts = {"guitar": {"bars": [{"n": [[0, 1, [[0, 0], [1, 24]]]]}]}}
+    tabdata.retune(parts, -1)
+    assert parts["guitar"]["bars"][0]["n"][0][2] == [[0, 11], [1, 23]]
 
 
 def test_network_failure_is_not_cached(monkeypatch, tmp_path):
