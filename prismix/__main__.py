@@ -28,7 +28,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="prismix", description="Prismix server")
     parser.add_argument("--host", default="127.0.0.1", help="bind address (default: local only)")
     parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--share", action="store_true", help="also serve phones on the LAN over HTTPS (band mode)")
+    parser.add_argument("--share", action=argparse.BooleanOptionalAction, default=True,
+                        help="also serve phones and other desktops on the LAN over HTTPS (band mode); --no-share turns it off")
     parser.add_argument("--open", action="store_true", help="open the page in the browser once the server is up")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
