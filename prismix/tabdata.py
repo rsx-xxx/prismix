@@ -34,7 +34,8 @@ MIN_COVERAGE = 0.6  # share of the tab's playing bars that found a bar in the re
 CANDIDATES = 3
 SLICE_DATA = "https://www.soundslice.com/slices/{code}/scoredata/"
 SLICE_URL = re.compile(r"^(?:https?://)?(?:www\.)?soundslice\.com/slices/([A-Za-z0-9]{3,12})(?:[/?#]|$)")
-FORMAT = 2  # 2: every pitched part, each with a "kind"
+FLAGS = "tshxm"  # a note's flags: tie, slide, hammer/pull, dead, palm mute
+FORMAT = 3  # 3: notes carry flags (tie, slide, hammer, dead, palm mute), beats let-ring and tempo
 KINDS = ("guitar", "bass", "keys", "other")
 MAX_PARTS = {"guitar": 6, "bass": 3, "keys": 4, "other": 5}
 MAX_BARS, MAX_STRINGS = 1500, 12
@@ -238,6 +239,14 @@ def _image(song_id: int) -> str:
 
 # ───────────────────────── conversion ─────────────────────────
 
+def _fret(n: dict) -> list:
+    """[string, fret] plus a flag string when the note is tied (t), slid (s), hammered or pulled (h), dead (x) or palm-muted (m)."""
+    flags = "".join(c for c, on in (
+        ("t", n.get("tie")), ("s", n.get("slide")), ("h", n.get("hp")), ("x", n.get("dead")), ("m", n.get("palmMute")),
+    ) if on)
+    return [n["string"], n["fret"], flags] if flags else [n["string"], n["fret"]]
+
+
 def compact(part: dict) -> list[dict]:
     """Songsterr part -> [{"len": whole notes, "sig": [n, d] when it changes, "mark": section, "n": [[pos, dur, [[string, fret]...]]]}].
 
@@ -254,9 +263,16 @@ def compact(part: dict) -> list[dict]:
                 if b.get("graceNote"):
                     continue
                 dur = b["duration"][0] / b["duration"][1]
-                frets = [[n["string"], n["fret"]] for n in b.get("notes", []) if not n.get("rest") and "fret" in n and "string" in n]
+                frets = [_fret(n) for n in b.get("notes", []) if not n.get("rest") and "fret" in n and "string" in n]
                 if frets and not b.get("rest"):
-                    notes.append([round(at / length, 4), round(dur / length, 4), frets])
+                    beat = [round(at / length, 4), round(dur / length, 4), frets]
+                    extra = {}
+                    if b.get("letRing"):
+                        extra["lr"] = 1
+                    bpm = (b.get("tempo") or {}).get("bpm")
+                    if bpm:
+                        extra["bpm"] = round(bpm)
+                    notes.append(beat + [extra] if extra else beat)
                 at += dur
         notes.sort(key=lambda x: x[0])
         bar = {"len": round(length, 4), "n": notes}
@@ -270,7 +286,7 @@ def compact(part: dict) -> list[dict]:
 
 def _chroma(bar: dict, tuning: list[int]) -> list[float]:
     v = [0.0] * 12
-    for _, dur, frets in bar["n"]:
+    for _, dur, frets, *_ in bar["n"]:
         for s, f in frets:
             if 0 <= s < len(tuning):
                 v[(tuning[s] + f) % 12] += max(dur, 0.03)
@@ -435,15 +451,23 @@ def _clean_bars(bars, strings: int) -> list[dict]:
         try:
             length = float(b["len"])
             notes = []
-            for pos, dur, frets in b["n"]:
+            for pos, dur, frets, *rest in b["n"]:
                 fl = []
-                for s_, f in frets:
+                for s_, f, *fx in frets:
                     if not (isinstance(s_, int) and isinstance(f, int) and 0 <= s_ < strings and 0 <= f <= 36):
                         raise ValueError
-                    fl.append([s_, f])
+                    flags = "".join(dict.fromkeys(c for c in str(fx[0]) if c in FLAGS)) if fx else ""
+                    fl.append([s_, f, flags] if flags else [s_, f])
                 if not fl or not 0 <= float(pos) < 1.0001:
                     raise ValueError
-                notes.append([round(float(pos), 4), round(max(0.0, float(dur)), 4), fl])
+                beat = [round(float(pos), 4), round(max(0.0, float(dur)), 4), fl]
+                extra = rest[0] if rest and isinstance(rest[0], dict) else {}
+                keep = {}
+                if extra.get("lr"):
+                    keep["lr"] = 1
+                if isinstance(extra.get("bpm"), int) and 20 <= extra["bpm"] <= 400:
+                    keep["bpm"] = extra["bpm"]
+                notes.append(beat + [keep] if keep else beat)
         except (KeyError, TypeError, ValueError) as e:
             raise TabDataError("Bad tab") from e
         if not 0 < length <= 8:
