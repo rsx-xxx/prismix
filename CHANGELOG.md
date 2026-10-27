@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.35
+
+- The chord header links to the exact page the chords were matched to, with its artist and title.
+
 ## 0.0.34
 
 - Chords and tab can be read in another key without moving the audio (Chord key, on the computer and on phones).

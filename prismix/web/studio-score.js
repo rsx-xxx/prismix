@@ -378,7 +378,11 @@ export function createScore({ player, api, notice }) {
       `${Math.round(structure.bpm * player.tempo)} BPM`, `${structure.timeSig[0]}/${structure.timeSig[1]}`,
     ].filter(Boolean);
     metaText = parts.join(' · ');
-    $('sc-meta').replaceChildren(...parts.map((t, i) => el('span', { className: i === 0 && k ? 'pill key' : 'pill', textContent: t })));
+    $('sc-meta').replaceChildren(...parts.map((t, i) => el('span', { className: i === 0 && k ? 'pill key' : 'pill', textContent: t })))
+    const src = cur.tabs;
+    if (opts.useTab && src?.url) { // say where the chord names come from, with the page itself
+      $('sc-meta').append(el('a', { className: 'pill', href: src.url, target: '_blank', rel: 'noopener', title: 'The chord sheet these chords are matched to', textContent: `Chords: ${[src.artist, src.title].filter(Boolean).join(' - ') || 'Songsterr'} ↗` }));
+    }
     renderChart(body);
   }
 
