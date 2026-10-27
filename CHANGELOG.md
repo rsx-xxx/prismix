@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.0.43
+
+- Keys and other pitched instruments now show as staff notation (treble and bass clefs, key signature, stems, beams, rests, ties) instead of numbered tab. Drums are a new part and show as a percussion score. Numbered tab stays for guitar and bass only. Cached tabs refresh once to add the drum parts.
+
 ## 0.0.42
 
 - Chords above the lyrics: a line that begins over a chord that started earlier now shows that chord (dimmed) instead of leaving the first words bare. Settings open as a small panel under their button, with no dimming or blur of the page. The tab instrument picker is Guitar, Bass, Keys and Others, each with a dropdown of its parts by name. Notes (flats or sharps) stay a per-device setting. `scripts/build-mac.sh --install` builds and installs the Mac app locally.
