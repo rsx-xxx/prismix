@@ -7,8 +7,20 @@ import { timeLine, splitAt } from './lyrics.js';
 
 const $ = (id) => document.getElementById(id);
 const LS = 'prismix.remote';
-const store = (() => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch { return {}; } })();
-const save = () => localStorage.setItem(LS, JSON.stringify(store));
+// The Android app answers https://offline.prismix itself, from songs kept on the phone: no host, solo only.
+const OFFLINE = location.hostname === 'offline.prismix';
+const store = (() => {
+  try {
+    const mine = JSON.parse(localStorage.getItem(LS)) || {};
+    // each origin has its own localStorage: the app keeps one copy of the settings for both
+    if (OFFLINE) return { ...mine, ...JSON.parse(window.Android?.stashed?.() || '{}'), pin: '' };
+    return mine;
+  } catch { return {}; }
+})();
+const save = () => {
+  localStorage.setItem(LS, JSON.stringify(store));
+  try { window.Android?.stash?.(JSON.stringify({ ...store, pin: undefined })); } catch { /* the copy is a convenience */ }
+};
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const el = (tag, props = {}, ...kids) => {
@@ -50,7 +62,7 @@ const S = {
   fail: null, // {id, model, text} when that song could not be loaded
   hostOnline: false,
   track: null, // {id, model, meta, structure, chords[], chordT[], barT[], lyrics}
-  mode: store.mode || 'follow', // follow | listen | solo
+  mode: OFFLINE ? 'solo' : store.mode || 'follow', // follow | listen | solo
   view: store.view || 'lyrics', // lyrics | chords
   withChords: store.chords ?? false,
   tabChords: store.tabChords ?? true, // chords above the tab staff
@@ -101,7 +113,7 @@ function connect() {
     setTimeout(connect, 1200);
   };
 }
-const ping = () => ws.readyState === 1 && ws.send(JSON.stringify({ t: 'ping', c: performance.now() }));
+const ping = () => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'ping', c: performance.now() }));
 setInterval(ping, 4000);
 
 function setLink(state, text) {
@@ -159,7 +171,7 @@ function setHost(m) {
   if (S.mode === 'listen') syncLocal(before == null || wasPlaying !== !!m.playing || Math.abs(hostPos() - before) > 0.4);
 }
 
-const send = (op, v) => ws.readyState === 1 && ws.send(JSON.stringify({ t: 'cmd', op, v }));
+const send = (op, v) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'cmd', op, v }));
 
 // ── the shared timeline ──
 const hostPos = () => {
@@ -268,6 +280,7 @@ async function loadTrack(id, model) {
     syncPlNav();
     render();
     if (S.mode !== 'follow') ensureLocal();
+    if (store.autosave && !OFFLINE && !off.have.has(id)) keep(id, model);
   } catch (err) {
     if (mine !== loadToken) return;
     const code = +err.message;
@@ -934,7 +947,7 @@ async function showHostName() {
 async function loadLibrary() {
   try {
     library = await getJson('/api/library');
-    paintLibrary();
+    if (OFFLINE && !library.length) paintEmptyOffline(); else paintLibrary();
   } catch { $('lib').textContent = 'Could not load the library.'; }
 }
 
@@ -986,7 +999,9 @@ function paintPlaylists() {
   }
   const back = el('button', { className: 'btn-line', type: 'button', textContent: '‹ Playlists' });
   back.onclick = () => { plView = null; paintPlaylists(); };
-  box.replaceChildren(el('div', { className: 'pl-top' }, back, el('b', { textContent: pl.name })),
+  const all = el('button', { className: 'btn-line', type: 'button', textContent: 'Save all' });
+  all.onclick = () => pl.items.forEach((it) => { const m = modelOf(it.id); if (m && !off.have.has(it.id)) keep(it.id, m); });
+  box.replaceChildren(el('div', { className: 'pl-top' }, back, el('b', { textContent: pl.name }), ...(droid?.offlineSave && !OFFLINE ? [all] : [])),
     el('ul', { className: 'lib' }, ...pl.items.map((it, n) => {
       const model = modelOf(it.id);
       const img = el('img', { className: 'cover', loading: 'lazy', alt: '', src: withPin(`/media/${it.id}/thumb.jpg`) });
@@ -995,6 +1010,7 @@ function paintPlaylists() {
         el('span', { className: 'meta' }, el('b', { textContent: `${n + 1}. ${it.title || it.id}` }),
           el('small', { textContent: model ? `${it.channel || ''}${it.channel ? ' · ' : ''}${fmt(it.duration)}` : 'Not ready on the host yet' })));
       if (model) li.onclick = () => playSong(it.id, model, pl);
+      li.append(...[keepBtn(it.id, model)].filter(Boolean));
       return li;
     })));
 }
@@ -1015,6 +1031,84 @@ function syncPlNav() {
 $('pl-prev').onclick = () => plStep(-1);
 $('pl-next').onclick = () => plStep(1);
 
+// ── songs kept on this phone (Android app) ──
+const off = { have: new Map(), busy: new Map() }; // id -> {bytes} | id -> 0..1
+function refreshOffline() {
+  try { off.have = new Map(JSON.parse(droid?.offlineList?.() || '[]').map((i) => [i.id, i])); } catch { off.have = new Map(); }
+}
+refreshOffline();
+let armed = null, armTimer = 0;
+function repaintKeep() {
+  paintLibrary();
+  paintPlaylists();
+}
+window.__offline = (id, p) => {
+  if (p >= 1) { off.busy.delete(id); refreshOffline(); }
+  else if (p < 0) off.busy.delete(id);
+  else off.busy.set(id, p);
+  repaintKeep();
+};
+function keep(id, model) {
+  if (!droid?.offlineSave || off.busy.has(id)) return;
+  off.busy.set(id, 0);
+  droid.offlineSave(id, model, store.pin || '');
+  repaintKeep();
+}
+function unkeep(id) {
+  droid.offlineRemove(id);
+  refreshOffline();
+  armed = null;
+  if (OFFLINE) { library = library.filter((i) => i.id !== id); if (!library.length) paintEmptyOffline(); }
+  repaintKeep();
+}
+$('cache-grp').hidden = !droid?.offlineSave || OFFLINE;
+$('autosave').checked = !!store.autosave;
+$('autosave').onchange = (e) => {
+  store.autosave = e.target.checked;
+  save();
+  if (store.autosave && S.track && !off.have.has(S.track.id)) keep(S.track.id, S.track.model);
+};
+function keepBtn(id, model) {
+  if (!droid?.offlineSave || (!model && !off.have.has(id))) return null;
+  const busy = off.busy.get(id);
+  const saved = off.have.has(id);
+  const text = busy !== undefined ? `${Math.round(busy * 100)}%` : armed === id ? 'Remove?' : saved ? 'Saved' : 'Save';
+  const b = el('button', { type: 'button', className: `keep${saved ? ' on' : ''}${armed === id ? ' arm' : ''}`, textContent: text, disabled: busy !== undefined });
+  b.onclick = (e) => {
+    e.stopPropagation();
+    if (!saved) { if (!OFFLINE) keep(id, model); return; }
+    if (armed === id) { clearTimeout(armTimer); unkeep(id); return; } // confirm() does not work in the WebView
+    armed = id;
+    clearTimeout(armTimer);
+    armTimer = setTimeout(() => { armed = null; repaintKeep(); }, 3000);
+    repaintKeep();
+  };
+  return b;
+}
+function paintEmptyOffline() {
+  $('lib').replaceChildren(el('p', { className: 'note', textContent: 'No songs saved yet. Connect to a host and tap Save next to a song.' }));
+}
+
+function offlineStart() {
+  document.body.classList.add('offline');
+  $('boot').hidden = true;
+  $('join').hidden = true;
+  if (!store.role) { showJoin(); return; }
+  $('app').hidden = false;
+  $('mode-seg').style.display = 'none';
+  $('lat-row').style.display = 'none';
+  $('song-tabs').style.display = 'none';
+  $('title').textContent = 'Offline songs';
+  $('sub').textContent = 'Saved on this phone';
+  setLink('bad', 'Offline');
+  S.mode = 'solo';
+  chrome();
+  render();
+  modeUi();
+  loadLibrary();
+  if (!S.track) openSongs();
+}
+
 function paintLibrary() {
   const q = $('song-q').value.trim().toLowerCase();
   const items = library.filter((it) => !q || `${it.title} ${it.channel || ''}`.toLowerCase().includes(q));
@@ -1025,6 +1119,7 @@ function paintLibrary() {
     const meta = el('span', { className: 'meta' }, el('b', { textContent: it.title }), el('small', { textContent: `${it.channel || ''}${it.channel ? ' · ' : ''}${fmt(it.duration)}` }));
     const li = el('li', { className: S.track?.id === it.id ? 'on' : '' }, img, meta);
     li.onclick = () => playSong(it.id, model, null);
+    li.append(...[keepBtn(it.id, model)].filter(Boolean));
     return li;
   }));
 }
@@ -1044,8 +1139,8 @@ function modeUi(extra) {
 }
 async function setMode(mode) {
   const prev = S.mode;
-  S.mode = store.mode = mode;
-  save();
+  S.mode = mode;
+  if (!OFFLINE) { store.mode = mode; save(); }
   modeUi();
   if (mode === 'follow') { S.local?.pause(); }
   else {
@@ -1157,8 +1252,9 @@ $('join').onsubmit = (e) => {
   save();
   S.view = store.view || 'lyrics';
   S.withChords = store.chords;
-  welcomed = false;
   $('j-err').textContent = '';
+  if (OFFLINE) { offlineStart(); return; }
+  welcomed = false;
   $('boot').hidden = false;
   $('join').hidden = true;
   const old = ws;
@@ -1166,7 +1262,11 @@ $('join').onsubmit = (e) => {
   old?.close(1000);
   connect();
 };
-if (store.name && store.role) connect(); else showJoin();
+if (OFFLINE) offlineStart();
+else {
+  if (store.name && store.role) connect(); else showJoin();
+  save(); // hand the settings to the app for the offline page
+}
 requestAnimationFrame(tick);
 window.__remote = S; // debugging and end-to-end tests
 
