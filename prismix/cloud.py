@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
-from . import export, library, tagging
+from . import analysis, export, library, tabdata, tagging
 from .config import DATA_DIR, MODELS
 
 CRED_FILE = DATA_DIR / "band_cloud.json"
@@ -194,6 +194,17 @@ def song_files(video_id: str, model: str):
     art = cover if cover and cover.is_file() else thumb if thumb.is_file() else None
     if art:
         yield "cover.jpg", lambda: art.read_bytes()
+    # What the phone's player needs for chords, lyrics and tab. Each is optional: a song without them still plays.
+    if analysis.read_structure(video_id):
+        yield "structure.json", lambda: (library.video_dir(video_id) / "structure.json").read_bytes()
+    if (library.video_dir(video_id) / "lyrics.json").is_file():
+        yield "lyrics.json", lambda: (library.video_dir(video_id) / "lyrics.json").read_bytes()
+    try:
+        tab = tabdata.lookup(video_id)
+    except (tabdata.TabDataError, ValueError, OSError):
+        tab = None
+    if tab and tab.get("found"):
+        yield "tab.json", lambda: json.dumps(tab, ensure_ascii=False, separators=(",", ":")).encode()
 
 
 def publish(cloud: Cloud, video_id: str, model: str, progress=lambda step, done, total: None) -> dict:

@@ -168,7 +168,7 @@ final class Offline {
         return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found", new HashMap<String, String>(), new ByteArrayInputStream(new byte[0]));
     }
 
-    private static WebResourceResponse asset(Context ctx, String name, String cache) throws IOException {
+    static WebResourceResponse asset(Context ctx, String name, String cache) throws IOException {
         InputStream in = ctx.getAssets().open("web/" + name);
         Map<String, String> h = new HashMap<>();
         h.put("Cache-Control", cache);

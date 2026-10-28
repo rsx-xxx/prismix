@@ -4,6 +4,11 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.0.49
+
+- Android: the Band Cloud screen is the app's own player now, with the same lyrics, chords, tab, mixer, tempo and key, fed from the cloud. Publishing also uploads the song's structure, lyrics and tab so members see them.
+- Android: the invite link opens the app and signs in on its own. If the phone keeps the link in the browser, the web player opens instead.
+
 ## 0.0.48
 
 - Android: Band Cloud sign-in is one field now. Paste the invite link; it already carries the cloud address and the token, so nothing else is asked.

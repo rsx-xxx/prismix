@@ -11,7 +11,8 @@ import { createNotes } from './notes.js';
 const $ = (id) => document.getElementById(id);
 const LS = 'prismix.remote';
 // The Android app answers https://offline.prismix itself, from songs kept on the phone: no host, solo only.
-const OFFLINE = location.hostname === 'offline.prismix';
+const CLOUD = location.hostname === 'cloud.prismix'; // the app's Band Cloud: same page, data from the cloud
+const OFFLINE = location.hostname === 'offline.prismix' || CLOUD;
 const store = (() => {
   try {
     const mine = JSON.parse(localStorage.getItem(LS)) || {};
@@ -1131,7 +1132,7 @@ $('autosave').onchange = (e) => {
   if (store.autosave && S.track && !off.have.has(S.track.id)) keep(S.track.id, S.track.model);
 };
 function keepBtn(id, model) {
-  if (!droid?.offlineSave || (!model && !off.have.has(id))) return null;
+  if (CLOUD || !droid?.offlineSave || (!model && !off.have.has(id))) return null;
   const busy = off.busy.get(id);
   const saved = off.have.has(id);
   const text = busy !== undefined ? `${Math.round(busy * 100)}%` : armed === id ? 'Remove?' : saved ? 'Saved' : 'Save';
@@ -1148,7 +1149,7 @@ function keepBtn(id, model) {
   return b;
 }
 function paintEmptyOffline() {
-  $('lib').replaceChildren(el('p', { className: 'note', textContent: 'No songs saved yet. Connect to a host and tap Save next to a song.' }));
+  $('lib').replaceChildren(el('p', { className: 'note', textContent: CLOUD ? 'No songs in the cloud yet. Publish them from Prismix on the computer.' : 'No songs saved yet. Connect to a host and tap Save next to a song.' }));
 }
 
 function offlineStart() {
@@ -1160,9 +1161,9 @@ function offlineStart() {
   $('mode-seg').style.display = 'none';
   $('lat-row').style.display = 'none';
   $('song-tabs').style.display = 'none';
-  $('title').textContent = 'Offline songs';
-  $('sub').textContent = 'Saved on this phone';
-  setLink('bad', 'Offline');
+  $('title').textContent = CLOUD ? 'Band Cloud' : 'Offline songs';
+  $('sub').textContent = CLOUD ? "Your band's library" : 'Saved on this phone';
+  setLink(CLOUD ? 'ok' : 'bad', CLOUD ? 'Cloud' : 'Offline');
   S.mode = 'solo';
   chrome();
   render();

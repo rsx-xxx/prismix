@@ -222,6 +222,10 @@ public class Main extends Activity {
         Uri d = i == null ? null : i.getData();
         String h = d == null ? null : d.getHost();
         if (h == null) { discover(); return; }
+        if ("prismix".equals(d.getScheme()) && "join".equals(h)) { // an invite opened from the join page: sign in at once
+            String o = d.getQueryParameter("o"), t = d.getQueryParameter("t");
+            if (o != null && t != null) { signInCloud(o + "/join?t=" + t, "", null, null); return; }
+        }
         // Android's resolver often cannot do mDNS: a `name.local` link carries the address in ?ip= for that case.
         String ip = d.getQueryParameter("ip");
         if (h.endsWith(".local") && ip != null && !ip.isEmpty()) go(ip);
@@ -375,6 +379,7 @@ public class Main extends Activity {
         @Override
         public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
             Uri u = r.getUrl();
+            if (CloudApi.HOST.equals(u.getHost())) return CloudApi.serve(m.getApplicationContext(), Cloud.load(m.prefs), u.getPath());
             if (!Offline.HOST.equals(u.getHost())) return null;
             return Offline.serve(m.getApplicationContext(), u.getPath());
         }
@@ -710,27 +715,30 @@ public class Main extends Activity {
             final Cloud.Credential ok = bad == null ? c : null;
             final String why = bad;
             ui.post(() -> {
-                if (ok == null) { err.setText(why); in.setEnabled(true); return; }
+                if (ok == null) {
+                    if (err == null) showCloud(why); else { err.setText(why); in.setEnabled(true); }
+                    return;
+                }
                 Cloud.save(prefs, ok); // only the member credential is kept
                 openCloud(ok);
             });
         }, "cloud-login").start());
     }
 
-    /** The join page turns the token into the session cookie and redirects to the player. */
+    /** The player page is the app's own; its data comes from the cloud through CloudApi. */
     private void openCloud(final Cloud.Credential c) {
         stopSearch();
         final int g = ++gen;
         screen("Opening Band Cloud…", c.host());
         panel.addView(spinner());
         cloudMode = true;
-        cloudFresh = true;
+        cloudFresh = false;
         host = "";
         listing = false;
         connecting = true;
         web.setVisibility(View.INVISIBLE);
         whenNet(() -> {
-            web.loadUrl(c.joinUrl());
+            web.loadUrl("https://" + CloudApi.HOST + "/remote");
             ui.postDelayed(() -> { if (g == gen && connecting) { connecting = false; showCloud("The cloud is not answering"); } }, 20000);
         });
     }
