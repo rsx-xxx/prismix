@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** The private Band Cloud: a member signs in with an invite link or token and only that credential is kept. */
+/** The private TigerKiss: a member signs in with an invite link or token and only that credential is kept. */
 final class Cloud {
     /** A well-formed id that is never published: the admin check only reads the status code. */
     private static final String PROBE_ID = "AAAAAAAAAAA";

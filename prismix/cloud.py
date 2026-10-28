@@ -1,4 +1,4 @@
-"""Band Cloud client: sign in with an invite link, publish processed songs, read the committed library.
+"""TigerKiss client: sign in with an invite link, publish processed songs, read the committed library.
 
 The cloud is a private store. Every invite link lets its holder play and publish; removing a song stays with the
 cloud's admin. Songs stay invisible until their commit. This module holds the credential in the user data folder,

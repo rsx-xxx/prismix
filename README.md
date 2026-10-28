@@ -57,7 +57,7 @@ What phones can do:
 - **Hear here:** a phone plays the sound and the host goes silent, so the computer needs no speakers. The host can also choose which device plays.
 - **Change things:** tempo, key and chord key are shared, and everyone sees who changed what. A phone can simplify chords for itself only.
 - **Stickers:** pin a remark to a moment of the song (quieter, louder, silence, a count, a bubble…) on the computer or a phone. It shows on the lyrics, chords and tab for everyone, with an optional comment that is always visible or shown on tap.
-- **Band Cloud:** publish processed songs to a private cloud from the computer (admin token); members open an invite link on a phone or in the Android app to browse, stream and download.
+- **TigerKiss:** publish processed songs to a private cloud from the computer (admin token); members open an invite link on a phone or in the Android app to browse, stream and download.
 - **Queue:** the host's **Queue** view shows songs being processed; click one to run it next.
 - **Solo (Android app):** save songs on the phone (about 25 MB each) and play them with no host at all.
 - **Lock and PIN:** lock playback and set a PIN in the Band panel.

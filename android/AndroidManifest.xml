@@ -39,6 +39,12 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="*" android:pathPrefix="/remote" />
             </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="band.deltaclans.win" android:path="/join" />
+            </intent-filter>
         </activity>
         <activity android:name=".ScanActivity" android:exported="false" android:screenOrientation="portrait" android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
         <service android:name=".MediaService" android:exported="false" android:foregroundServiceType="mediaPlayback" />

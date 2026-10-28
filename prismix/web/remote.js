@@ -11,7 +11,7 @@ import { createNotes } from './notes.js';
 const $ = (id) => document.getElementById(id);
 const LS = 'prismix.remote';
 // The Android app answers https://offline.prismix itself, from songs kept on the phone: no host, solo only.
-const CLOUD = location.hostname === 'cloud.prismix'; // the app's Band Cloud: same page, data from the cloud
+const CLOUD = location.hostname === 'cloud.prismix'; // the app's TigerKiss: same page, data from the cloud
 const OFFLINE = location.hostname === 'offline.prismix' || CLOUD;
 const store = (() => {
   try {
@@ -1161,9 +1161,9 @@ function offlineStart() {
   $('mode-seg').style.display = 'none';
   $('lat-row').style.display = 'none';
   $('song-tabs').style.display = 'none';
-  $('title').textContent = CLOUD ? 'Band Cloud' : 'Offline songs';
+  $('title').textContent = CLOUD ? 'TigerKiss' : 'Offline songs';
   $('sub').textContent = CLOUD ? "Your band's library" : 'Saved on this phone';
-  setLink(CLOUD ? 'ok' : 'bad', CLOUD ? 'Cloud' : 'Offline');
+  setLink(CLOUD ? 'ok' : 'bad', CLOUD ? 'TigerKiss' : 'Offline');
   S.mode = 'solo';
   chrome();
   render();

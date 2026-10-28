@@ -298,14 +298,14 @@ def create_app() -> FastAPI:
             await old.http.aclose()
         return {"connected": False}
 
-    # ── Band Cloud: the cloud credential lives on this computer, so only its own window may use these ──
+    # ── TigerKiss: the cloud credential lives on this computer, so only its own window may use these ──
     app.state.publisher = cloud.Publisher()
 
     def cloud_for(request: Request) -> cloud.Cloud:
         own_window(request)
         cl = cloud.current()
         if not cl:
-            raise HTTPException(401, "Sign in to Band Cloud first")
+            raise HTTPException(401, "Sign in to TigerKiss first")
         return cl
 
     @app.get("/api/cloud")

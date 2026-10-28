@@ -54,7 +54,7 @@ final class Saver {
         });
     }
 
-    /** A file from the Band Cloud, fetched with the member token. Only the signed-in cloud's own address is ever contacted. */
+    /** A file from the TigerKiss, fetched with the member token. Only the signed-in cloud's own address is ever contacted. */
     static void saveCloud(final Context ctx, final String url, final String suggested) {
         final Cloud.Credential cred = Main.cloud();
         QUEUE.execute(() -> {

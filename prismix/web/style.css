@@ -882,7 +882,7 @@ dialog[open]::backdrop { opacity: 1; }
 .tab-sel { max-width: 280px; height: 30px; padding: 0 28px 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background-color: transparent; color: var(--text); font-size: 13px; }
 .set-row select { height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background-color: transparent; color: var(--text); font-size: 13px; }
 
-/* Band Cloud */
+/* TigerKiss */
 .card .pub {
   position: absolute; left: 44px; top: 8px; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 14px; border: 0; background: #000a; color: #fff;
   opacity: 0; transition: opacity .15s; font-size: 14px; display: grid; place-items: center;

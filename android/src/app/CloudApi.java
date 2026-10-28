@@ -18,7 +18,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The player's own page, answered from the Band Cloud. The page asks the host API it always asks (library, lyrics, tab,
+ * The player's own page, answered from the TigerKiss. The page asks the host API it always asks (library, lyrics, tab,
  * stems); here each path is translated to the cloud's song files and fetched with the member token.
  */
 final class CloudApi {
@@ -35,7 +35,7 @@ final class CloudApi {
         if (path.contains("..") || path.contains("//") || path.contains("\\")) return status(404);
         try {
             if (path.equals("/") || path.equals("/remote")) return Offline.asset(ctx, "remote.html", "no-cache");
-            if (path.equals("/remote/hello")) return json("{\"app\":\"prismix\",\"name\":\"Band Cloud\",\"offline\":true,\"pin\":false}");
+            if (path.equals("/remote/hello")) return json("{\"app\":\"prismix\",\"name\":\"TigerKiss\",\"offline\":true,\"pin\":false}");
             if (c == null) return status(401);
             if (path.equals("/api/playlists")) return json("[]");
             if (path.equals("/api/library")) return json(library(c));

@@ -95,7 +95,7 @@ public class Main extends Activity {
     private Runnable afterNet;
     private String wantName; // a name the user typed, looked for among the discovered hosts
     private boolean connecting; // the page is loading behind the progress screen
-    private boolean cloudMode; // the web view shows the Band Cloud player, not a LAN host
+    private boolean cloudMode; // the web view shows the TigerKiss player, not a LAN host
     private boolean cloudFresh; // history of the sign-in redirect is dropped once the player has loaded
     private NsdManager nsd;
     private NsdManager.DiscoveryListener nsdListener;
@@ -226,6 +226,10 @@ public class Main extends Activity {
             String o = d.getQueryParameter("o"), t = d.getQueryParameter("t");
             if (o != null && t != null) { signInCloud(o + "/join?t=" + t, "", null, null); return; }
         }
+        if ("https".equals(d.getScheme()) && "/join".equals(d.getPath())) { // a TigerKiss invite link tapped anywhere: open it in the app
+            signInCloud(d.toString(), "", null, null);
+            return;
+        }
         // Android's resolver often cannot do mDNS: a `name.local` link carries the address in ?ip= for that case.
         String ip = d.getQueryParameter("ip");
         if (h.endsWith(".local") && ip != null && !ip.isEmpty()) go(ip);
@@ -260,7 +264,7 @@ public class Main extends Activity {
         if (m != null) m.ui.post(() -> m.web.evaluateJavascript(script, null));
     }
 
-    /** The signed-in Band Cloud member credential, if any. */
+    /** The signed-in TigerKiss member credential, if any. */
     static Cloud.Credential cloud() {
         Main m = current;
         return m == null ? null : Cloud.load(m.prefs);
@@ -643,10 +647,10 @@ public class Main extends Activity {
         web.loadUrl("https://" + Offline.HOST + "/remote");
     }
 
-    // ── Band Cloud ──
+    // ── TigerKiss ──
 
     private void cloudButton() {
-        Button b = button("Band Cloud", false);
+        Button b = button("TigerKiss", false);
         b.setOnClickListener(v -> showCloud(null));
         panel.addView(b);
     }
@@ -659,10 +663,10 @@ public class Main extends Activity {
         host = "";
         listing = false;
         final Cloud.Credential have = Cloud.load(prefs);
-        screen("Band Cloud", have == null ? "Paste the invite link you were sent." : "Signed in to " + have.host());
+        screen("TigerKiss", have == null ? "Paste the invite link you were sent." : "Signed in to " + have.host());
         final TextView err = text(problem == null ? "" : problem, 14, Color.parseColor("#ff6b5b"), 8);
         if (have != null) {
-            Button open = button("Open Band Cloud", true);
+            Button open = button("Open TigerKiss", true);
             open.setOnClickListener(v -> openCloud(have));
             panel.addView(open);
             Button out = button("Sign out", false);
@@ -729,7 +733,7 @@ public class Main extends Activity {
     private void openCloud(final Cloud.Credential c) {
         stopSearch();
         final int g = ++gen;
-        screen("Opening Band Cloud…", c.host());
+        screen("Opening TigerKiss…", c.host());
         panel.addView(spinner());
         cloudMode = true;
         cloudFresh = false;

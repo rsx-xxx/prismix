@@ -1,4 +1,4 @@
-// Band Cloud on the desktop: sign in with an invite link, publish processed songs, and play the committed library.
+// TigerKiss on the desktop: sign in with an invite link, publish processed songs, and play the committed library.
 export function createCloud({ $, el, api, notice, fmt }) {
   const state = { signedIn: false, host: '', songs: [], jobs: new Map(), playing: null };
   const audio = $('cloud-audio');
@@ -19,7 +19,7 @@ export function createCloud({ $, el, api, notice, fmt }) {
   }
 
   function render() {
-    $('cloud-btn').textContent = state.signedIn ? 'Cloud' : 'Cloud sign-in';
+    $('cloud-btn').textContent = state.signedIn ? 'TigerKiss' : 'TigerKiss sign-in';
     const sec = $('cloud-section');
     sec.hidden = !state.signedIn;
     if (!state.signedIn) { stop(); return; }

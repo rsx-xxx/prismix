@@ -425,7 +425,7 @@ function renderLibrary() {
     });
     const add = el('button', { className: 'add', type: 'button', textContent: '+', title: 'Add to playlist', ariaLabel: 'Add to playlist' });
     add.addEventListener('click', async (e) => { e.stopPropagation(); await plview.load(); plview.pick(it); });
-    const pub = el('button', { className: 'pub', type: 'button', textContent: '↑', title: 'Publish to Band Cloud', ariaLabel: 'Publish to Band Cloud' });
+    const pub = el('button', { className: 'pub', type: 'button', textContent: '↑', title: 'Publish to TigerKiss', ariaLabel: 'Publish to TigerKiss' });
     pub.addEventListener('click', (e) => { e.stopPropagation(); cloud.publish(it, open, pub); });
     card.append(add, del, pub);
     card.draggable = true;

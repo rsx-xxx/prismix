@@ -4,6 +4,11 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.2.0
+
+- The band cloud is now called TigerKiss everywhere in the app, so a musician can later belong to several bands.
+- Android: a TigerKiss invite link (band.deltaclans.win/join) opens the app and signs in, instead of the browser page. Needs the cloud site to publish its app-link file for the no-prompt handoff.
+
 ## 0.1.0
 
 - Processing a song can be cancelled: a Cancel button on the progress card and on every waiting or running row in the queue.
