@@ -4,6 +4,10 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.0.50
+
+- Homebrew: the cask uses the current `postflight_steps` form, so `brew install --cask prismix` no longer prints the deprecated `postflight` warning.
+
 ## 0.0.49
 
 - Android: the Band Cloud screen is the app's own player now, with the same lyrics, chords, tab, mixer, tempo and key, fed from the cloud. Publishing also uploads the song's structure, lyrics and tab so members see them.

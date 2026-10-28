@@ -22,8 +22,8 @@ cask "prismix" do
   app "Prismix.app"
 
   # The DMG is ad-hoc signed, not notarized (see packaging/SIGNING.md).
-  postflight do
-    system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{appdir}/Prismix.app"]
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/Prismix.app"]
   end
 
   zap trash: "~/Library/Application Support/Prismix"
