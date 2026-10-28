@@ -52,6 +52,18 @@ def main() -> None:
     (ROOT / "build").mkdir(exist_ok=True)
     os.environ["PRISMIX_BUILD_VERSION"] = version
     PyInstaller.__main__.run(args)
+    if sys.platform == "darwin":
+        register_scheme(ROOT / "dist" / "Prismix.app")
+
+
+def register_scheme(app: Path) -> None:
+    """Let prismix://join links from the cloud open this app (PyInstaller's CLI cannot add URL types)."""
+    import plistlib
+
+    path = app / "Contents" / "Info.plist"
+    info = plistlib.loads(path.read_bytes())
+    info["CFBundleURLTypes"] = [{"CFBundleURLName": "com.rsx.prismix", "CFBundleURLSchemes": ["prismix"]}]
+    path.write_bytes(plistlib.dumps(info))
 
 
 if __name__ == "__main__":

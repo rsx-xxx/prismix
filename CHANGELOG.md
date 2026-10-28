@@ -4,6 +4,11 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.0.51
+
+- Band Cloud: one kind of link for everyone. Paste the invite link in the desktop app (no address or admin token field) and you can play and publish. Removing a song for everyone stays with the cloud admin.
+- Clicking the link on a computer opens the Prismix app and signs it in, or the web player when the app is not installed.
+
 ## 0.0.50
 
 - Homebrew: the cask uses the current `postflight_steps` form, so `brew install --cask prismix` no longer prints the deprecated `postflight` warning.

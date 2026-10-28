@@ -16,6 +16,10 @@ import uvicorn
 from .config import DATA_DIR
 
 TITLE = "Prismix"
+SCHEME = "prismix://"
+_window = None
+_pending: list[str] = []
+_handler = None  # the Apple event handler must outlive main()
 
 
 def _free_port() -> int:
@@ -54,6 +58,56 @@ def selftest() -> None:
     print("selftest ok; js runtime:", list(js_runtime()))
 
 
+def open_link(link: str) -> None:
+    """A clicked prismix://join link: sign in to the cloud, then reload the page. Held until the window exists."""
+    import json
+
+    if _window is None:
+        _pending.append(link)
+        return
+    from . import cloud
+
+    try:
+        cloud.accept_link(link)
+        _window.evaluate_js("location.reload()")
+    except cloud.CloudError as e:
+        _window.evaluate_js(f"alert({json.dumps(str(e))})")
+    except Exception:
+        logging.getLogger(__name__).exception("could not open the link")
+
+
+def _watch_links() -> None:
+    """macOS delivers a clicked prismix:// link to the running app as an Apple event; Windows starts the app with it as an argument."""
+    for arg in sys.argv[1:]:
+        if arg.startswith(SCHEME):
+            _pending.append(arg)
+    if sys.platform != "darwin":
+        return
+    try:
+        from Foundation import NSAppleEventManager, NSObject
+
+        def code(c: bytes) -> int:
+            return int.from_bytes(c, "big")
+
+        class LinkHandler(NSObject):
+            def handleURL_withReply_(self, event, reply):  # noqa: N802 - Objective-C selector
+                link = event.paramDescriptorForKeyword_(code(b"----")).stringValue()
+                if link and link.startswith(SCHEME):
+                    open_link(str(link))
+
+        global _handler
+        _handler = LinkHandler.alloc().init()
+        NSAppleEventManager.sharedAppleEventManager().setEventHandler_andSelector_forEventClass_andEventID_(
+            _handler, b"handleURL:withReply:", code(b"GURL"), code(b"GURL"))
+    except Exception:
+        logging.getLogger(__name__).exception("link handler unavailable")
+
+
+def _window_ready() -> None:
+    while _pending:
+        open_link(_pending.pop(0))
+
+
 def main() -> None:
     if "--selftest" in sys.argv:
         selftest()
@@ -72,12 +126,14 @@ def main() -> None:
     from . import lan
 
     lan_server = lan.start(app)
+    _watch_links()
     try:
         import webview
 
         webview.settings["ALLOW_DOWNLOADS"] = True
-        webview.create_window(TITLE, url, width=1280, height=840, min_size=(900, 600))
-        webview.start()
+        global _window
+        _window = webview.create_window(TITLE, url, width=1280, height=840, min_size=(900, 600))
+        webview.start(_window_ready)
     except Exception:
         logging.getLogger(__name__).exception("native window unavailable, opening the browser")
         from .browser import open_url

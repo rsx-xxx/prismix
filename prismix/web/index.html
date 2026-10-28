@@ -340,14 +340,13 @@
   <dialog id="cloud-dialog">
     <div class="pl-head"><h3>Band Cloud</h3><button class="icon-btn" id="cloud-close" type="button" aria-label="Close">×</button></div>
     <form id="cloud-form" class="band-pane">
-      <p class="muted">Sign in with the admin token to publish. Members only play, so give them an invite link instead.</p>
-      <label class="band-row">Address <input id="cloud-url" type="text" maxlength="300" placeholder="band.example.com" spellcheck="false" autocomplete="off"></label>
-      <label class="band-row">Admin token <input id="cloud-token" type="password" maxlength="200" spellcheck="false" autocomplete="off"></label>
+      <p class="muted">Paste the invite link. Everyone with the link can play and publish songs.</p>
+      <label class="band-row">Invite link <input id="cloud-link" type="password" maxlength="2000" placeholder="https://…/join?t=…" spellcheck="false" autocomplete="off"></label>
       <button class="btn primary" type="submit">Sign in</button>
       <p id="cloud-err" class="muted" role="alert"></p>
     </form>
     <div id="cloud-signed" class="band-pane" hidden>
-      <p>Signed in to <b id="cloud-who"></b> as admin.</p>
+      <p>Signed in to <b id="cloud-who"></b>.</p>
       <button class="btn ghost" id="cloud-out" type="button">Sign out</button>
     </div>
   </dialog>

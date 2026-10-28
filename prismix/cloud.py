@@ -1,8 +1,8 @@
-"""Band Cloud client: sign in as the admin, publish processed songs, read the committed library.
+"""Band Cloud client: sign in with an invite link, publish processed songs, read the committed library.
 
-The cloud is a private store with one admin token (publish) and read-only member tokens. Songs stay invisible
-until their commit. This module holds the credential in the user data folder, talks to the API with it, and
-proxies reads so the desktop page never needs the token.
+The cloud is a private store. Every invite link lets its holder play and publish; removing a song stays with the
+cloud's admin. Songs stay invisible until their commit. This module holds the credential in the user data folder,
+talks to the API with it, and proxies reads so the desktop page never needs the token.
 """
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ from . import analysis, export, library, tabdata, tagging
 from .config import DATA_DIR, MODELS
 
 CRED_FILE = DATA_DIR / "band_cloud.json"
-PROBE_ID = "AAAAAAAAAAA"  # a well-formed id that is never published: the admin check only reads the status code
 PART_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$")
 STEM_FORMAT = "m4a128"  # AAC plays in every phone browser; 128k keeps a six-stem song near 25 MB
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
@@ -37,26 +36,22 @@ class CloudError(Exception):
         self.status = status
 
 
-def parse_credential(text: str, url: str = "") -> tuple[str, str]:
-    """(origin, token) from an invite link, a link plus token, or a bare token with the address typed separately."""
-    text, url = text.strip(), url.strip()
-    token = text
-    base = url
-    if "://" in text:
-        parts = urlsplit(text)
-        token = (parse_qs(parts.query).get("t") or [""])[0].strip()
-        base = base or f"{parts.scheme}://{parts.netloc}"
-    if not base:
-        raise CloudError("Type the cloud address")
-    if "://" not in base:
-        base = "https://" + base
-    parts = urlsplit(base)
-    host = parts.hostname or ""
-    if not host or parts.scheme not in ("https", "http") or (parts.scheme == "http" and host not in LOCAL_HOSTS):
+def parse_credential(text: str) -> tuple[str, str]:
+    """(origin, token) from an invite link: https://host/join?t=... or prismix://join?o=https://host&t=..."""
+    text = text.strip()
+    parts = urlsplit(text)
+    if parts.scheme not in ("https", "http", "prismix"):
+        raise CloudError("Paste the invite link")
+    query = parse_qs(parts.query)
+    token = (query.get("t") or [""])[0].strip()
+    base = (query.get("o") or [""])[0].strip() if parts.scheme == "prismix" else f"{parts.scheme}://{parts.netloc}"
+    base_parts = urlsplit(base)
+    host = base_parts.hostname or ""
+    if not host or base_parts.scheme not in ("https", "http") or (base_parts.scheme == "http" and host not in LOCAL_HOSTS):
         raise CloudError("The cloud address must be https")
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,128}", token):
-        raise CloudError("That token does not look right")
-    return f"{parts.scheme}://{parts.netloc}", token
+        raise CloudError("That link does not look right")
+    return f"{base_parts.scheme}://{base_parts.netloc}", token
 
 
 def valid_path(rel: str) -> bool:
@@ -108,9 +103,9 @@ class Cloud:
         except httpx.HTTPError:
             raise CloudError("The cloud is not answering", 502) from None
         if r.status_code == 401:
-            raise CloudError("The cloud refused this token", 401)
+            raise CloudError("The cloud refused this link", 401)
         if r.status_code == 403:
-            raise CloudError("This token cannot publish: use the admin token", 403)
+            raise CloudError("Only the cloud admin can do that", 403)
         if r.status_code == 429:
             raise CloudError("Too many failed attempts, try again in a few minutes", 429)
         return r
@@ -125,15 +120,6 @@ class Cloud:
         r = self.request("GET", f"/api/v1/songs/{song_id}/manifest.json")
         return r.json() if r.status_code == 200 else None
 
-    def verify_admin(self) -> None:
-        """Raises unless the token may publish. An empty commit is refused as malformed for the admin and as forbidden for a member."""
-        self.index()
-        r = self.http.post(f"/api/v1/songs/{PROBE_ID}/commit", json={})
-        if r.status_code == 403:
-            raise CloudError("That is a member token. Publishing needs the admin token", 403)
-        if r.status_code != 400:
-            raise CloudError(f"The cloud answered {r.status_code}", 502)
-
     def put_file(self, song_id: str, rel: str, data: bytes, sha: str) -> None:
         r = self.request("PUT", f"/api/v1/songs/{song_id}/files/{rel}", content=data, headers={"X-Sha256": sha})
         if r.status_code != 200:
@@ -147,19 +133,23 @@ class Cloud:
             raise CloudError(f"Commit failed ({r.status_code})", 502)
         return r.json()
 
-    def delete(self, song_id: str) -> bool:
-        return self.request("DELETE", f"/api/v1/songs/{song_id}").status_code == 200
 
-
-def connect(url: str, token: str) -> Cloud:
-    origin, token = parse_credential(token, url)
+def connect(link: str) -> Cloud:
+    origin, token = parse_credential(link)
     cloud = Cloud(origin, token)
     try:
-        cloud.verify_admin()
+        cloud.index()  # a refused link fails here, before it is saved
     except CloudError:
         cloud.close()
         raise
     return cloud
+
+
+def accept_link(link: str) -> None:
+    """Sign in from a clicked or pasted invite link."""
+    cl = connect(link)
+    save_credential(cl.url, cl.token)
+    cl.close()
 
 
 def current() -> Cloud | None:

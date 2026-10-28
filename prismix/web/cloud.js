@@ -1,4 +1,4 @@
-// Band Cloud on the desktop: sign in with the admin token, publish processed songs, and play the committed library.
+// Band Cloud on the desktop: sign in with an invite link, publish processed songs, and play the committed library.
 export function createCloud({ $, el, api, notice, fmt }) {
   const state = { signedIn: false, host: '', songs: [], jobs: new Map(), playing: null };
   const audio = $('cloud-audio');
@@ -29,17 +29,12 @@ export function createCloud({ $, el, api, notice, fmt }) {
     $('cloud-list').replaceChildren(...state.songs.map((s) => {
       const play = el('button', { className: 'btn small', type: 'button', textContent: state.playing === s.id ? 'Pause' : 'Play' });
       play.addEventListener('click', () => toggle(s));
-      const del = el('button', { className: 'btn small ghost', type: 'button', textContent: 'Unpublish' });
-      del.addEventListener('click', async () => {
-        if (!confirm(`Remove "${s.title}" from the cloud for everyone?`)) return;
-        try { await api(`/api/cloud/songs/${s.id}`, { method: 'DELETE' }); await refresh(); } catch (e) { notice(e.message); }
-      });
       return el('li', { className: 'cloud-row' },
         el('img', { className: 'cloud-cover', alt: '', loading: 'lazy', src: fileUrl(s.id, 'cover.jpg') }),
         el('div', { className: 'cloud-text' },
           el('b', { textContent: s.title || s.id }),
           el('span', { className: 'muted', textContent: `${s.artist || ''} · ${fmt(s.duration)} · ${(s.bytes / 1048576).toFixed(1)} MB` })),
-        play, del);
+        play);
     }));
   }
 
@@ -82,7 +77,7 @@ export function createCloud({ $, el, api, notice, fmt }) {
   // ── sign-in ──
   function openLogin() {
     $('cloud-err').textContent = '';
-    $('cloud-token').value = '';
+    $('cloud-link').value = '';
     $('cloud-signed').hidden = !state.signedIn;
     $('cloud-form').hidden = state.signedIn;
     $('cloud-who').textContent = state.host;
@@ -95,8 +90,8 @@ export function createCloud({ $, el, api, notice, fmt }) {
     const err = $('cloud-err');
     err.textContent = 'Checking…';
     try {
-      await post('/api/cloud/login', { url: $('cloud-url').value, token: $('cloud-token').value });
-      $('cloud-token').value = '';
+      await post('/api/cloud/login', { link: $('cloud-link').value });
+      $('cloud-link').value = '';
       $('cloud-dialog').close();
       await refresh();
     } catch (x) { err.textContent = x.message; }

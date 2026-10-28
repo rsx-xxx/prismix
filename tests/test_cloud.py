@@ -10,13 +10,13 @@ from prismix import cloud, export, library, server, tagging
 
 VID = "dQw4w9WgXcQ"
 TOKEN = "A" * 43
+LINK = f"https://band.test/join?t={TOKEN}"
 
 
 class FakeCloud:
     """Just enough of the band cloud API: a bearer check, uploads kept in memory, and a commit that checks them."""
 
-    def __init__(self, admin=True):
-        self.admin = admin
+    def __init__(self):
         self.files: dict[str, bytes] = {}
         self.committed: dict | None = None
         self.puts: list[str] = []
@@ -27,8 +27,6 @@ class FakeCloud:
         path = req.url.path
         if path == "/api/v1/index.json":
             return httpx.Response(200, json={"songs": [{"id": VID, "title": "T"}]})
-        if req.method in ("PUT", "POST", "DELETE") and not self.admin:
-            return httpx.Response(403, json={"error": "forbidden"})
         if req.method == "PUT":
             rel = path.split("/files/", 1)[1]
             if hashlib.sha256(req.content).hexdigest() != req.headers["x-sha256"]:
@@ -64,14 +62,14 @@ def cloud_for(fake):
 
 
 def test_parse_credential():
-    assert cloud.parse_credential(TOKEN, "band.test") == ("https://band.test", TOKEN)
     assert cloud.parse_credential(f"https://band.test/join?t={TOKEN}") == ("https://band.test", TOKEN)
     assert cloud.parse_credential(f"  https://band.test:8443/join?t={TOKEN}  ")[0] == "https://band.test:8443"
-    assert cloud.parse_credential(TOKEN, "http://localhost:9000")[0] == "http://localhost:9000"
-    for url, tok in [("http://band.test", TOKEN), ("", TOKEN), ("band.test", "short"), ("band.test", "bad token!" * 5),
-                     ("ftp://band.test", TOKEN)]:
+    assert cloud.parse_credential(f"prismix://join?o=https%3A%2F%2Fband.test&t={TOKEN}") == ("https://band.test", TOKEN)
+    assert cloud.parse_credential(f"http://localhost:9000/join?t={TOKEN}")[0] == "http://localhost:9000"
+    for link in [f"http://band.test/join?t={TOKEN}", TOKEN, "https://band.test/join?t=short", "https://band.test/join",
+                 f"ftp://band.test/join?t={TOKEN}", f"prismix://join?o=http%3A%2F%2Fband.test&t={TOKEN}", f"prismix://join?t={TOKEN}"]:
         with pytest.raises(cloud.CloudError):
-            cloud.parse_credential(tok, url)
+            cloud.parse_credential(link)
 
 
 def test_valid_path():
@@ -90,12 +88,15 @@ def test_credential_file_is_private(tmp_path, monkeypatch):
     assert cloud.load_credential() is None
 
 
-def test_verify_admin_accepts_admin_and_refuses_member_or_bad_token():
-    cloud_for(FakeCloud(admin=True)).verify_admin()
-    with pytest.raises(cloud.CloudError, match="member"):
-        cloud_for(FakeCloud(admin=False)).verify_admin()
-    with pytest.raises(cloud.CloudError, match="refused"):
-        cloud.Cloud("https://band.test", "B" * 43, transport=httpx.MockTransport(FakeCloud())).verify_admin()
+def test_connect_refuses_a_bad_link():
+    real = cloud.Cloud
+    try:
+        cloud.Cloud = lambda url, token, **kw: real(url, token, transport=httpx.MockTransport(FakeCloud()))
+        cloud.connect(f"https://band.test/join?t={TOKEN}").close()
+        with pytest.raises(cloud.CloudError, match="refused"):
+            cloud.connect(f"https://band.test/join?t={'B' * 43}")
+    finally:
+        cloud.Cloud = real
 
 
 def seed_song(tmp_path, monkeypatch, stems=("vocals", "drums")):
@@ -154,12 +155,6 @@ def test_publisher_reports_errors_and_done(tmp_path, monkeypatch):
             break
         time.sleep(0.05)
     assert pub.get(jid)["state"] == "done"
-    bad = pub.start(cloud_for(FakeCloud(admin=False)), VID, "htdemucs_ft")
-    for _ in range(100):
-        if pub.get(bad)["state"] != "running":
-            break
-        time.sleep(0.05)
-    assert pub.get(bad)["state"] == "error" and "admin" in pub.get(bad)["error"]
 
 
 # ── the desktop's own API ──
@@ -180,9 +175,9 @@ def api(tmp_path, monkeypatch):
 def test_login_flow_and_proxy(api):
     assert api.get("/api/cloud").json() == {"signedIn": False, "host": ""}
     assert api.get("/api/cloud/index").status_code == 401
-    assert api.post("/api/cloud/login", json={"url": "band.test", "token": "short"}).status_code == 400
-    assert api.post("/api/cloud/login", json={"url": "band.test", "token": "B" * 43}).status_code == 401
-    r = api.post("/api/cloud/login", json={"url": "band.test", "token": TOKEN})
+    assert api.post("/api/cloud/login", json={"link": "short"}).status_code == 400
+    assert api.post("/api/cloud/login", json={"link": f"https://band.test/join?t={'B' * 43}"}).status_code == 401
+    r = api.post("/api/cloud/login", json={"link": LINK})
     assert r.json() == {"signedIn": True, "host": "band.test"}
     assert TOKEN not in json.dumps(api.get("/api/cloud").json())
     assert api.get("/api/cloud/index").json()["songs"][0]["id"] == VID
@@ -196,7 +191,7 @@ def test_login_flow_and_proxy(api):
 
 def test_publish_endpoint(api, tmp_path, monkeypatch):
     seed_song(tmp_path / "lib", monkeypatch)
-    api.post("/api/cloud/login", json={"url": "band.test", "token": TOKEN})
+    api.post("/api/cloud/login", json={"link": LINK})
     assert api.post("/api/cloud/publish", json={"videoId": VID, "model": "mix"}).status_code == 404
     job = api.post("/api/cloud/publish", json={"videoId": VID, "model": "htdemucs_ft"}).json()["job"]
     for _ in range(100):

@@ -35,3 +35,8 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 [Run]
 Filename: "{app}\Prismix.exe"; Description: "Launch Prismix"; Flags: nowait postinstall skipifsilent
 Filename: "{app}\Prismix.exe"; Flags: nowait skipifnotsilent
+
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\prismix"; ValueType: string; ValueData: "URL:Prismix"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\prismix"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCU; Subkey: "Software\Classes\prismix\shell\open\command"; ValueType: string; ValueData: """{app}\Prismix.exe"" ""%1"""

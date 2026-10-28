@@ -136,8 +136,7 @@ class ExportRequest(BaseModel):
 
 
 class CloudLogin(BaseModel):
-    url: str = Field(default="", max_length=300)
-    token: str = Field(max_length=2000)
+    link: str = Field(max_length=2000)
 
 
 class CloudPublish(BaseModel):
@@ -299,7 +298,7 @@ def create_app() -> FastAPI:
             await old.http.aclose()
         return {"connected": False}
 
-    # ── Band Cloud: the admin credential lives on this computer, so only its own window may use these ──
+    # ── Band Cloud: the cloud credential lives on this computer, so only its own window may use these ──
     app.state.publisher = cloud.Publisher()
 
     def cloud_for(request: Request) -> cloud.Cloud:
@@ -319,11 +318,9 @@ def create_app() -> FastAPI:
     def cloud_login(body: CloudLogin, request: Request):
         own_window(request)
         try:
-            cl = cloud.connect(body.url, body.token)
+            cloud.accept_link(body.link)
         except cloud.CloudError as e:
             raise HTTPException(e.status, str(e)) from None
-        cloud.save_credential(cl.url, cl.token)
-        cl.close()
         return cloud_status(request)
 
     @app.post("/api/cloud/logout")
@@ -377,18 +374,6 @@ def create_app() -> FastAPI:
         if not job:
             raise HTTPException(404, "Unknown job")
         return {k: v for k, v in job.items() if k != "at"}
-
-    @app.delete("/api/cloud/songs/{video_id}")
-    def cloud_unpublish(video_id: str, request: Request):
-        cl = cloud_for(request)
-        try:
-            if not library.VIDEO_ID_RE.match(video_id):
-                raise HTTPException(404, "Not found")
-            return {"ok": cl.delete(video_id)}
-        except cloud.CloudError as e:
-            raise HTTPException(e.status, str(e)) from None
-        finally:
-            cl.close()
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
