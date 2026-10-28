@@ -4,6 +4,10 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.0.46
+
+- Fixed the Settings button doing nothing in the desktop app: the panel no longer depends on the browser popover feature, and closes on an outside click or Esc.
+
 ## 0.0.45
 
 - Band Cloud: sign in with the admin token on the computer to publish a processed song to your private band cloud, and see the cloud library beside the local one. The Android app has a new Band Cloud section: paste a member invite link, then browse, stream with seeking and download. The LAN connection page is unchanged.

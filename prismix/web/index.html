@@ -30,7 +30,7 @@
     <button class="btn ghost" id="queue-btn" type="button" title="Songs being prepared" hidden>Queue</button>
     <button class="btn ghost" id="cloud-btn" type="button" title="Publish songs to your private band cloud and play them from anywhere">Cloud sign-in</button>
     <button class="btn ghost" id="band-btn" type="button" title="Play with phones or another Prismix computer on this Wi-Fi">Band</button>
-    <button class="icon-btn" id="settings-btn" type="button" popovertarget="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+    <button class="icon-btn" id="settings-btn" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
   </header>
 
   <main>
@@ -396,7 +396,7 @@
     <p class="muted" id="queue-empty" hidden>Nothing is being processed.</p>
   </dialog>
 
-  <div id="settings" class="pop" popover>
+  <div id="settings" class="pop" hidden>
     <div class="pl-head"><h3>Settings</h3><button class="icon-btn" id="settings-close" type="button" aria-label="Close">×</button></div>
     <div class="set-row"><span>Notes</span><select id="acc-sel" aria-label="Flats or sharps"><option value="auto">Auto (by key)</option><option value="flat">Flats ♭</option><option value="sharp">Sharps ♯</option></select></div>
     <div class="set-row"><span>Theme</span><button class="icon-btn" id="theme-btn" type="button" aria-label="Theme"></button></div>

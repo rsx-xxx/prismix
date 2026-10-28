@@ -1191,17 +1191,22 @@ window.addEventListener('keyup', (e) => {
   e.preventDefault();
 });
 
-// a popover hung under the button: no backdrop, light-dismiss (outside click, Esc), the page behind stays usable
-$('settings').addEventListener('beforetoggle', (e) => {
-  if (e.newState !== 'open') return;
-  const r = $('settings-btn').getBoundingClientRect(), box = $('settings').style;
+// a panel hung under the button: no backdrop, closes on an outside click or Esc, the page behind stays usable
+const settingsPanel = $('settings');
+const closeSettings = () => { settingsPanel.hidden = true; };
+$('settings-btn').addEventListener('click', () => {
+  if (!settingsPanel.hidden) return closeSettings();
+  const r = $('settings-btn').getBoundingClientRect(), box = settingsPanel.style;
   box.top = `${Math.round(r.bottom + 8)}px`;
   box.right = `${Math.max(8, Math.round(innerWidth - r.right))}px`;
+  settingsPanel.hidden = false;
 });
-$('settings-close').addEventListener('click', () => $('settings').hidePopover());
+document.addEventListener('pointerdown', (e) => { if (!settingsPanel.hidden && !e.target.closest('#settings, #settings-btn')) closeSettings(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !settingsPanel.hidden) closeSettings(); });
+$('settings-close').addEventListener('click', closeSettings);
 $('acc-sel').value = getAccidentals();
 $('acc-sel').addEventListener('change', () => { setAccidentals($('acc-sel').value); window.dispatchEvent(new Event('accidentals')); });
-$('help-btn').addEventListener('click', () => { $('settings').hidePopover(); cheats.toggle(); });
+$('help-btn').addEventListener('click', () => { closeSettings(); cheats.toggle(); });
 window.addEventListener('beforeunload', savePrefs);
 
 // ── boot ──
