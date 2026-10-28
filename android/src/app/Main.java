@@ -102,12 +102,24 @@ public class Main extends Activity {
     private ExecutorService pool;
     private static Main current;
 
+    /** A locally built APK may carry a member invite: take it once, so signing out stays signed out. */
+    private void importEmbeddedInvite() {
+        if (prefs.getBoolean("embeddedDone", false)) return;
+        String invite = Embedded.invite(this);
+        if (invite == null) return;
+        try {
+            Cloud.save(prefs, Cloud.parse(invite, ""));
+            prefs.edit().putBoolean("embeddedDone", true).apply();
+        } catch (Cloud.Failure e) { /* a bad embedded invite: the sign-in screen is still there */ }
+    }
+
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         current = this;
         bars(BG, false);
         prefs = getSharedPreferences("band", MODE_PRIVATE);
+        importEmbeddedInvite();
 
         web = new WebView(this);
         web.setBackgroundColor(Color.parseColor(BG));

@@ -145,6 +145,7 @@ export function createTab({ player, chordsIn = () => [] }) {
       const cell = el('div', { className: 'tbar', style: `flex:${w} 1 0` }, el('span', { className: 'n', textContent: String(i + 1) }));
       cell.dataset.t0 = String(starts[i]);
       cell.dataset.t1 = String(ends[i]);
+      if (tb.auto) { cell.classList.add('auto'); cell.title = 'Filled in from a matching bar'; }
       if (tb.mark) cell.append(el('span', { className: 'tag', textContent: tb.mark }));
       const chs = el('div', { className: 'tch' });
       if (j != null) {

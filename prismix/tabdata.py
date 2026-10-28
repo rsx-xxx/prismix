@@ -19,7 +19,7 @@ from difflib import SequenceMatcher
 
 import httpx
 
-from . import analysis, library, tabs
+from . import analysis, library, tabfill, tabs
 
 log = logging.getLogger(__name__)
 
@@ -173,6 +173,7 @@ def import_soundslice(video_id: str, url: str) -> dict:
     fitted = fit(parts, structure)
     if not fitted:
         raise TabDataError("That tab does not look like this recording")
+    gapfill(parts, fitted, structure)
     result = {
         "found": True, "v": FORMAT, "source": "soundslice", "songId": code, "url": f"https://www.soundslice.com/slices/{code}/",
         "artist": " ".join((head.get("a") or "").split()), "title": " ".join((head.get("name") or "").split()), **fitted,
@@ -391,6 +392,13 @@ def fit(parts: dict[str, dict], structure: dict) -> dict | None:
     return {"similarity": round(sim, 3), "coverage": round(cover, 3), "map": pair, "shift": -t if t <= 6 else 12 - t}
 
 
+def gapfill(parts: dict[str, dict], fitted: dict, structure: dict) -> None:
+    """Fill the bars the tab left out from its own repeats (see tabfill); updates `fitted` with the new map."""
+    fitted["map"], fitted["filled"] = tabfill.fill(parts, fitted["map"], _bar_chroma(structure))
+    if fitted["filled"]["copied"] or fitted["filled"]["inserted"]:
+        log.info("tab gaps filled: %s", fitted["filled"])
+
+
 def retune(parts: dict[str, dict], semitones: int) -> None:
     """Move every note by `semitones` in place, an octave back where the fret would leave the neck."""
     if not semitones:
@@ -479,7 +487,7 @@ def _clean_bars(bars, strings: int) -> list[dict]:
         if not 0 < length <= 8:
             raise TabDataError("Bad tab")
         bar = {"len": round(length, 4), "n": sorted(notes, key=lambda x: x[0])}
-        for k in ("sig", "mark"):
+        for k in ("sig", "mark", "auto"):
             if k in b:
                 bar[k] = b[k]
         out.append(bar)
@@ -584,6 +592,7 @@ def lookup(video_id: str, *, force: bool = False) -> dict:
             continue
         fitted = fit(parts, structure)
         if fitted:
+            gapfill(parts, fitted, structure)
             retune(parts, fitted["shift"])
             result = {
                 "found": True, "v": FORMAT, "source": "songsterr", "songId": song["songId"],

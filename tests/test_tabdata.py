@@ -1,6 +1,6 @@
 import pytest
 
-from prismix import tabdata
+from prismix import tabdata, tabfill
 
 TUNING = [64, 59, 55, 50, 45, 40]  # string 0 is the highest
 
@@ -188,3 +188,35 @@ def test_compact_keeps_techniques_and_clean_bars_preserves_them():
     assert bar["n"][0] == [0.0, 0.25, [[0, 3, "s"]], {"lr": 1, "bpm": 70}]
     assert bar["n"][1][2] == [[0, 3, "t"], [1, 0, "x"]]
     assert tabdata._clean_bars([bar], 6)[0]["n"] == bar["n"]
+
+
+def _fill_parts(rest):
+    def bar(r):
+        return {"len": 1.0, "n": [] if r is None else [[0.0, 0.25, [[5, (r - 40) % 12]]]]}
+    return {"guitar": {"kind": "guitar", "tuning": TUNING, "bars": [bar(r) for r in rest]}}
+
+
+def test_fill_copies_matching_bar_into_resting_hole():
+    roots = [0, 5, 0, 5, 0, 5]
+    parts = _fill_parts([0, 5, None, 5, 0, 5])
+    rec = tabdata._bar_chroma(_structure(roots))
+    tmap, stats = tabfill.fill(parts, list(range(6)), rec)
+    assert tmap == list(range(6)) and stats["copied"] == 1 and stats["open"] == []
+    hole = parts["guitar"]["bars"][2]
+    assert hole["auto"] == 1 and hole["n"] == parts["guitar"]["bars"][0]["n"]
+
+
+def test_fill_leaves_hole_without_similar_bar():
+    parts = _fill_parts([0, 5, None, 5])
+    rec = tabdata._bar_chroma(_structure([0, 5, 7, 5]))
+    _, stats = tabfill.fill(parts, list(range(4)), rec)
+    assert stats["copied"] == 0 and stats["open"] == [[2, 2]]
+    assert parts["guitar"]["bars"][2]["n"] == []
+
+
+def test_fill_inserts_bars_for_skipped_repeat_and_tail():
+    parts = _fill_parts([0, 5, 0, 5])
+    rec = tabdata._bar_chroma(_structure([0, 5, 0, 5, 0, 5]))
+    tmap, stats = tabfill.fill(parts, [0, 1, 2, 3], rec)
+    assert stats["inserted"] == 2 and tmap == [0, 1, 2, 3, 4, 5]
+    assert len(parts["guitar"]["bars"]) == 6 and parts["guitar"]["bars"][5]["auto"] == 1

@@ -5,8 +5,19 @@ cd "$(dirname "$0")"
 SDK=${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}
 BT=$SDK/build-tools/34.0.0
 JAR=$SDK/platforms/android-34/android.jar
-rm -rf build && mkdir -p build/classes
-javac --release 8 -g:none -Xlint:-options -cp "$JAR:lib/zxing-core-3.5.3.jar" -d build/classes src/app/*.java
+rm -rf build && mkdir -p build/classes build/gen build/assets
+# A member invite can be baked in, encrypted, from a gitignored file. CI has no such file, so published builds carry none.
+INVITE_FILE=${PRISMIX_INVITE_FILE:-../files/secrets/band_member.env}
+KEYHEX=
+if [ -f "$INVITE_FILE" ]; then
+  KEYHEX=$(openssl rand -hex 16); IVHEX=$(openssl rand -hex 16)
+  INVITE=$(sed -n 's/^BAND_INVITE=//p' "$INVITE_FILE" | head -1 | tr -d '"\r\n')
+  { printf '%s' "$IVHEX" | xxd -r -p; printf '%s' "$INVITE" | openssl enc -aes-128-cbc -K "$KEYHEX" -iv "$IVHEX"; } > build/assets/cloud.bin
+  echo "embedding an encrypted member invite" >&2
+fi
+sed "s/@@KEY@@/$KEYHEX/" src/app/Embedded.java > build/gen/Embedded.java
+SRC=$(ls src/app/*.java | grep -v '/Embedded.java$')
+javac --release 8 -g:none -Xlint:-options -cp "$JAR:lib/zxing-core-3.5.3.jar" -d build/classes $SRC build/gen/Embedded.java
 $BT/d8 --min-api 24 --lib "$JAR" --output build $(find build/classes -name '*.class') lib/zxing-core-3.5.3.jar
 VN=${PRISMIX_VERSION:-}
 VN=${VN#v}

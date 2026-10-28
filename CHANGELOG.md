@@ -4,6 +4,11 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.0.47
+
+- Tabs: bars where the recording plays but the tab rests (an instrument dropping out mid-song, a tab that stops early or skips a repeated section) are now filled from the tab's own bars that match the recording's chords almost exactly. Filled bars have a dashed outline; anything without a close match stays empty.
+- Android: a build can carry an encrypted read-only Band Cloud invite from a local, untracked file, so the app signs in on first launch. The public release build contains none.
+
 ## 0.0.46
 
 - Fixed the Settings button doing nothing in the desktop app: the panel no longer depends on the browser popover feature, and closes on an outside click or Esc.
