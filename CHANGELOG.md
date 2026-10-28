@@ -4,6 +4,10 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.0.48
+
+- Android: Band Cloud sign-in is one field now. Paste the invite link; it already carries the cloud address and the token, so nothing else is asked.
+
 ## 0.0.47
 
 - Tabs: bars where the recording plays but the tab rests (an instrument dropping out mid-song, a tab that stops early or skips a repeated section) are now filled from the tab's own bars that match the recording's chords almost exactly. Filled bars have a dashed outline; anything without a close match stays empty.

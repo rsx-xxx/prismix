@@ -46,7 +46,7 @@ final class Cloud {
             token = m != null && m.find() ? m.group(1) : "";
             if (base.isEmpty() && u.getScheme() != null && u.getRawAuthority() != null) base = u.getScheme() + "://" + u.getRawAuthority();
         }
-        if (base.isEmpty()) throw new Failure("Type the cloud address");
+        if (base.isEmpty()) throw new Failure("Paste the whole invite link");
         if (!base.contains("://")) base = "https://" + base;
         URI u = uri(base);
         String host = u.getHost();

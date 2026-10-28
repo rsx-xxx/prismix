@@ -646,7 +646,7 @@ public class Main extends Activity {
         panel.addView(b);
     }
 
-    /** Sign in to the private cloud with an invite link or a member token; once signed in, open the player. */
+    /** Sign in to the private cloud with an invite link (it carries the address and the token); once signed in, open the player. */
     private void showCloud(String problem) {
         stopSearch();
         ++gen;
@@ -664,17 +664,15 @@ public class Main extends Activity {
             out.setOnClickListener(v -> signOutCloud());
             panel.addView(out);
         }
-        final EditText link = field("Invite link or member token");
-        final EditText addr = field("Cloud address (only with a bare token)");
+        final EditText link = field("Invite link");
         final Button in = button(have == null ? "Sign in" : "Sign in with another invite", have == null);
         in.setOnClickListener(v -> {
             in.setEnabled(false);
             err.setText("");
-            signInCloud(link.getText().toString(), addr.getText().toString(), err, in);
+            signInCloud(link.getText().toString(), "", err, in);
         });
         link.setOnEditorActionListener((v, a, ev) -> { in.performClick(); return true; });
         panel.addView(link, fieldParams());
-        panel.addView(addr, fieldParams());
         panel.addView(in);
         panel.addView(err);
         Button lan = button("LAN connections", false);
