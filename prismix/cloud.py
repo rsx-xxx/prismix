@@ -240,12 +240,15 @@ class Publisher:
                     return jid
             self.jobs = {k: v for k, v in self.jobs.items() if v["state"] == "running" or time.time() - v["at"] < 600}
             jid = uuid.uuid4().hex[:12]
-            job = self.jobs[jid] = {"id": jid, "videoId": video_id, "model": model, "state": "running", "step": "", "done": 0, "total": 0, "at": time.time()}
+            job = self.jobs[jid] = {"id": jid, "videoId": video_id, "model": model, "state": "running", "step": "", "done": 0, "total": 0, "at": time.time(),
+                                    "stop": threading.Event()}
         threading.Thread(target=self._run, args=(job, cloud), daemon=True).start()
         return jid
 
     def _run(self, job: dict, cloud: Cloud) -> None:
         def progress(step, done, total):
+            if job["stop"].is_set():
+                raise CloudError("Cancelled")  # files already sent stay invisible: a song shows up only at its commit
             job.update(step=step, done=done, total=total)
 
         try:
@@ -258,6 +261,13 @@ class Publisher:
         finally:
             job["at"] = time.time()
             cloud.close()
+
+    def cancel(self, jid: str) -> bool:
+        job = self.jobs.get(jid)
+        if not job or job["state"] != "running":
+            return False
+        job["stop"].set()
+        return True
 
     def get(self, jid: str) -> dict | None:
         return self.jobs.get(jid)

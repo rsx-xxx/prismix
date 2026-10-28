@@ -36,3 +36,30 @@ def test_urgent_job_pauses_running_one_and_resumes_it_after():
     assert err is None
     assert ends == [("end", "c"), ("end", "a"), ("end", "b")]
 
+
+
+def test_cancel_stops_a_running_job_and_drops_a_waiting_one():
+    async def run():
+        started = threading.Event()
+
+        def fake(job):
+            started.set()
+            while True:
+                job.update("separate", 0.5, "x")
+                threading.Event().wait(0.01)
+
+        m = jobs.JobManager()
+        m._execute = fake
+        m.start()
+        a, b = m.submit("a", "m"), m.submit("b", "m")
+        while not started.is_set():
+            await asyncio.sleep(0.01)
+        assert m.cancel(b.id) and b.error == "Cancelled" and b not in m._pending
+        assert m.cancel(a.id)
+        while not a.finished:
+            await asyncio.sleep(0.01)
+        await m.stop()
+        return a.error, m.cancel(a.id), m._running
+
+    err, again, running = asyncio.run(run())
+    assert err == "Cancelled" and again is False and running is None

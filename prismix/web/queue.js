@@ -26,6 +26,14 @@ export function createQueue({ $, api }) {
       bar.append(i);
       li.append(bar);
     }
+    if (j.stage !== 'done' && j.stage !== 'error') {
+      const stop = document.createElement('button');
+      stop.type = 'button';
+      stop.className = 'btn small ghost';
+      stop.textContent = 'Cancel';
+      stop.onclick = async () => { stop.disabled = true; try { await api(`/api/jobs/${j.id}/cancel`, { method: 'POST' }); } catch { /* already finished */ } refresh(); };
+      li.append(stop);
+    }
     if (j.stage === 'queued') {
       const go = document.createElement('button');
       go.type = 'button';

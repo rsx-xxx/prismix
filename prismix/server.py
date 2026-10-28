@@ -373,7 +373,14 @@ def create_app() -> FastAPI:
         job = app.state.publisher.get(job_id)
         if not job:
             raise HTTPException(404, "Unknown job")
-        return {k: v for k, v in job.items() if k != "at"}
+        return {k: v for k, v in job.items() if k not in ("at", "stop")}
+
+    @app.post("/api/cloud/publish/{job_id}/cancel")
+    def cloud_publish_cancel(job_id: str, request: Request):
+        own_window(request)
+        if not app.state.publisher.cancel(job_id):
+            raise HTTPException(404, "That upload already finished")
+        return {"ok": True}
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
@@ -771,6 +778,12 @@ def create_app() -> FastAPI:
     def jobs_promote(job_id: str):
         if not jobs.promote(job_id):
             raise HTTPException(404, "That job is not waiting any more")
+        return {"ok": True}
+
+    @app.post("/api/jobs/{job_id}/cancel")
+    def jobs_cancel(job_id: str):
+        if not jobs.cancel(job_id):
+            raise HTTPException(404, "That job already finished")
         return {"ok": True}
 
     @app.get("/api/jobs/{job_id}/events")

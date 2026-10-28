@@ -365,9 +365,15 @@ function trackJob(job) {
   const msg = el('span', { textContent: 'Queued' });
   const pct = el('span', { textContent: '0%' });
   const bar = el('i');
+  const stop = el('button', { className: 'btn small ghost', type: 'button', textContent: 'Cancel' });
+  stop.addEventListener('click', async () => {
+    stop.disabled = true;
+    try { await api(`/api/jobs/${job.id}/cancel`, { method: 'POST' }); } catch { /* already finished */ }
+  });
   box.replaceChildren(
     el('img', { src: ytThumb(job.videoId), alt: '' }),
     el('div', { className: 'body' }, title, el('div', { className: 'bar' }, bar), el('div', { className: 'row' }, msg, pct)),
+    stop,
   );
   box.hidden = false;
   box.classList.remove('fresh'); void box.offsetWidth; box.classList.add('fresh');
@@ -380,7 +386,7 @@ function trackJob(job) {
     pct.textContent = `${Math.round(j.progress * 100)}%`;
     msg.textContent = j.message || j.stage;
     if (j.stage === 'error') {
-      es.close(); box.hidden = true; notice(j.message || 'Processing failed');
+      es.close(); box.hidden = true; if (j.message !== 'Cancelled') notice(j.message || 'Processing failed');
     } else if (j.stage === 'done') {
       es.close(); box.hidden = true;
       await loadLibrary();

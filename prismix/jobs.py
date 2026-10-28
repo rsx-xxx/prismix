@@ -28,6 +28,10 @@ class Preempted(BaseException):
     """Raised inside a running job to hand the worker to an urgent one; BaseException so no stage swallows it."""
 
 
+class Cancelled(BaseException):
+    """Raised inside a running job when the user aborts it; BaseException so no stage swallows it."""
+
+
 @dataclass
 class Job:
     video_id: str
@@ -42,6 +46,7 @@ class Job:
     version: int = 0
     rush: bool = False
     preempt: bool = False
+    cancelled: bool = False
 
     @property
     def finished(self) -> bool:
@@ -60,6 +65,8 @@ class Job:
         }
 
     def update(self, stage: str, frac: float, message: str) -> None:
+        if self.cancelled:
+            raise Cancelled
         if self.preempt and stage != "analyze":  # analysis is short and a retry would skip it
             raise Preempted
         lo, hi = (0.0, 1.0) if stage == "analyze" and self.kind in ("analyze", "reanalyze") else STAGES.get(
@@ -116,6 +123,18 @@ class JobManager:
         self._promote(job)
         return True
 
+    def cancel(self, job_id: str) -> bool:
+        """Abort a waiting job at once, or a running one at its next progress report."""
+        job = self._jobs.get(job_id)
+        if not job or job.finished:
+            return False
+        job.cancelled = True
+        if job in self._pending:
+            self._pending.remove(job)
+            job.error = "Cancelled"
+            job.version += 1
+        return True
+
     def _rush_end(self) -> int:
         return next((i for i, j in enumerate(self._pending) if not j.rush), len(self._pending))
 
@@ -157,6 +176,8 @@ class JobManager:
                 self._running = None
                 self._requeue(job)
                 continue
+            except Cancelled:
+                job.error = "Cancelled"
             except (pipeline.PipelineError, analysis.AnalysisError) as e:
                 job.error = str(e)
             except Exception as e:

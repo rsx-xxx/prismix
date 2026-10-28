@@ -61,17 +61,20 @@ export function createCloud({ $, el, api, notice, fmt }) {
   async function publish(item, model, button) {
     if (!state.signedIn) { openLogin(); return; }
     button.disabled = true;
+    const stop = el('button', { className: 'pub', type: 'button', textContent: '✕', title: 'Cancel the upload', ariaLabel: 'Cancel the upload' });
+    button.after(stop);
     try {
       const { job } = await post('/api/cloud/publish', { videoId: item.id, model });
+      stop.addEventListener('click', (e) => { e.stopPropagation(); stop.disabled = true; post(`/api/cloud/publish/${job}/cancel`).catch(() => {}); });
       for (;;) {
         const j = await api(`/api/cloud/publish/${job}`);
         button.textContent = j.state === 'running' && j.total ? `${j.done}/${j.total}` : '…';
         if (j.state === 'done') break;
-        if (j.state === 'error') { notice(j.error); break; }
+        if (j.state === 'error') { if (j.error !== 'Cancelled') notice(j.error); break; }
         await new Promise((r) => setTimeout(r, 700));
       }
       await refresh();
-    } catch (e) { notice(e.message); } finally { button.disabled = false; button.textContent = '↑'; }
+    } catch (e) { notice(e.message); } finally { stop.remove(); button.disabled = false; button.textContent = '↑'; }
   }
 
   // ── sign-in ──

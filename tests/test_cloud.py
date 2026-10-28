@@ -1,5 +1,6 @@
 import hashlib
 import json
+import threading
 import time
 
 import httpx
@@ -155,6 +156,30 @@ def test_publisher_reports_errors_and_done(tmp_path, monkeypatch):
             break
         time.sleep(0.05)
     assert pub.get(jid)["state"] == "done"
+
+
+def test_publish_can_be_cancelled(tmp_path, monkeypatch):
+    seed_song(tmp_path, monkeypatch)
+    fake = FakeCloud()
+    pub = cloud.Publisher()
+    gate = threading.Event()
+    real_put = cloud.Cloud.put_file
+
+    def slow_put(self, *a, **kw):
+        gate.wait(2)
+        return real_put(self, *a, **kw)
+
+    monkeypatch.setattr(cloud.Cloud, "put_file", slow_put)
+    jid = pub.start(cloud_for(fake), VID, "htdemucs_ft")
+    assert pub.cancel(jid)
+    gate.set()
+    for _ in range(100):
+        if pub.get(jid)["state"] != "running":
+            break
+        time.sleep(0.05)
+    assert pub.get(jid)["state"] == "error" and pub.get(jid)["error"] == "Cancelled"
+    assert fake.committed is None
+    assert not pub.cancel(jid)
 
 
 # ── the desktop's own API ──
