@@ -25,10 +25,11 @@ FORMATS: dict[str, tuple[str, str, list[str]]] = {
     "flac": ("flac", "audio/flac", ["-c:a", "flac", "-compression_level", "8"]),
     "mp3": ("mp3", "audio/mpeg", ["-c:a", "libmp3lame", "-q:a", "0"]),
     "m4a": ("m4a", "audio/mp4", ["-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart"]),
+    "m4a128": ("m4a", "audio/mp4", ["-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart"]),  # Band Cloud
     "ogg": ("ogg", "audio/ogg", ["-c:a", "libvorbis", "-q:a", "7"]),
     "opus": ("opus", "audio/ogg", ["-c:a", "libopus", "-b:a", "160k"]),
 }
-LOSSY = {"mp3", "m4a", "ogg", "opus"}
+LOSSY = {"mp3", "m4a", "m4a128", "ogg", "opus"}
 # Leave headroom so lossy encoders do not clip on inter-sample peaks.
 PEAK_CEILING = {"lossy": 0.89, "lossless": 0.98}
 

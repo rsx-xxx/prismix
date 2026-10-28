@@ -21,12 +21,14 @@ from . import (
     analysis,
     browser,
     client,
+    cloud,
     export,
     lan,
     library,
     lyrics,
     markers,
     mashup,
+    notes,
     original,
     pipeline,
     playlists,
@@ -131,6 +133,16 @@ class ExportRequest(BaseModel):
     semitones: float = 0.0
     format: str = "flac"
     volumes: dict[str, float] = {}
+
+
+class CloudLogin(BaseModel):
+    url: str = Field(default="", max_length=300)
+    token: str = Field(max_length=2000)
+
+
+class CloudPublish(BaseModel):
+    video_id: str = Field(alias="videoId")
+    model: str
 
 
 class OriginalRequest(BaseModel):
@@ -286,6 +298,97 @@ def create_app() -> FastAPI:
         if old:
             await old.http.aclose()
         return {"connected": False}
+
+    # ── Band Cloud: the admin credential lives on this computer, so only its own window may use these ──
+    app.state.publisher = cloud.Publisher()
+
+    def cloud_for(request: Request) -> cloud.Cloud:
+        own_window(request)
+        cl = cloud.current()
+        if not cl:
+            raise HTTPException(401, "Sign in to Band Cloud first")
+        return cl
+
+    @app.get("/api/cloud")
+    def cloud_status(request: Request):
+        own_window(request)
+        cred = cloud.load_credential()
+        return {"signedIn": bool(cred), "host": urlparse(cred[0]).netloc if cred else ""}
+
+    @app.post("/api/cloud/login")
+    def cloud_login(body: CloudLogin, request: Request):
+        own_window(request)
+        try:
+            cl = cloud.connect(body.url, body.token)
+        except cloud.CloudError as e:
+            raise HTTPException(e.status, str(e)) from None
+        cloud.save_credential(cl.url, cl.token)
+        cl.close()
+        return cloud_status(request)
+
+    @app.post("/api/cloud/logout")
+    def cloud_logout(request: Request):
+        own_window(request)
+        cloud.clear_credential()
+        return {"signedIn": False, "host": ""}
+
+    @app.get("/api/cloud/index")
+    def cloud_index(request: Request):
+        cl = cloud_for(request)
+        try:
+            return {"songs": cl.index()}
+        except cloud.CloudError as e:
+            raise HTTPException(e.status, str(e)) from None
+        finally:
+            cl.close()
+
+    @app.get("/api/cloud/files/{video_id}/{rel:path}")
+    def cloud_file(video_id: str, rel: str, request: Request):
+        cl = cloud_for(request)
+        if not library.VIDEO_ID_RE.match(video_id) or not cloud.valid_path(rel):
+            cl.close()
+            raise HTTPException(404, "Not found")
+        fwd = {k: v for k, v in request.headers.items() if k in ("range", "if-range")}
+        try:
+            r = cl.http.send(cl.http.build_request("GET", f"/files/{video_id}/{rel}", headers=fwd), stream=True)
+        except Exception:  # noqa: BLE001
+            cl.close()
+            raise HTTPException(502, "The cloud is not answering") from None
+        keep = ("content-type", "content-length", "content-range", "accept-ranges", "etag")
+        return StreamingResponse(r.iter_raw(), status_code=r.status_code, headers={k: v for k, v in r.headers.items() if k in keep},
+                                 background=BackgroundTask(lambda: (r.close(), cl.close())))
+
+    @app.post("/api/cloud/publish")
+    def cloud_publish(req: CloudPublish, request: Request):
+        cl = cloud_for(request)
+        try:
+            ready = library.read_meta(req.video_id, req.model)
+        except ValueError:
+            ready = None
+        if not ready:
+            cl.close()
+            raise HTTPException(404, "That song is not processed yet")
+        return {"job": app.state.publisher.start(cl, req.video_id, req.model)}
+
+    @app.get("/api/cloud/publish/{job_id}")
+    def cloud_publish_status(job_id: str, request: Request):
+        own_window(request)
+        job = app.state.publisher.get(job_id)
+        if not job:
+            raise HTTPException(404, "Unknown job")
+        return {k: v for k, v in job.items() if k != "at"}
+
+    @app.delete("/api/cloud/songs/{video_id}")
+    def cloud_unpublish(video_id: str, request: Request):
+        cl = cloud_for(request)
+        try:
+            if not library.VIDEO_ID_RE.match(video_id):
+                raise HTTPException(404, "Not found")
+            return {"ok": cl.delete(video_id)}
+        except cloud.CloudError as e:
+            raise HTTPException(e.status, str(e)) from None
+        finally:
+            cl.close()
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
@@ -598,6 +701,12 @@ def create_app() -> FastAPI:
         if not library.VIDEO_ID_RE.match(video_id):
             raise HTTPException(404, "Not found")
         return await asyncio.to_thread(markers.get, video_id)
+
+    @app.get("/api/notes/{video_id}")
+    async def get_notes(video_id: str):
+        if not library.VIDEO_ID_RE.match(video_id):
+            raise HTTPException(404, "Not found")
+        return await asyncio.to_thread(notes.load, video_id)
 
     @app.post("/api/export")
     async def export_audio(req: ExportRequest):

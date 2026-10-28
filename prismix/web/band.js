@@ -17,7 +17,7 @@ export function describe(m) {
   return what ? `${m.who}: ${what}` : '';
 }
 
-export function createBand({ player, current, open, $ }) {
+export function createBand({ player, current, open, onNotes, $ }) {
   let timer = 0;
   let status = { clients: [], locked: false, token: false, url: '', qr: '' };
   const saved = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch { return {}; } };
@@ -83,6 +83,7 @@ export function createBand({ player, current, open, $ }) {
     onmessage: (m) => {
       if (m.t === 'cmd') commands[m.op]?.(m.v);
       else if (m.t === 'changed') note(describe(m));
+      else if (m.t === 'notes' || m.t === 'noteerr') onNotes?.(m);
       else if (m.t === 'roster' || m.t === 'welcome') { Object.assign(status, m); player.setHeld?.(m.speaker != null); render(); }
     },
     onclose: () => { status = { ...status, clients: [], speaker: null }; player.setHeld?.(false); render(); },
@@ -151,5 +152,5 @@ export function createBand({ player, current, open, $ }) {
 
   ['state', 'seek', 'tune', 'loop', 'mix'].forEach((t) => player.addEventListener(t, publish));
   timer = setInterval(() => { if (player.playing) publish(); }, 2000);
-  return { publish, stop() { clearInterval(timer); net.stop(); } };
+  return { publish, send: (m) => net.send(m), stop() { clearInterval(timer); net.stop(); } };
 }

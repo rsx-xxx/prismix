@@ -6,6 +6,7 @@ import { createMedia } from './media.js';
 import { describe } from './band.js';
 import { timeLine, splitAt } from './lyrics.js';
 import { createSocket } from './socket.js';
+import { createNotes } from './notes.js';
 
 const $ = (id) => document.getElementById(id);
 const LS = 'prismix.remote';
@@ -163,6 +164,8 @@ function onMessage(m) {
   } else if (m.t === 'changed') {
     const text = describe(m);
     if (text) { notice(text); lastChange = performance.now(); }
+  } else if (m.t === 'notes' || m.t === 'noteerr') {
+    stickers.onMessage(m);
   } else if (m.t === 'locked') {
     $('locked').hidden = false;
   } else if (m.t === 'kicked') {
@@ -192,6 +195,10 @@ function setHost(m) {
 }
 
 const send = (op, v) => net.send({ t: 'cmd', op, v });
+
+// Stickers go through the band socket: a phone is read-only over HTTP.
+const stickers = createNotes({ id: () => S.track?.id || null, send: (m) => net.send(m), roots: () => [$('stage')], button: $('nt-btn') });
+if (OFFLINE) $('nt-btn').hidden = true;
 
 // ── the shared timeline ──
 const hostPos = () => {
@@ -255,6 +262,7 @@ async function loadTrack(id, model) {
   const mine = ++loadToken;
   S.track = null;
   S.fail = null;
+  stickers.load();
   $('title').textContent = 'Loading…';
   $('sub').textContent = '';
   render();
@@ -294,6 +302,7 @@ async function loadTrack(id, model) {
       buildChords(t);
     }
     S.track = t;
+    stickers.load();
     $('title').textContent = meta.title;
     $('sub').textContent = meta.channel || '';
     $('t-dur').textContent = fmt(meta.duration);
@@ -466,6 +475,8 @@ function renderLyrics(stage, t) {
           }
           const tx = el('span', { className: 'tx', textContent: o.txt });
           sy.append(tx);
+          sy.dataset.t = String(o.t);
+          sy.dataset.e = String(o.e);
           node.syl.push({ el: sy, t: o.t, e: o.e, s: 0 });
           si++;
           return sy;
@@ -561,6 +572,8 @@ function renderTab(stage, t) {
     }
     cell.append(stf);
     row.append(cell);
+    cell.dataset.t0 = String(b0);
+    cell.dataset.t1 = String(b1);
     nodes.bars[j] = cell;
     nodes.tabCells[j] = [b0, b1];
     const col = j - rowStart;
@@ -629,6 +642,8 @@ function renderChart(stage, t) {
       if (c.b >= b0 - 0.01) slot.append(pill(c, i)); else slot.append(el('span', { className: 'tie' }));
       cell.append(slot);
     });
+    cell.dataset.t0 = String(t.beatSec(b0));
+    cell.dataset.t1 = String(t.beatSec(b1));
     nodes.bars[j] = cell;
     chart.append(cell);
   });

@@ -17,6 +17,8 @@ import time
 
 from fastapi import WebSocket, WebSocketDisconnect
 
+from . import library, notes
+
 log = logging.getLogger(__name__)
 
 ROLES = ("singer", "guitar", "bass", "drums", "keys", "other")
@@ -194,6 +196,16 @@ class Band:
                 await self._send(h, {"t": "cmd", "op": msg["op"], "v": msg.get("v"), "from": c.name})
                 if msg["op"] in SHARED_OPS:  # everyone sees who moved a shared setting
                     await self.broadcast({"t": "changed", "who": c.name, "op": msg["op"], "v": msg.get("v")}, skip=c)
+        elif kind == "note" and msg.get("op") in ("add", "edit", "del"):  # stickers stay editable while playback is locked
+            vid = msg.get("id")
+            try:
+                if not isinstance(vid, str) or not library.VIDEO_ID_RE.match(vid):
+                    raise ValueError("bad song")
+                items = await asyncio.to_thread(notes.apply, vid, msg["op"], msg.get("note"), c.name)
+            except ValueError as e:
+                await self._send(c, {"t": "noteerr", "error": str(e)})
+                return
+            await self.broadcast({"t": "notes", "id": vid, "notes": items})
         elif kind == "speaker" and not c.host:
             if msg.get("on"):
                 self.speaker = c.id

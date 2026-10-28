@@ -24,7 +24,7 @@ from . import lan
 
 PORTS = (443, lan.HTTPS_PORT)  # the clean name-only link, then the classic one
 # Answered here even while connected: they describe this computer, not the host.
-LOCAL_API = ("/api/client", "/api/update", "/api/version")
+LOCAL_API = ("/api/client", "/api/cloud", "/api/update", "/api/version")
 RELAYED = ("/api/", "/media/", "/remote/hello")
 KEEP_REQUEST = ("range", "if-none-match", "if-modified-since", "x-band-token", "if-range", "accept", "accept-encoding")
 KEEP_RESPONSE = ("content-type", "content-length", "content-range", "accept-ranges", "content-encoding",

@@ -882,3 +882,21 @@ dialog[open]::backdrop { opacity: 1; }
 
 .tab-sel { max-width: 280px; height: 30px; padding: 0 28px 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background-color: transparent; color: var(--text); font-size: 13px; }
 .set-row select { height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background-color: transparent; color: var(--text); font-size: 13px; }
+
+/* Band Cloud */
+.card .pub {
+  position: absolute; left: 44px; top: 8px; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 14px; border: 0; background: #000a; color: #fff;
+  opacity: 0; transition: opacity .15s; font-size: 14px; display: grid; place-items: center;
+}
+.card:hover .pub, .card .pub:focus-visible, .card .pub:disabled { opacity: 1; }
+.card .pub:hover { background: var(--accent); }
+@media (hover: none) { .card .pub { opacity: 1; } }
+#cloud-section { margin-top: 8px; }
+.cloud-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cloud-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.cloud-cover { width: 64px; height: 36px; object-fit: cover; border-radius: 6px; background: var(--surface-2); flex: none; }
+.cloud-text { flex: 1; display: grid; min-width: 0; }
+.cloud-text b, .cloud-text span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cloud-player { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.cloud-player audio { flex: 1; min-width: 0; }
+#cloud-dialog form, #cloud-dialog .band-pane { display: grid; gap: 12px; }

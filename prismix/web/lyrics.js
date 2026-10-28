@@ -287,6 +287,7 @@ export function createLyrics({ player, api, chords = () => [] }) {
     if (show) {
       const copy = n.cloneNode(true);
       copy.removeAttribute('role'); copy.removeAttribute('tabindex');
+      copy.querySelectorAll('.nt-box').forEach((b) => b.remove()); // stickers stay in the lyrics block
       box.replaceChildren(...copy.childNodes);
       cur.dsy = [...box.querySelectorAll('.sy')];
     } else box.replaceChildren();

@@ -2,6 +2,13 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## Unreleased
+
+## 0.0.45
+
+- Band Cloud: sign in with the admin token on the computer to publish a processed song to your private band cloud, and see the cloud library beside the local one. The Android app has a new Band Cloud section: paste a member invite link, then browse, stream with seeking and download. The LAN connection page is unchanged.
+- Stickers: pin a symbol and an optional comment to a moment of the song, from the computer or a phone. It appears on the lyrics, chords and tab for the whole band, and the comment is either always visible or shown on tap.
+
 ## 0.0.44
 
 - Score fixes: the key signature now follows the notes (no more sharps over flat songs), staff lines run through the clef column, flags are curved, and rests keep clear of stems. Tabs open larger and have A− / A+ buttons to change their size. The Video button is gone from the bottom bar. Lyrics light up a little earlier to cover output latency.

@@ -13,7 +13,9 @@ import { createSplit } from './split.js';
 import { initCheatsheet } from './cheatsheet.js';
 import { getAccidentals, setAccidentals } from './theory.js';
 import { createBand } from './band.js';
+import { createNotes } from './notes.js';
 import { createJoin } from './join.js';
+import { createCloud } from './cloud.js';
 import { createQueue } from './queue.js';
 import { createMedia } from './media.js';
 import { initLinks } from './links.js';
@@ -417,7 +419,9 @@ function renderLibrary() {
     });
     const add = el('button', { className: 'add', type: 'button', textContent: '+', title: 'Add to playlist', ariaLabel: 'Add to playlist' });
     add.addEventListener('click', async (e) => { e.stopPropagation(); await plview.load(); plview.pick(it); });
-    card.append(add, del);
+    const pub = el('button', { className: 'pub', type: 'button', textContent: '↑', title: 'Publish to Band Cloud', ariaLabel: 'Publish to Band Cloud' });
+    pub.addEventListener('click', (e) => { e.stopPropagation(); cloud.publish(it, open, pub); });
+    card.append(add, del, pub);
     card.draggable = true;
     card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('application/x-prismix-song', it.id); e.dataTransfer.effectAllowed = 'copy'; });
     const go = () => { state.plist = null; location.hash = `#/v/${it.id}/${open}`; };
@@ -445,6 +449,7 @@ async function route() {
 function showHome(inPlaylist = false) {
   state.token++;
   video.hide(); // gives the stems back if the video's sound was on, so saved prefs are the real mix
+  $('nt-toggle').hidden = true;
   if (state.current) { savePrefs(); player.dispose(); state.current = null; }
   score.close();
   tabView.close();
@@ -526,6 +531,8 @@ async function openStudio(id, model) {
   }
   if (token !== state.token) { player.dispose(); return; }
   state.current = { id, model, meta };
+  $('nt-toggle').hidden = false;
+  stickers.load();
   applyPrefs(loadPrefs(id));
   band.publish();
   $('loading').hidden = true;
@@ -1136,8 +1143,16 @@ function dispatch(e) {
   return true;
 }
 
-const band = createBand({ player, current: () => state.current, $ });
+const stickers = createNotes({
+  id: () => state.current?.id || null,
+  send: (m) => band.send(m),
+  roots: () => [$('ly-body'), $('sc-body'), $('tabview')],
+  button: $('nt-toggle'),
+});
+const band = createBand({ player, current: () => state.current, onNotes: (m) => stickers.onMessage(m), $ });
 createJoin({ $ });
+const cloud = createCloud({ $, el, api, notice, fmt });
+cloud.refresh();
 const queue = createQueue({ $, api });
 // Media keys, Now Playing and the Windows media overlay drive the studio player.
 const media = createMedia({

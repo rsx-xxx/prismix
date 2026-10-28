@@ -13,6 +13,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.concurrent.ExecutorService;
@@ -52,6 +54,33 @@ final class Saver {
         });
     }
 
+    /** A file from the Band Cloud, fetched with the member token. Only the signed-in cloud's own address is ever contacted. */
+    static void saveCloud(final Context ctx, final String url, final String suggested) {
+        final Cloud.Credential cred = Main.cloud();
+        QUEUE.execute(() -> {
+            String name = clean(suggested == null ? "" : suggested);
+            try {
+                if (cred == null) throw new IllegalStateException("not signed in");
+                URI want = URI.create(cred.origin), got = URI.create(url);
+                if (!want.getScheme().equals(got.getScheme()) || !want.getRawAuthority().equals(got.getRawAuthority())) throw new IllegalStateException("not the cloud");
+                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                c.setRequestProperty("Authorization", "Bearer " + cred.token);
+                c.setConnectTimeout(8000);
+                c.setReadTimeout(60 * 1000);
+                if (c.getResponseCode() != 200) throw new IllegalStateException("the cloud said " + c.getResponseCode());
+                try (InputStream in = c.getInputStream(); OutputStream out = open(ctx, "Cloud", name)) {
+                    byte[] buf = new byte[64 * 1024];
+                    int n;
+                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                }
+                c.disconnect();
+                done(ctx, name, null);
+            } catch (Exception e) {
+                done(ctx, name, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+            }
+        });
+    }
+
     private static void done(final Context ctx, final String name, final String err) {
         Main.post(() -> Toast.makeText(ctx, err == null ? "Saved: " + name : "Could not save " + name + " (" + err + ")", Toast.LENGTH_LONG).show());
     }
@@ -73,17 +102,18 @@ final class Saver {
 
     private static OutputStream open(Context ctx, String folder, String name) throws Exception {
         String dir = clean(folder);
+        boolean zip = name.toLowerCase().endsWith(".zip");
         if (Build.VERSION.SDK_INT >= 29) {
             ContentResolver r = ctx.getContentResolver();
             ContentValues v = new ContentValues();
             v.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
-            v.put(MediaStore.MediaColumns.MIME_TYPE, "audio/mp4");
-            v.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/Prismix/" + dir);
-            Uri uri = r.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, v);
+            v.put(MediaStore.MediaColumns.MIME_TYPE, zip ? "application/zip" : "audio/mp4");
+            v.put(MediaStore.MediaColumns.RELATIVE_PATH, (zip ? Environment.DIRECTORY_DOWNLOADS : Environment.DIRECTORY_MUSIC) + "/Prismix/" + dir);
+            Uri uri = r.insert(zip ? MediaStore.Downloads.EXTERNAL_CONTENT_URI : MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, v);
             if (uri == null) throw new IllegalStateException("no storage");
             return r.openOutputStream(uri);
         }
-        File d = new File(ctx.getExternalFilesDir(Environment.DIRECTORY_MUSIC), "Prismix/" + dir);
+        File d = new File(ctx.getExternalFilesDir(zip ? Environment.DIRECTORY_DOWNLOADS : Environment.DIRECTORY_MUSIC), "Prismix/" + dir);
         if (!d.isDirectory() && !d.mkdirs()) throw new IllegalStateException("no storage");
         return new FileOutputStream(new File(d, name));
     }

@@ -95,6 +95,8 @@ public class Main extends Activity {
     private Runnable afterNet;
     private String wantName; // a name the user typed, looked for among the discovered hosts
     private boolean connecting; // the page is loading behind the progress screen
+    private boolean cloudMode; // the web view shows the Band Cloud player, not a LAN host
+    private boolean cloudFresh; // history of the sign-in redirect is dropped once the player has loaded
     private NsdManager nsd;
     private NsdManager.DiscoveryListener nsdListener;
     private ExecutorService pool;
@@ -242,6 +244,12 @@ public class Main extends Activity {
         if (m != null) m.ui.post(() -> m.web.evaluateJavascript(script, null));
     }
 
+    /** The signed-in Band Cloud member credential, if any. */
+    static Cloud.Credential cloud() {
+        Main m = current;
+        return m == null ? null : Cloud.load(m.prefs);
+    }
+
     static String hostName() {
         Main m = current;
         return m == null ? "" : m.host;
@@ -298,6 +306,8 @@ public class Main extends Activity {
             m.ui.post(() -> m.web.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP));
         }
         @JavascriptInterface public void download(String url, String folder) { Saver.save(m.getApplicationContext(), url, folder); }
+        /** A file link in the cloud player: saved through the member token, since the page's cookie does not reach a download. */
+        @JavascriptInterface public void cloudDownload(String url, String name) { if (m.cloudMode) Saver.saveCloud(m.getApplicationContext(), url, name); }
         @JavascriptInterface public void mediaStop() { m.stopService(new Intent(m, MediaService.class)); m.ui.post(() -> m.keepAwake(false)); }
         @JavascriptInterface public void switchHost() { m.ui.post(() -> m.discover()); }
         @JavascriptInterface public String offlineList() { return Offline.list(m.getApplicationContext()).toString(); }
@@ -344,7 +354,10 @@ public class Main extends Activity {
         }
 
         @Override
-        public void onPageFinished(WebView v, String url) { m.reveal(); }
+        public void onPageFinished(WebView v, String url) {
+            if (m.cloudMode && m.cloudFresh && !url.contains("/join")) { m.cloudFresh = false; v.clearHistory(); }
+            m.reveal();
+        }
 
         /** The offline origin is answered from the phone itself; everything else goes to the host. */
         @Override
@@ -356,7 +369,9 @@ public class Main extends Activity {
 
         @Override
         public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e) {
-            if (r.isForMainFrame()) m.discover(); // host moved or went away: look again
+            if (!r.isForMainFrame()) return;
+            if (m.cloudMode) m.showCloud("The cloud is not answering"); // the cloud is not a host to search for
+            else m.discover(); // host moved or went away: look again
         }
     }
 
@@ -561,6 +576,7 @@ public class Main extends Activity {
     }
 
     private void screen(String title, String sub) {
+        cloudMode = false;
         panel.removeAllViews();
         web.setVisibility(View.GONE);
         scroll.setVisibility(View.VISIBLE);
@@ -599,6 +615,7 @@ public class Main extends Activity {
     }
 
     private void goOffline() {
+        cloudMode = false;
         stopSearch();
         ++gen;
         host = "";
@@ -609,12 +626,120 @@ public class Main extends Activity {
         web.loadUrl("https://" + Offline.HOST + "/remote");
     }
 
+    // ── Band Cloud ──
+
+    private void cloudButton() {
+        Button b = button("Band Cloud", false);
+        b.setOnClickListener(v -> showCloud(null));
+        panel.addView(b);
+    }
+
+    /** Sign in to the private cloud with an invite link or a member token; once signed in, open the player. */
+    private void showCloud(String problem) {
+        stopSearch();
+        ++gen;
+        connecting = false;
+        host = "";
+        listing = false;
+        final Cloud.Credential have = Cloud.load(prefs);
+        screen("Band Cloud", have == null ? "Paste the invite link you were sent." : "Signed in to " + have.host());
+        final TextView err = text(problem == null ? "" : problem, 14, Color.parseColor("#ff6b5b"), 8);
+        if (have != null) {
+            Button open = button("Open Band Cloud", true);
+            open.setOnClickListener(v -> openCloud(have));
+            panel.addView(open);
+            Button out = button("Sign out", false);
+            out.setOnClickListener(v -> signOutCloud());
+            panel.addView(out);
+        }
+        final EditText link = field("Invite link or member token");
+        final EditText addr = field("Cloud address (only with a bare token)");
+        final Button in = button(have == null ? "Sign in" : "Sign in with another invite", have == null);
+        in.setOnClickListener(v -> {
+            in.setEnabled(false);
+            err.setText("");
+            signInCloud(link.getText().toString(), addr.getText().toString(), err, in);
+        });
+        link.setOnEditorActionListener((v, a, ev) -> { in.performClick(); return true; });
+        panel.addView(link, fieldParams());
+        panel.addView(addr, fieldParams());
+        panel.addView(in);
+        panel.addView(err);
+        Button lan = button("LAN connections", false);
+        lan.setOnClickListener(v -> discover());
+        panel.addView(lan);
+    }
+
+    private EditText field(String hint) {
+        EditText e = new EditText(this);
+        e.setHint(hint);
+        e.setTextColor(Color.WHITE);
+        e.setHintTextColor(Color.GRAY);
+        e.setSingleLine(true);
+        e.setImeOptions(EditorInfo.IME_ACTION_GO);
+        e.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
+        return e;
+    }
+
+    private LinearLayout.LayoutParams fieldParams() {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.topMargin = dp(16);
+        return lp;
+    }
+
+    private void signInCloud(final String text, final String address, final TextView err, final Button in) {
+        whenNet(() -> new Thread(() -> {
+            String bad = null;
+            Cloud.Credential c = null;
+            try {
+                c = Cloud.parse(text, address);
+                Cloud.verifyMember(c);
+            } catch (Cloud.Failure f) {
+                bad = f.getMessage();
+            }
+            final Cloud.Credential ok = bad == null ? c : null;
+            final String why = bad;
+            ui.post(() -> {
+                if (ok == null) { err.setText(why); in.setEnabled(true); return; }
+                Cloud.save(prefs, ok); // only the member credential is kept
+                openCloud(ok);
+            });
+        }, "cloud-login").start());
+    }
+
+    /** The join page turns the token into the session cookie and redirects to the player. */
+    private void openCloud(final Cloud.Credential c) {
+        stopSearch();
+        final int g = ++gen;
+        screen("Opening Band Cloud…", c.host());
+        panel.addView(spinner());
+        cloudMode = true;
+        cloudFresh = true;
+        host = "";
+        listing = false;
+        connecting = true;
+        web.setVisibility(View.INVISIBLE);
+        whenNet(() -> {
+            web.loadUrl(c.joinUrl());
+            ui.postDelayed(() -> { if (g == gen && connecting) { connecting = false; showCloud("The cloud is not answering"); } }, 20000);
+        });
+    }
+
+    private void signOutCloud() {
+        Cloud.clear(prefs);
+        android.webkit.CookieManager.getInstance().removeAllCookies(null);
+        android.webkit.WebStorage.getInstance().deleteAllData();
+        web.clearCache(true);
+        showCloud(null);
+    }
+
     private void showSearching() {
         screen(wantName != null ? "Looking for " + wantName + "…" : "Looking for your band's host…",
                 "Open Prismix on the computer and share to the network.");
         panel.addView(spinner());
         scanButton();
         offlineButton();
+        cloudButton();
     }
 
     private void showList() {
@@ -639,6 +764,7 @@ public class Main extends Activity {
         panel.addView(again);
         scanButton();
         offlineButton();
+        cloudButton();
         manualEntry();
     }
 
@@ -655,6 +781,7 @@ public class Main extends Activity {
         panel.addView(retry);
         scanButton();
         offlineButton();
+        cloudButton();
         manualEntry();
     }
 
@@ -757,7 +884,10 @@ public class Main extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (web.getVisibility() == View.VISIBLE && web.canGoBack()) web.goBack();
+        if (cloudMode && web.getVisibility() == View.VISIBLE) {
+            // the player closes its own sheet first; with nothing open, back leaves for the cloud screen
+            web.evaluateJavascript("window.__back&&window.__back()", v -> { if (!"true".equals(v)) showCloud(null); });
+        } else if (web.getVisibility() == View.VISIBLE && web.canGoBack()) web.goBack();
         else super.onBackPressed();
     }
 }

@@ -160,10 +160,18 @@ public class MediaService extends Service {
             Bitmap b = null;
             try {
                 URL u = new URL(url);
-                if (!u.getHost().equals(Main.hostName())) return;
-                HttpsURLConnection c = (HttpsURLConnection) u.openConnection();
-                c.setSSLSocketFactory(Main.tls());
-                c.setHostnameVerifier((h, s) -> true);
+                Cloud.Credential cred = Main.cloud();
+                java.net.HttpURLConnection c;
+                if (cred != null && u.getHost().equals(cred.host())) {
+                    c = (java.net.HttpURLConnection) u.openConnection();
+                    c.setRequestProperty("Authorization", "Bearer " + cred.token);
+                } else {
+                    if (!u.getHost().equals(Main.hostName())) return;
+                    HttpsURLConnection lan = (HttpsURLConnection) u.openConnection();
+                    lan.setSSLSocketFactory(Main.tls());
+                    lan.setHostnameVerifier((h, s) -> true);
+                    c = lan;
+                }
                 c.setConnectTimeout(3000);
                 c.setReadTimeout(5000);
                 try (InputStream in = c.getInputStream()) { b = BitmapFactory.decodeStream(in); }
