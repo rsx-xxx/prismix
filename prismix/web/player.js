@@ -1,6 +1,7 @@
-// Multi-stem player. One Signalsmith Stretch node per stem (WASM phase-vocoder with
-// formant handling) so tempo and key change independently without the "robot" artefacts of
-// naive resampling. All nodes get identical schedules, so they stay sample-locked.
+// Multi-stem player with two engines that share one clock. At normal tempo and key the stems play as plain
+// AudioBufferSources: no DSP, sample-locked, cheap enough for any phone. Once tempo or key changes, one Signalsmith
+// Stretch node per stem (WASM phase-vocoder with formant handling) takes over so the two move independently without
+// the "robot" artefacts of naive resampling. Its copy of the audio is only made while it is needed.
 import SignalsmithStretch from './vendor/SignalsmithStretch.mjs';
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -20,6 +21,9 @@ export class StemPlayer extends EventTarget {
     this.playing = false;
     this._anchor = { pos: 0, t: 0 }; // input position `pos` is heard at context time `t`
     this._latency = 0.1;
+    this._rate = 1; // speed of the engine that is actually sounding (tempo only once the stretch engine runs)
+    this._engine = null; // 'direct' | 'stretch' while playing
+    this._stretchOk = false;
     this._raf = 0;
   }
 
@@ -63,21 +67,13 @@ export class StemPlayer extends EventTarget {
         loaded[i] += value.length;
         report();
       }
-      const decoded = await this.ctx.decodeAudioData(await new Blob(chunks).arrayBuffer());
-      const channels = [0, 1].map((c) => {
-        const out = new Float32Array(decoded.length);
-        decoded.copyFromChannel(out, Math.min(c, decoded.numberOfChannels - 1));
-        return out;
-      });
-      const node = await SignalsmithStretch(this.ctx); // default options: 1 in, 2-ch out (0-input config yields silence)
-      await node.addBuffers(channels, channels.map((c) => c.buffer));
+      const buf = await this.ctx.decodeAudioData(await new Blob(chunks).arrayBuffer());
       const gain = this.ctx.createGain();
-      node.connect(gain).connect(this.duck);
-      return { name: s.name, node, gain, volume: 1, muted: false, solo: false };
+      gain.connect(this.duck);
+      return { name: s.name, buf, node: null, gain, src: null, volume: 1, muted: false, solo: false };
     }));
 
-    this._latency = (await this.stems[0].node.latency()) || 0.1;
-    this.stems.forEach((s) => s.node.stop());
+    this._latency = 0.1; // settled by the first stretch preparation
     this._anchor = { pos: 0, t: this.ctx.currentTime };
     this._tick();
   }
@@ -96,7 +92,7 @@ export class StemPlayer extends EventTarget {
   _positionAt(t) {
     const { pos, t: t0 } = this._anchor;
     if (!this.playing) return pos;
-    let p = pos + Math.max(0, t - t0) * this.tempo;
+    let p = pos + Math.max(0, t - t0) * this._rate;
     if (this.loop && p >= this.loop.b) {
       const len = this.loop.b - this.loop.a;
       p = this.loop.a + ((p - this.loop.a) % len);
@@ -106,7 +102,7 @@ export class StemPlayer extends EventTarget {
 
   get pitch() { return this.semitones + this.cents / 100; }
 
-  _each(fn) { this.stems.forEach((s) => fn(s.node, s)); }
+  _each(fn) { this.stems.forEach((s) => s.node && fn(s.node, s)); }
 
   _params() {
     return {
@@ -118,13 +114,86 @@ export class StemPlayer extends EventTarget {
     };
   }
 
-  /** Re-apply tempo/key/loop to every node without interrupting playback. */
+  get _needsStretch() { return this.tempo !== 1 || this.pitch !== 0; }
+
+  /** Hand each stem to the stretch engine (copies the audio one stem at a time to keep peak memory low). */
+  _prepStretch() {
+    if (this._stretchOk) return Promise.resolve();
+    this._prep ??= (async () => {
+      for (const s of this.stems) {
+        if (!s.node) { // the WASM engine is only instantiated once tempo or key is first changed
+          s.node = await SignalsmithStretch(this.ctx); // default options: 1 in, 2-ch out (0-input config yields silence)
+          s.node.connect(s.gain);
+          s.node.stop(); // idle until scheduled
+        }
+        const chans = [0, 1].map((c) => {
+          const out = new Float32Array(s.buf.length);
+          s.buf.copyFromChannel(out, Math.min(c, s.buf.numberOfChannels - 1));
+          return out;
+        });
+        await s.node.addBuffers(chans, chans.map((c) => c.buffer));
+      }
+      this._latency = (await this.stems[0]?.node?.latency()) || 0.1;
+      this._stretchOk = true;
+    })().finally(() => { this._prep = null; });
+    return this._prep;
+  }
+
+  _dropStretch() {
+    if (!this._stretchOk) return;
+    this._stretchOk = false;
+    for (const s of this.stems) { try { s.node?.dropBuffers(); } catch { /* node gone */ } }
+  }
+
+  _startDirect(t, pos) {
+    const ctx = this.ctx;
+    const lp = this.loop;
+    for (const s of this.stems) {
+      const src = ctx.createBufferSource();
+      src.buffer = s.buf;
+      if (lp) { src.loop = true; src.loopStart = lp.a; src.loopEnd = lp.b; }
+      src.connect(s.gain);
+      src.start(t, lp && (pos < lp.a || pos >= lp.b) ? lp.a : pos);
+      s.src = src;
+    }
+  }
+
+  _stopDirect(when) {
+    for (const s of this.stems) {
+      if (!s.src) continue;
+      try { s.src.stop(when); } catch { /* already ended */ }
+      const old = s.src;
+      old.onended = () => old.disconnect();
+      s.src = null;
+    }
+  }
+
+  /** Make the sounding engine match tempo/key/loop, without a gap: the old one ends exactly where the new one begins. */
   _retune() {
-    if (!this.playing) return;
+    if (!this.ctx) return;
+    const stretch = this._needsStretch;
+    if (stretch && !this._stretchOk) {
+      this._prepStretch().then(() => this._retune(), () => { this.tempo = 1; this.semitones = 0; this.cents = 0; this._emit('tune'); });
+      if (this.playing) return; // keep sounding on the direct engine until the stretch one is ready
+    }
+    if (!this.playing) { this._rate = stretch && this._stretchOk ? this.tempo : 1; return; }
     const t = this.ctx.currentTime + 0.02;
-    this._anchor = { pos: this._positionAt(t), t };
-    const params = { ...this._params(), output: t, active: true };
-    this._each((n) => n.schedule(params));
+    const pos = this._positionAt(t);
+    this._anchor = { pos, t };
+    if (stretch) {
+      this._stopDirect(t);
+      this._rate = this.tempo;
+      this._engine = 'stretch';
+      const params = { ...this._params(), output: t, input: pos, active: true };
+      this._each((n) => n.schedule(params));
+    } else {
+      this._each((n) => n.stop(t));
+      this._stopDirect(t);
+      this._rate = 1;
+      this._engine = 'direct';
+      this._startDirect(t, pos);
+      this._dropStretch();
+    }
   }
 
   /** Resume a suspended context (autoplay policy, phone call, background); false if it stays blocked. */
@@ -138,17 +207,23 @@ export class StemPlayer extends EventTarget {
   async play() {
     if (!this.ctx || this.playing) return;
     const ctx = this.ctx;
+    if (this._needsStretch) await this._prepStretch().catch(() => {});
     if (!(await this._wake()) || ctx !== this.ctx || this.playing) return this._emit('blocked'); // never claim to play while silent
     if (this._anchor.pos >= this.duration - 0.05) this._anchor.pos = this.loop?.a ?? 0;
-    const t = this.ctx.currentTime + this._latency;
+    const stretch = this._needsStretch && this._stretchOk;
+    const t = ctx.currentTime + (stretch ? this._latency : 0.05);
     const pos = this._anchor.pos;
-    this.duck.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.duck.gain.setValueAtTime(0, this.ctx.currentTime);
+    this.duck.gain.cancelScheduledValues(ctx.currentTime);
+    this.duck.gain.setValueAtTime(0, ctx.currentTime);
     this.duck.gain.setTargetAtTime(1, t - 0.01, 0.01);
     this._anchor = { pos, t };
     this.playing = true;
-    const params = { ...this._params(), output: t, input: pos, active: true };
-    this._each((n) => n.schedule(params));
+    this._engine = stretch ? 'stretch' : 'direct';
+    this._rate = stretch ? this.tempo : 1;
+    if (stretch) {
+      const params = { ...this._params(), output: t, input: pos, active: true };
+      this._each((n) => n.schedule(params));
+    } else this._startDirect(t, pos);
     this._emit('state');
   }
 
@@ -157,8 +232,10 @@ export class StemPlayer extends EventTarget {
     const pos = this.position;
     const now = this.ctx.currentTime;
     this.duck.gain.setTargetAtTime(0, now, 0.012);
+    this._stopDirect(now + 0.06);
     this._each((n) => n.stop(now + 0.06));
     this.playing = false;
+    this._engine = null;
     this._anchor = { pos, t: now };
     this._emit('state');
   }
@@ -180,8 +257,13 @@ export class StemPlayer extends EventTarget {
     this.duck.gain.setTargetAtTime(0, now, 0.008);
     this.duck.gain.setTargetAtTime(1, t, 0.012);
     this._anchor = { pos, t };
-    const params = { ...this._params(), output: t, input: pos, active: true };
-    this._each((n) => n.schedule(params));
+    if (this._engine === 'stretch') {
+      const params = { ...this._params(), output: t, input: pos, active: true };
+      this._each((n) => n.schedule(params));
+    } else {
+      this._stopDirect(t);
+      this._startDirect(t, pos);
+    }
     this._emit('seek');
   }
 
@@ -255,7 +337,9 @@ export class StemPlayer extends EventTarget {
 
   dispose() {
     cancelAnimationFrame(this._raf);
-    for (const s of this.stems) { try { s.node.stop(); s.node.disconnect(); } catch { /* closing */ } }
+    for (const s of this.stems) { try { s.src?.stop(); s.node?.stop(); s.node?.disconnect(); } catch { /* closing */ } }
+    this._stretchOk = false;
+    this._engine = null;
     this.stems = [];
     this.playing = false;
     this.loop = null;

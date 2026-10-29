@@ -8,10 +8,17 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FilterInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -25,7 +32,7 @@ final class CloudApi {
     static final String HOST = "cloud.prismix";
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_-]{11}");
     private static final Pattern LIBRARY = Pattern.compile("^/api/library/([A-Za-z0-9_-]{11})/([A-Za-z0-9_-]{1,40})$");
-    private static final Pattern STEM = Pattern.compile("^/media/([A-Za-z0-9_-]{11})/[A-Za-z0-9_-]{1,40}/([A-Za-z0-9_-]{1,40})\\.m4a$");
+    private static final Pattern STEM = Pattern.compile("^/media/([A-Za-z0-9_-]{11})/([A-Za-z0-9_-]{1,40})/([A-Za-z0-9_-]{1,40})\\.m4a$");
     private static final Pattern FILE = Pattern.compile("^/(?:media/([A-Za-z0-9_-]{11})/(structure\\.json|thumb\\.jpg)|api/(lyrics|tabdata)/([A-Za-z0-9_-]{11}))$");
 
     private CloudApi() { }
@@ -48,8 +55,10 @@ final class CloudApi {
             if (m.matches()) return json(meta(c, m.group(1), m.group(2)));
             m = STEM.matcher(path);
             if (m.matches()) {
-                String stem = m.group(2);
-                return pipe(c, "/files/" + m.group(1) + "/" + (stem.equals("mix") ? "mix.m4a" : "stems/" + stem + ".m4a"), "audio/mp4");
+                String stem = m.group(3);
+                String remote = "/files/" + m.group(1) + "/" + (stem.equals("mix") ? "mix.m4a" : "stems/" + stem + ".m4a");
+                // Stems never change for a given song and model, so they are kept on the phone after the first download.
+                return cached(ctx, new File(cacheRoot(ctx), m.group(1) + "/" + m.group(2) + "/" + stem + ".m4a"), c, remote, "audio/mp4");
             }
             m = FILE.matcher(path);
             if (m.matches()) {
@@ -140,6 +149,109 @@ final class CloudApi {
         int len = h.getContentLength();
         if (len >= 0) head.put("Content-Length", String.valueOf(len));
         return new WebResourceResponse(mime, null, 200, "OK", head, h.getInputStream());
+    }
+
+    private static final long CACHE_MAX = 1536L << 20;
+
+    private static File cacheRoot(Context ctx) {
+        return new File(ctx.getCacheDir(), "cloud-stems");
+    }
+
+    /** A cloud file from the phone's disk when it is there; otherwise streamed to the page while it is saved for next time. */
+    private static WebResourceResponse cached(Context ctx, File file, Cloud.Credential c, String path, String mime) throws Exception {
+        Map<String, String> head = new HashMap<>();
+        head.put("Cache-Control", "private, max-age=31536000, immutable");
+        if (file.isFile() && file.length() > 0) {
+            file.setLastModified(System.currentTimeMillis());
+            head.put("Content-Length", String.valueOf(file.length()));
+            return new WebResourceResponse(mime, null, 200, "OK", head, new FileInputStream(file));
+        }
+        HttpURLConnection h = open(c, path);
+        int code = h.getResponseCode();
+        if (code != 200) { h.disconnect(); return status(code == 404 ? 404 : 502); }
+        int len = h.getContentLength();
+        if (len >= 0) head.put("Content-Length", String.valueOf(len));
+        File dir = file.getParentFile();
+        if (dir == null || !(dir.isDirectory() || dir.mkdirs())) return new WebResourceResponse(mime, null, 200, "OK", head, h.getInputStream());
+        File part = new File(dir, file.getName() + ".part");
+        return new WebResourceResponse(mime, null, 200, "OK", head, new Tee(h.getInputStream(), h, part, file, len, cacheRoot(ctx)));
+    }
+
+    /** Passes the download through and keeps a copy; the copy only counts if the whole file arrived. */
+    private static final class Tee extends FilterInputStream {
+        private final HttpURLConnection conn;
+        private final File part, done, root;
+        private final long expect;
+        private FileOutputStream out;
+        private long got;
+        private boolean finished;
+
+        Tee(InputStream in, HttpURLConnection conn, File part, File done, long expect, File root) throws IOException {
+            super(in);
+            this.conn = conn; this.part = part; this.done = done; this.expect = expect; this.root = root;
+            this.out = new FileOutputStream(part);
+        }
+
+        @Override public int read() throws IOException {
+            int b = super.read();
+            if (b >= 0) save(new byte[] {(byte) b}, 0, 1); else finish();
+            return b;
+        }
+
+        @Override public int read(byte[] buf, int off, int len) throws IOException {
+            int n = super.read(buf, off, len);
+            if (n > 0) save(buf, off, n); else if (n < 0) finish();
+            return n;
+        }
+
+        private void save(byte[] buf, int off, int n) {
+            if (out == null) return;
+            try { out.write(buf, off, n); got += n; } catch (IOException e) { abandon(); }
+        }
+
+        private void finish() {
+            if (finished) return;
+            finished = true;
+            if (out == null) return;
+            try { out.close(); } catch (IOException e) { abandon(); return; }
+            out = null;
+            if ((expect >= 0 && got != expect) || got == 0 || !part.renameTo(done)) part.delete(); else trim(root);
+        }
+
+        private void abandon() {
+            try { if (out != null) out.close(); } catch (IOException ignored) { }
+            out = null;
+            part.delete();
+        }
+
+        @Override public void close() throws IOException {
+            if (!finished) abandon();
+            try { super.close(); } finally { conn.disconnect(); }
+        }
+    }
+
+    /** Keeps the stem cache under its size limit by dropping the songs used longest ago. */
+    private static void trim(File root) {
+        File[] songs = root.listFiles();
+        if (songs == null) return;
+        long total = 0;
+        java.util.List<File> files = new java.util.ArrayList<>();
+        for (File song : songs) collect(song, files);
+        for (File f : files) total += f.length();
+        if (total <= CACHE_MAX) return;
+        File[] all = files.toArray(new File[0]);
+        Arrays.sort(all, Comparator.comparingLong(File::lastModified));
+        for (File f : all) {
+            if (total <= CACHE_MAX * 3 / 4) break;
+            long n = f.length();
+            if (f.delete()) total -= n;
+        }
+    }
+
+    private static void collect(File f, java.util.List<File> out) {
+        if (f.isFile()) { out.add(f); return; }
+        File[] kids = f.listFiles();
+        if (kids != null) for (File k : kids) collect(k, out);
     }
 
     private static WebResourceResponse json(String body) {

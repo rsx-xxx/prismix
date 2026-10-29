@@ -4,6 +4,12 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.11.0
+
+- Smoother playback on phones and laptops. At normal tempo and key the stems now play directly, with no time-stretch processing (the heavy part that made phones lag); the stretch engine and its memory are only used while tempo or key is changed.
+- Following the host no longer jumps around: sync only re-seeks after real drift (over 120 ms, twice in a row).
+- The Android app keeps cloud stems on the phone after the first download (up to 1.5 GB, oldest songs dropped first), so a song opens instantly the next time.
+
 ## 0.10.0
 
 - Phone page: picking a song shows a loading bar with progress while its audio downloads, so it no longer looks stuck.

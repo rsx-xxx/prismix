@@ -1330,7 +1330,7 @@ function loading(f) {
   $('m-note').textContent = $('load-txt').textContent;
 }
 
-let lastFix = 0;
+let lastFix = 0, drift = 0;
 function syncLocal(force = false) {
   const p = S.local, h = S.host;
   if (S.mode !== 'listen' || !p || !h) return;
@@ -1351,9 +1351,12 @@ function syncLocal(force = false) {
   }
   const heard = p.position - p.outLatency * p.tempo;
   const err = heard - want;
-  if ((force || Math.abs(err) > 0.08) && performance.now() - lastFix > 1500) {
+  // A seek is an audible blip, so only fix drift that is real: past 120 ms on two checks in a row, or when forced.
+  drift = Math.abs(err) > 0.12 ? drift + 1 : 0;
+  if ((force || drift >= 2) && performance.now() - lastFix > 2500) {
     p.seek(want + ahead);
     lastFix = performance.now();
+    drift = 0;
   }
 }
 
