@@ -310,6 +310,8 @@ export function paintScore(stf, i, lay) {
 // Clef and key signature at the start of every row.
 export function clefColumn(lay) {
   const col = el('div', { className: 'clefs', 'aria-hidden': 'true' });
+  // drums: no percussion clef, the row starts at the bars
+  if (lay.drums) { col.style.width = '0'; return col; }
   for (const st of lay.staves) col.append(el('span', { className: 'lines', style: `top:calc(${st.y0 - lay.ymin} * var(--hs))` }));
   const place = (cls, y, text, x, extra = '') => col.append(el('span', { className: `s ${cls}`, textContent: text, style: `left:calc(${x} * var(--hs));top:calc(${y - lay.ymin} * var(--hs));${extra}` }));
   const marks = [];

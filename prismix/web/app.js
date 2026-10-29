@@ -748,7 +748,7 @@ function wireUpdate(u) {
   const dlg = $('update-dialog');
   dlg.addEventListener('cancel', (e) => e.preventDefault()); // no Escape while files are being swapped
   const progress = (pct, msg) => {
-    if (!dlg.open) dlg.showModal();
+    if (!dlg.open) dlg.show();
     $('update-dlg-msg').textContent = msg;
     $('update-dlg-bar').firstElementChild.style.width = `${pct}%`;
     $('update-dlg-pct').textContent = pct ? `${pct}%` : '';
@@ -1482,9 +1482,9 @@ $('settings-btn').addEventListener('click', () => {
   const box = settingsPanel.style;
   const side = $('sidebar');
   if (getComputedStyle(side).display !== 'none') {
-    // desktop: the rail's Settings entry unfolds upward inside the rail itself
+    // desktop: the rail's Settings entry unfolds under its own entry inside the rail
     box.cssText = '';
-    side.insertBefore(settingsPanel, side.querySelector('.push'));
+    side.append(settingsPanel);
   } else {
     const r = $('settings-btn').getBoundingClientRect();
     document.body.append(settingsPanel);

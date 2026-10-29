@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.32.2
+
+The "Updating Prismix" popup is now a small card in the bottom corner and no longer blocks the screen. In the desktop sidebar, Settings sits right under the last button and opens inline, with no duplicate title, close button or extra background, so the player gets more room. The white background in the fingering panel now covers only the chord diagram, not the whole panel. A drum part with a single bar now shows a red countdown number instead of yellow. The percussion clef column left of the drum bars is gone, as it carried no information.
+
 ## 0.32.1
 
 Opening a song hung on "Loading stems…" forever: the mixer's small stem list, added in 0.28.0, read volumes from stems that had not loaded yet and threw before loading began. It now starts at full volume and loads normally. Settings in the desktop sidebar now unfolds upward inside the sidebar instead of opening as a floating panel beside it.

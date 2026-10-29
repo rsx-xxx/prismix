@@ -1024,10 +1024,10 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
 .fg-pair svg { width: 100%; height: auto; max-width: 96px; }
 .fg-pair .next { opacity: .7; }
 .fg-pair .next svg { max-width: 64px; }
-.fg-pair figure { padding: 8px 6px 6px; border-radius: 12px; background: #fff; color: #14110f; --bg: #fff; }
-.fg-pair figure svg { color: #14110f; }
-.fg-pair figcaption { order: -1; font-weight: 800; font-size: 20px; line-height: 1.2; background: none; box-shadow: none; color: oklch(0.5 0.2 var(--h)); }
+.fg-pair figure svg { box-sizing: border-box; padding: 6px; border-radius: 10px; background: #fff; color: #14110f; --bg: #fff; }
+.fg-pair figcaption { order: -1; font-weight: 800; font-size: 20px; line-height: 1.2; background: none; box-shadow: none; color: oklch(0.78 0.15 var(--h)); }
 .fg-pair .next figcaption { font-size: 15px; }
+:root[data-theme="light"] .fg-pair figcaption { color: oklch(0.5 0.2 var(--h)); }
 .fing-side select { width: 100%; min-width: 9rem; text-overflow: ellipsis; }
 .fing-side .capo-pick { width: 100%; }
 .fing-side .capo-pick > .muted { font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
@@ -1130,12 +1130,11 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
   }
   .sidebar > :not(.brand):hover { background: var(--surface-2); color: var(--text); }
   .sidebar [aria-current] { background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent); }
-  .sidebar .push { margin-top: auto; }
-  /* Settings unfolds upward inside the rail, above its own entry */
-  body .sidebar > #settings.pop { position: static; display: block; height: auto; width: auto; margin: auto 0 6px; padding: 8px 14px 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; box-shadow: none; color: var(--text); cursor: default; font-size: 14px; }
+  /* Settings unfolds under its own entry inside the rail: no title, no close button, no panel of its own */
+  body .sidebar > #settings.pop { position: static; display: block; height: auto; width: auto; margin: 0; padding: 0 6px 0 12px; background: none; border: 0; border-radius: 0; box-shadow: none; animation: none; color: var(--text); cursor: default; font-size: 14px; }
   body .sidebar > #settings.pop[hidden] { display: none; }
+  #settings .pl-head { display: none; }
   body .sidebar:has(#settings:not([hidden])) { width: 300px; box-shadow: 12px 0 40px -18px #000; }
-  body .sidebar:has(#settings:not([hidden])) .push { margin-top: 0; }
   .sidebar:has(#settings:not([hidden])) span { opacity: 1; }
   body .topbar { padding-left: 24px; }
   body .topbar .brand,
@@ -1170,12 +1169,14 @@ body:has(#tabview:not([hidden], .off, .out)) #ahead { display: none !important; 
 .card .badges .instr { margin-left: auto; }
 .pp-go .instr { flex: none; margin-left: 12px; }
 
-/* Update in progress: a modal that cannot be mistaken for "nothing happened"; Escape does not dismiss it */
-.upd-dlg { text-align: center; width: min(360px, calc(100vw - 2rem)); }
-.upd-dlg[open] { display: grid; gap: 10px; justify-items: center; }
-.upd-dlg::backdrop { background: rgb(0 0 0 / .5); backdrop-filter: blur(4px); }
-.upd-dlg img { border-radius: 14px; animation: upd-pulse 1.6s ease-in-out infinite; }
-.upd-dlg .bar { width: 100%; }
-.upd-dlg small { font-size: 12px; }
+/* Update in progress: a small card in the corner, so the app stays usable while files are being swapped */
+.upd-dlg { position: fixed; inset: auto 16px 16px auto; margin: 0; z-index: 70; width: min(300px, calc(100vw - 2rem)); padding: 12px 14px; background: var(--surface); color: var(--text); border: 1px solid var(--line-strong); border-radius: 14px; box-shadow: 0 14px 36px #0006; }
+.upd-dlg[open] { display: grid; grid-template-columns: 36px 1fr; column-gap: 12px; row-gap: 4px; align-items: center; }
+.upd-dlg img { grid-row: 1 / span 3; width: 36px; height: 36px; border-radius: 10px; animation: upd-pulse 1.6s ease-in-out infinite; }
+.upd-dlg h3 { margin: 0; font-size: 14px; }
+.upd-dlg p { margin: 0; font-size: 12.5px; }
+.upd-dlg .bar { grid-column: 2; width: 100%; }
+.upd-dlg small { grid-column: 1 / -1; font-size: 12px; }
+.upd-dlg #update-dlg-pct { grid-column: 2; }
 @keyframes upd-pulse { 50% { transform: scale(.92); opacity: .7; } }
 @media (prefers-reduced-motion: reduce) { .upd-dlg img { animation: none; } }
