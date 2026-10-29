@@ -1386,12 +1386,20 @@ const settingsPanel = $('settings');
 const closeSettings = () => { settingsPanel.hidden = true; };
 $('settings-btn').addEventListener('click', () => {
   if (!settingsPanel.hidden) return closeSettings();
-  const r = $('settings-btn').getBoundingClientRect(), box = settingsPanel.style;
-  box.top = `${Math.round(r.bottom + 8)}px`;
-  box.right = `${Math.max(8, Math.round(innerWidth - r.right))}px`;
+  const box = settingsPanel.style;
+  const side = $('sidebar');
+  if (getComputedStyle(side).display !== 'none') {
+    // desktop: the control lives in the sidebar's bottom-left corner; open beside the rail, bottom-aligned with it
+    const r = side.getBoundingClientRect();
+    box.left = `${Math.round(r.right + 8)}px`; box.right = 'auto'; box.top = 'auto'; box.bottom = '16px';
+  } else {
+    const r = $('settings-btn').getBoundingClientRect();
+    box.top = `${Math.round(r.bottom + 8)}px`; box.bottom = 'auto'; box.left = 'auto';
+    box.right = `${Math.max(8, Math.round(innerWidth - r.right))}px`;
+  }
   settingsPanel.hidden = false;
 });
-document.addEventListener('pointerdown', (e) => { if (!settingsPanel.hidden && !e.target.closest('#settings, #settings-btn')) closeSettings(); });
+document.addEventListener('pointerdown', (e) => { if (!settingsPanel.hidden && !e.target.closest('#settings, #settings-btn, [data-go="settings-btn"]')) closeSettings(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !settingsPanel.hidden) closeSettings(); });
 $('settings-close').addEventListener('click', closeSettings);
 $('acc-sel').value = getAccidentals();

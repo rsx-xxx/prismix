@@ -508,8 +508,8 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 
 /* lyrics */
 .lyrics { margin-top: 0; }
-.ly-body { position: relative; overscroll-behavior: contain; height: var(--pane-h); overflow-y: auto; padding: 24px 8px; scroll-behavior: auto; mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent); }
-.ly-lines { display: grid; gap: 6px; justify-items: start; padding: 120px 0; }
+.ly-body { position: relative; overscroll-behavior: contain; height: var(--pane-h); overflow-y: auto; padding: 8px 8px 24px; scroll-behavior: auto; mask-image: linear-gradient(transparent, #000 4%, #000 86%, transparent); }
+.ly-lines { display: grid; gap: 6px; justify-items: start; padding: 0 0 120px; }
 .ly-line { box-sizing: border-box; cursor: pointer; outline-offset: 4px; font-size: clamp(20px, 3.2vw, 30px); font-weight: 750; line-height: 1.25; color: var(--muted); opacity: .55; transition: color .25s, opacity .25s, transform .25s; transform-origin: left center; }
 .ly-line.gap { font-size: 18px; }
 .ly-line.past { opacity: .4; }
@@ -673,7 +673,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
   .split[hidden], .panes.solo > .split { display: none; }
   .panes.solo > .block { grid-column: 1; }
 }
-.chart.aligned { display: grid; grid-template-columns: 1fr; gap: 6px; align-content: start; box-sizing: border-box; padding: 144px 8px; mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent); }
+.chart.aligned { display: grid; grid-template-columns: 1fr; gap: 6px; align-content: start; box-sizing: border-box; padding: 8px 8px 144px; mask-image: linear-gradient(transparent, #000 4%, #000 86%, transparent); }
 .ly-body { box-sizing: border-box; }
 .arow { display: flex; flex-wrap: wrap; align-content: center; align-items: center; gap: 8px; box-sizing: border-box; }
 .arow .cell { flex: 0 1 132px; }
@@ -1013,7 +1013,10 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
 .fg-pair svg { width: 100%; height: auto; max-width: 96px; }
 .fg-pair .next { opacity: .7; }
 .fg-pair .next svg { max-width: 64px; }
-.fg-pair figcaption { font-weight: 650; font-size: 13px; }
+.fg-pair figure { padding: 8px 6px 6px; border-radius: 12px; background: #fff; color: #14110f; --bg: #fff; }
+.fg-pair figure svg { color: #14110f; }
+.fg-pair figcaption { order: -1; font-weight: 800; font-size: 20px; line-height: 1.2; background: none; box-shadow: none; color: oklch(0.5 0.2 var(--h)); }
+.fg-pair .next figcaption { font-size: 15px; }
 .fing-side select { width: 100%; min-width: 9rem; text-overflow: ellipsis; }
 .fing-side .capo-pick { width: 100%; }
 .fing-side .capo-pick > .muted { font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
@@ -1097,6 +1100,7 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
   :root { --side-w: 68px; --side-open: 216px; }
   .view-btn { display: inline-grid; }
   body { padding-left: var(--side-w); }
+  body .dock { left: var(--side-w); }
   body .sidebar {
     position: fixed; z-index: 30; inset: 0 auto 0 0; width: var(--side-w); display: flex; flex-direction: column; gap: 2px; overflow: hidden; transition: width .18s ease, box-shadow .18s;
     padding: 18px 12px 16px; background: var(--glass); backdrop-filter: blur(28px) saturate(1.5); -webkit-backdrop-filter: blur(28px) saturate(1.5);

@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.26.1
+
+Settings works again on the desktop layout: it opens beside the left rail, bottom-aligned with the Settings button, and the player bar no longer covers that button. The empty space above the first lyric line and the first chord bar is gone. In the chord panel the current and next fingerings are white cards with the chord name above the diagram, in the chord's colour.
+
 ## 0.26.0
 
 Spotify links now find the right YouTube video more reliably: if the first search isn't a convincing match, other searches are tried, and the artist's own channel and the song's length count for more. Songs added from Spotify also remember Spotify's artist and title, so lyrics and chords are looked up by the real song name even when the video's own title is messy. Songs already matched before this update keep their old match.
