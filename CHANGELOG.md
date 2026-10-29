@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.30.2
+
+The release build of 0.29.0 to 0.30.1 stopped at a lint error in the new Chordify reader; this version fixes it and carries everything from those releases (ranked tab choice, compact player with the scroll magnet, no more answering for other local apps).
+
 ## 0.30.1
 
 Prismix no longer answers for other local apps. Its bare-name ports 80 and 443 (for `https://prismix.local/`) were open on every interface, so `https://nsgen.localhost/` on the same computer landed in Prismix. They now listen on the Wi-Fi address only, following it when it changes, and any request for a `*.localhost` name other than `stems.localhost` is refused. Restart Prismix to release the old listeners.

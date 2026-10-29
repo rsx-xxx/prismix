@@ -3,6 +3,7 @@
 Only the page's embedded summary is read; the timed chord track sits behind an endpoint robots.txt disallows, so it
 is not fetched. The summary is a second opinion on our own analysis and a yardstick to rank tab candidates by.
 """
+import contextlib
 import json
 import logging
 import re
@@ -77,8 +78,6 @@ def fetch(video_id: str) -> dict | None:
     if r.status_code >= 500:
         return None
     ref = parse(r.text) if r.status_code == 200 else None
-    try:
+    with contextlib.suppress(OSError):
         path.write_text(json.dumps(ref or {}))
-    except OSError:
-        pass
     return ref
