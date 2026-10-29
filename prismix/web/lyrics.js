@@ -322,9 +322,21 @@ export function createLyrics({ player, api, chords = () => [] }) {
     b.setAttribute('aria-pressed', String(layout === 'merged'));
     document.dispatchEvent(new Event('layout:change'));
   };
+  // Drum tabs have no chords to merge: they open side by side whatever the saved choice; a click there only lasts while drums are shown.
+  let saved = layout, drumsPick = null;
+  const onDrums = () => $('tabview').dataset.kind === 'drums' && !$('tabview').hidden;
+  document.addEventListener('tab:kind', () => {
+    const want = onDrums() ? (drumsPick ?? 'apart') : saved;
+    if (!onDrums()) drumsPick = null;
+    if (want === layout) return;
+    layout = want;
+    applyLayout();
+    if (cur) { cur.active = -2; frame(player.position); }
+  });
   $('ly-layout').addEventListener('click', () => {
     layout = layout === 'merged' ? 'apart' : 'merged';
-    try { localStorage.setItem('stems:layout', layout); } catch { /* ignore */ }
+    if (onDrums()) drumsPick = layout;
+    else { saved = layout; try { localStorage.setItem('stems:layout', layout); } catch { /* ignore */ } }
     applyLayout();
     if (cur) { cur.active = -2; frame(player.position); }
   });
