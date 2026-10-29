@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.29.0
+
+Tabs are now chosen, not just accepted: every Songsterr candidate is fitted to the recording and ranked, and the best one becomes the template that is aligned and gap-filled. The ranking weighs the bar fit, whether the artist matches the track, whether the tab had to be transposed, and how well it sticks to the chords Chordify lists for the same video (only its public page summary is read). A tab by a different artist in another key with a loose fit is now rejected, which fixes a wrong "Рондо" tab being picked for a Сироткин track. Tracks checked earlier keep their old result until the tab search is re-run.
+
 ## 0.28.0
 
 The player's three-dots menu now starts with a small stem mixer: mute, solo and volume for every stem, in step with the big mixer above. Songsterr tabs counted at half the app's tempo (bars twice as long as the recording's) are now recognised as well, next to the double-tempo ones from 0.27.1, and the layout that explains the recording's bars best is chosen. Saved stem volumes now also show on the big mixer's sliders when a song is opened.

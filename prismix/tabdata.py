@@ -19,7 +19,7 @@ from difflib import SequenceMatcher
 
 import httpx
 
-from . import analysis, library, tabfill, tabs
+from . import analysis, chordify, library, tabfill, tabs
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +31,9 @@ UA = "Mozilla/5.0 (compatible; prismix)"
 MIN_TITLE = 0.6
 MIN_SCORE = 0.5  # mean bar similarity (0..1) of the matched bars
 MIN_COVERAGE = 0.6  # share of the tab's playing bars that found a bar in the recording
-CANDIDATES = 3
+CANDIDATES = 5
+MIN_ARTIST = 0.5  # a transposed tab by an artist this unlike the track's needs a very close fit
+SURE_FIT = 0.75
 SLICE_DATA = "https://www.soundslice.com/slices/{code}/scoredata/"
 SLICE_URL = re.compile(r"^(?:https?://)?(?:www\.)?soundslice\.com/slices/([A-Za-z0-9]{3,12})(?:[/?#]|$)")
 FLAGS = "tshxm"  # a note's flags: tie, slide, hammer/pull, dead, palm mute
@@ -210,6 +212,34 @@ def candidates(info: dict) -> list[dict]:
             if score > found.get(s["songId"], (0, None))[0]:
                 found[s["songId"]] = (score, s)
     return [s for _, s in sorted(found.values(), key=lambda x: -x[0])][:CANDIDATES]
+
+
+def artist_match(info: dict, song: dict) -> float:
+    """How well the song's artist fits the names this track could carry; 0.5 when it names none."""
+    known = [a for a, _ in tabs.guess_query(info) if a]
+    if not known:
+        return 0.5
+    name = tabs._norm(song["artist"])
+    return max(SequenceMatcher(None, name, a).ratio() for a in known)
+
+
+def tone_mass(parts: dict[str, dict], shift_t: int, tones: set[int]) -> float:
+    """Share of the tab's pitch content (in the recording's key) that is made of the reference chords' tones."""
+    total = [0.0] * 12
+    for v in _tab_chroma(_lead_parts(parts)):
+        total = [a + b for a, b in zip(total, v, strict=True)]
+    whole = sum(total)
+    return sum(total[(pc + shift_t) % 12] for pc in tones) / whole if whole else 0.0
+
+
+def rank_candidate(parts: dict[str, dict], fitted: dict, artist: float, ref: dict | None) -> float:
+    """One number to compare fitted candidates by: bar fit, then who plays it, whether it needed transposing,
+    and how well it sticks to the chords Chordify hears."""
+    rank = fitted["similarity"] * fitted["coverage"] * (0.7 + 0.3 * artist) * (0.92 if fitted["shift"] else 1.0)
+    if ref:
+        t = -fitted["shift"] % 12
+        rank *= 0.6 + 0.4 * tone_mass(parts, t, chordify.tones(ref))
+    return rank
 
 
 def _kind(track: dict) -> str | None:
@@ -655,7 +685,9 @@ def lookup(video_id: str, *, force: bool = False) -> dict:
         raise TabDataError("Analyse the track first")
     result: dict = {"found": False}
     flaky = False  # a network failure must not be remembered as "no tab"
-    for song in candidates(info):
+    ref = chordify.fetch(video_id)  # an independent second opinion on the chords; None when unreachable
+    best = None
+    for song in candidates(info):  # every candidate is scored, the best one becomes the template
         try:
             parts = _download(song)
         except (TabDataError, KeyError, ValueError, OSError) as e:
@@ -665,16 +697,26 @@ def lookup(video_id: str, *, force: bool = False) -> dict:
         if not parts:
             continue
         fitted = fit(parts, structure)
-        if fitted:
-            gapfill(parts, fitted, structure)
-            retune(parts, fitted["shift"])
-            result = {
-                "found": True, "v": FORMAT, "source": "songsterr", "songId": song["songId"],
-                "url": f"https://www.songsterr.com/a/wsa/x-tab-s{song['songId']}",
-                "artist": song["artist"], "title": song["title"], **fitted,
-                "tracks": parts,
-            }
-            break
+        if not fitted:
+            continue
+        artist = artist_match(info, song)
+        if fitted["shift"] and artist < MIN_ARTIST and fitted["similarity"] < SURE_FIT:
+            log.info("songsterr %s skipped: another artist, in another key, a loose fit", song["songId"])
+            continue
+        rank = rank_candidate(parts, fitted, artist, ref)
+        log.info("songsterr %s (%s - %s): rank %.3f", song["songId"], song["artist"], song["title"], rank)
+        if best is None or rank > best[0]:
+            best = (rank, song, parts, fitted)
+    if best:
+        _, song, parts, fitted = best
+        gapfill(parts, fitted, structure)
+        retune(parts, fitted["shift"])
+        result = {
+            "found": True, "v": FORMAT, "source": "songsterr", "songId": song["songId"],
+            "url": f"https://www.songsterr.com/a/wsa/x-tab-s{song['songId']}",
+            "artist": song["artist"], "title": song["title"], **fitted,
+            "tracks": parts,
+        }
     if result["found"] or not flaky:
         _save(video_id, result)
         if result["found"] and not force:

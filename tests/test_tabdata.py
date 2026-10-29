@@ -93,6 +93,7 @@ def test_network_failure_is_not_cached(monkeypatch, tmp_path):
     monkeypatch.setattr(library, "read_info", lambda v: {"title": "T", "uploader": "A"})
     monkeypatch.setattr(analysis, "read_structure", lambda v: _structure([0, 5, 7, 0]))
     monkeypatch.setattr(tabdata, "candidates", lambda i: [{"songId": 1}])
+    monkeypatch.setattr(tabdata.chordify, "fetch", lambda v: None)
     saved = []
     monkeypatch.setattr(tabdata, "_save", lambda v, d: saved.append(d))
 
@@ -256,3 +257,22 @@ def test_fit_splits_a_tab_counted_at_half_tempo():
     assert got and got["regrouped"] == "split" and got["map"] == list(range(16))
     bars = parts["guitar"]["bars"]
     assert len(bars) == 16 and bars[0]["len"] == 0.5 and bars[0]["n"][0][:2] == [0.0, 0.5] and len(bars[0]["n"]) == 2
+
+
+def test_artist_match_tells_the_wrong_artist():
+    info = {"title": "Сироткин - Тоже является частью вселенной", "channel": "Сироткин - Topic"}
+    assert tabdata.artist_match(info, {"artist": "Сироткин"}) > 0.9
+    assert tabdata.artist_match(info, {"artist": "Рондо"}) < tabdata.MIN_ARTIST
+    assert tabdata.artist_match({"title": "x"}, {"artist": "Рондо"}) == 0.5
+
+
+def test_rank_prefers_the_tab_that_sticks_to_the_reference_chords():
+    # a tab made of C and G chords, against a reference of C and G chords and one of F and Bb
+    bar = {"n": [[0.0, 1, [[3, 5], [4, 5]]]], "len": 1}  # D string fret 5 and A string fret 5 -> G, D... plus tuning
+    parts = {"guitar": {"kind": "guitar", "tuning": TUNING, "bars": [bar] * 4}}
+    fitted = {"similarity": 0.8, "coverage": 1.0, "shift": 0}
+    near = {"chords": [{"r": 7, "q": "maj"}, {"r": 0, "q": "maj"}]}
+    far = {"chords": [{"r": 5, "q": "maj"}, {"r": 10, "q": "maj"}]}
+    assert tabdata.rank_candidate(parts, fitted, 1.0, near) > tabdata.rank_candidate(parts, fitted, 1.0, far)
+    assert tabdata.rank_candidate(parts, fitted, 1.0, None) > tabdata.rank_candidate(parts, fitted, 0.0, None)
+    assert tabdata.rank_candidate(parts, fitted, 1.0, None) > tabdata.rank_candidate(parts, {**fitted, "shift": 5}, 1.0, None)
