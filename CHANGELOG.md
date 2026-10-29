@@ -2,6 +2,14 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.14.0
+
+- New "Play on" button (like Cast or Spotify Connect, no Spotify account needed): send Prismix's sound to another output on this computer (speakers, AirPlay, Bluetooth) or to a phone connected through Band. The choice is remembered.
+- The accent colour follows the cover of the open song, in both themes.
+- On phones: a bottom navigation bar (Library, Upload, Playlists, Cloud, Band) and a swipe-down handle to leave the studio; the mini player sits above the bar.
+- Top bar fits at any desktop width; buttons no longer stack or get cut off.
+- Library covers that were missing (a certificate error while downloading them) are fetched again on startup.
+
 ## 0.13.0
 
 - The menu-bar mini player shows the song cover; Now Playing, the media overlay and Android already do.

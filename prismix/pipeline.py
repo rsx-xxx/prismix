@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import tempfile
 import time
-import urllib.request
 from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
@@ -229,10 +228,29 @@ def _save_thumbnail(meta: dict, dest: Path) -> None:
     if not url or not url.startswith("https://"):
         return
     try:
-        with urllib.request.urlopen(url, timeout=15) as r:  # noqa: S310 (https only)
-            dest.write_bytes(r.read(5_000_000))
+        import httpx  # bundles its own CA list: the python.org macOS build has none for urllib
+
+        r = httpx.get(url, timeout=15, follow_redirects=True)
+        r.raise_for_status()
+        dest.write_bytes(r.content[:5_000_000])
     except Exception as e:  # cosmetic only
         log.warning("thumbnail fetch failed: %s", e)
+
+
+def backfill_covers() -> int:
+    """Fetch the YouTube cover of every library song that has none (older imports and failed fetches). Returns how many were saved."""
+    from .config import LIBRARY_DIR
+
+    saved = 0
+    for d in LIBRARY_DIR.iterdir() if LIBRARY_DIR.is_dir() else []:
+        if not library.VIDEO_ID_RE.match(d.name) or (d / "thumb.jpg").is_file():
+            continue
+        info = library.read_info(d.name)
+        if not info or info.get("fromCloud"):  # cloud songs bring their own cover
+            continue
+        _save_thumbnail({"thumbnail": f"https://i.ytimg.com/vi/{d.name}/hqdefault.jpg"}, d / "thumb.jpg")
+        saved += (d / "thumb.jpg").is_file()
+    return saved
 
 
 # ───────────────────────── audio io ─────────────────────────

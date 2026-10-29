@@ -42,6 +42,7 @@ export class StemPlayer extends EventTarget {
     this.out = this.ctx.createGain(); // silences this device when another one plays the room's sound
     this.out.gain.value = this.held ? 0 : 1;
     this.out.connect(this.ctx.destination);
+    if (this.sinkId) ctx.setSinkId?.(this.sinkId).catch(() => { this.sinkId = ''; });
     this.master.connect(this.out);
     this.duck = this.ctx.createGain(); // short fades around seek/pause to avoid clicks
     this.duck.connect(this.master);
@@ -324,6 +325,13 @@ export class StemPlayer extends EventTarget {
   setMuted(name, on) { this._stem(name).muted = on; this._applyGains(); }
   setSolo(name, on) { this._stem(name).solo = on; this._applyGains(); }
   setVolume(name, v) { this._stem(name).volume = clamp(v, 0, 1.5); this._applyGains(); }
+  /** Route this computer's sound to another output ('' = system default). Resolves false where the engine cannot. */
+  async setSink(id) {
+    this.sinkId = id || '';
+    if (!this.ctx) return true;
+    if (!this.ctx.setSinkId) return !id;
+    try { await this.ctx.setSinkId(this.sinkId); return true; } catch { this.sinkId = ''; return false; }
+  }
   setHeld(on) { this.held = !!on; if (this.out) this.out.gain.setTargetAtTime(on ? 0 : 1, this.ctx.currentTime, 0.02); }
   setMaster(v) { this.master.gain.setTargetAtTime(clamp(v, 0, 1), this.ctx.currentTime, 0.02); this.masterLevel = v; }
 

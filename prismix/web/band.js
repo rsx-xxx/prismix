@@ -19,6 +19,7 @@ export function describe(m) {
 
 export function createBand({ player, current, open, onNotes, $ }) {
   let timer = 0;
+  const watchers = [];
   let status = { clients: [], locked: false, token: false, url: '', qr: '' };
   const saved = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch { return {}; } };
 
@@ -134,6 +135,7 @@ export function createBand({ player, current, open, onNotes, $ }) {
     $('band-hint').textContent += sp ? ` ${sp.name} is playing the sound, so this computer is silent.` : '';
     $('band-btn').dataset.count = status.clients.length || '';
     $('band-btn').title = `Band: ${status.clients.length} connected`;
+    watchers.forEach((f) => f(status));
     if (!dlg.open) return;
   }
 
@@ -154,5 +156,5 @@ export function createBand({ player, current, open, onNotes, $ }) {
 
   ['state', 'seek', 'tune', 'loop', 'mix'].forEach((t) => player.addEventListener(t, publish));
   timer = setInterval(() => { if (player.playing) publish(); }, 2000);
-  return { publish, send: (m) => net.send(m), stop() { clearInterval(timer); net.stop(); } };
+  return { status: () => status, watch: (f) => watchers.push(f), setSpeaker: (id) => net.send({ t: 'admin', speaker: id }), publish, send: (m) => net.send(m), stop() { clearInterval(timer); net.stop(); } };
 }

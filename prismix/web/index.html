@@ -28,6 +28,7 @@
     <input id="up-file" type="file" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.wma,.aif,.aiff,.mkv,.m4b" hidden>
     <button class="btn ghost" id="pl-btn" type="button" data-ico="list" title="Pick from YouTube or Spotify playlists">Playlists</button>
     <button class="btn ghost" id="cloud-btn" type="button" title="Your band's cloud: songs shared between everyone's devices, processed once">Band cloud sign-in</button>
+    <button class="icon-btn" id="out-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Play on a device" title="Play on: this computer, speakers or a phone on this Wi-Fi"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 17V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v11M2 20h20M9 14.5a4 4 0 0 1 6 0M12 17.5h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <button class="btn ghost" id="band-btn" type="button" title="Play with phones or another Prismix computer on this Wi-Fi">Band</button>
     <button class="icon-btn" id="settings-btn" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
   </header>
@@ -87,6 +88,7 @@
     </section>
 
     <section id="studio" hidden>
+      <button class="grip" id="grip" type="button" aria-label="Close the player"><i></i></button>
       <div class="trackhead">
         <button class="icon-btn" id="back" aria-label="Back to library">
           <svg viewBox="0 0 24 24" width="20" height="20"><path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -185,6 +187,16 @@
   </main>
 
   <button id="follow" class="follow" type="button" data-ico="locate" title="Follow playback: scroll back to the playing position (F)" aria-label="Follow playback" hidden></button>
+
+  <div class="out-pop" id="out-pop" role="menu" aria-label="Play on" hidden></div>
+
+  <nav class="botnav" id="botnav" aria-label="Main">
+    <a href="#/" data-go="home" aria-current="page"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 11 12 4l8 7v9H4zM9 20v-6h6v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Library</span></a>
+    <button type="button" data-go="up-btn"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Upload</span></button>
+    <button type="button" data-go="pl-btn"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 6h12M4 12h12M4 18h8M18 14v6M15 17h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Playlists</span></button>
+    <button type="button" data-go="cloud-btn"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 18a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6-1A4.5 4.5 0 0 1 17 18z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Cloud</span></button>
+    <button type="button" data-go="band-btn"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M16 11a3 3 0 1 0 0-6M3 20c0-3 3-5 6-5s6 2 6 5M9 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6M17 15c2.5.3 4 2 4 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Band</span></button>
+  </nav>
 
   <aside class="mini" id="mini" hidden aria-label="Now playing">
     <div class="mini-bar"><i id="mini-bar"></i></div>

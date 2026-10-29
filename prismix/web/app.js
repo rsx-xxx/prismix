@@ -13,6 +13,8 @@ import { createSplit } from './split.js';
 import { initCheatsheet } from './cheatsheet.js';
 import { getAccidentals, setAccidentals } from './theory.js';
 import { createBand } from './band.js';
+import { createOutput } from './output.js';
+import { setAccent, clearAccent } from './accent.js';
 import { createNotes } from './notes.js';
 import { createJoin } from './join.js';
 import { createCloud } from './cloud.js';
@@ -460,8 +462,8 @@ function showHome(inPlaylist = false) {
   $('nt-toggle').hidden = true;
   if (state.current) {
     savePrefs();
-    if (player.playing) startBackground(); else { player.dispose(); state.current = null; }
-  }
+    if (player.playing) startBackground(); else { player.dispose(); state.current = null; clearAccent(); }
+  } else clearAccent();
   followBtn.hide();
   score.close();
   tabView.close();
@@ -500,7 +502,19 @@ function paintMini() {
   $('mini-bar').style.width = `${Math.min(100, (player.position / Math.max(player.duration, 1)) * 100)}%`;
 }
 $('mini-play').addEventListener('click', () => { player.toggle(); paintMini(); });
-$('mini-close').addEventListener('click', () => { player.dispose(); state.current = null; endBackground(); });
+$('mini-close').addEventListener('click', () => { player.dispose(); state.current = null; clearAccent(); endBackground(); });
+
+// Phones: drag the grip at the top of the player down to leave it (the song keeps playing in the mini player).
+{
+  const grip = $('grip');
+  let y0 = null;
+  grip.addEventListener('touchstart', (e) => { y0 = e.touches[0].clientY; }, { passive: true });
+  grip.addEventListener('touchend', (e) => {
+    if (y0 != null && e.changedTouches[0].clientY - y0 > 70) location.hash = '#/';
+    y0 = null;
+  });
+  grip.addEventListener('click', () => { location.hash = '#/'; });
+}
 
 // ── studio ──
 /** What is shared about how the song is played: audio key, chords-only shift, guitar tuning. */
@@ -632,6 +646,7 @@ async function openStudio(id, model) {
 
 /** The views of an opened studio; also used when coming back to a song that kept playing in the background. */
 function mountStudio(id, model, meta, token) {
+  setAccent(`/media/${id}/thumb.jpg`);
   $('nt-toggle').hidden = false;
   $('dock').hidden = false;
   syncDock();
@@ -1279,6 +1294,12 @@ const stickers = createNotes({
   button: $('nt-toggle'),
 });
 const band = createBand({ player, current: () => state.current, onNotes: (m) => stickers.onMessage(m), $ });
+createOutput({ player, band, $ });
+$('botnav').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-go]');
+  if (b) $(b.dataset.go).click();
+});
+
 createJoin({ $ });
 const cloud = createCloud({
   $, el, api, notice, fmt, onChange: () => { renderLibrary(); plview.rerender(); },

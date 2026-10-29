@@ -206,6 +206,7 @@ def create_app() -> FastAPI:
         LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
         jobs.start()
         prefetcher.start()
+        threading.Thread(target=pipeline.backfill_covers, name="covers", daemon=True).start()
         updates.auto(busy, lambda: os._exit(0))
         yield
         await prefetcher.stop()

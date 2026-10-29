@@ -41,3 +41,17 @@ def test_attempts_survive_a_restart(tmp_path, monkeypatch):
     assert "tabs" in prefetch._attempts(vid)
     (library.video_dir(vid) / "prefetch.json").write_text("not json")
     assert prefetch._attempts(vid) == {}
+
+
+def test_backfill_covers_skips_cloud_songs(tmp_path, monkeypatch):
+    from prismix import config, library, pipeline
+
+    monkeypatch.setattr(config, "LIBRARY_DIR", tmp_path)
+    monkeypatch.setattr(library, "LIBRARY_DIR", tmp_path)
+    fetched = []
+    monkeypatch.setattr(pipeline, "_save_thumbnail", lambda meta, dest: (fetched.append(meta["thumbnail"]), dest.write_bytes(b"x")))
+    for vid, extra in (("aaaaaaaaaaa", {}), ("bbbbbbbbbbb", {"fromCloud": True})):
+        (tmp_path / vid).mkdir()
+        (tmp_path / vid / "info.json").write_text(json.dumps({"id": vid, "title": "t", **extra}))
+    assert pipeline.backfill_covers() == 1
+    assert fetched == ["https://i.ytimg.com/vi/aaaaaaaaaaa/hqdefault.jpg"]
