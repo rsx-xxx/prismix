@@ -21,6 +21,7 @@ class FakeCloud:
         self.files: dict[str, bytes] = {}
         self.committed: dict | None = None
         self.puts: list[str] = []
+        self.deleted = ""
 
     def __call__(self, req: httpx.Request) -> httpx.Response:
         if req.headers.get("authorization") != f"Bearer {TOKEN}":
@@ -28,6 +29,9 @@ class FakeCloud:
         path = req.url.path
         if path == "/api/v1/index.json":
             return httpx.Response(200, json={"songs": [{"id": VID, "title": "T"}]})
+        if req.method == "DELETE":
+            self.deleted = path.rsplit("/", 1)[1]
+            return httpx.Response(204)
         if req.method == "PUT":
             rel = path.split("/files/", 1)[1]
             if hashlib.sha256(req.content).hexdigest() != req.headers["x-sha256"]:
@@ -312,3 +316,9 @@ def test_download_never_touches_a_song_already_in_the_library(tmp_path, monkeypa
     cloud.download(cloud_for(fake), VID)
     assert (tmp_path / VID / "info.json").read_text() == '{"title": "mine"}'
     assert sorted(p.name for p in (tmp_path / VID).iterdir()) == ["info.json"]
+
+
+def test_delete_song():
+    fake = FakeCloud()
+    cloud_for(fake).delete_song(VID)
+    assert fake.deleted == VID

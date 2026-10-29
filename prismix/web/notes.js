@@ -49,9 +49,9 @@ export function createNotes({ id, send, roots, button }) {
     const i = el('input', { type: 'radio', name: 'nt-show', value: v });
     return el('label', {}, i, label);
   };
-  const showRow = el('div', { className: 'nt-row' }, radio('tap', ' Show on tap'), radio('always', ' Always show'), radio('hover', ' Show on hover'));
+  const showRow = el('div', { className: 'nt-row' }, radio('always', ' Always show'), radio('hover', ' On hover'), radio('tap', ' Hidden'));
   const meta = el('div', { className: 'nt-meta' });
-  const del = el('button', { type: 'button', className: 'btn ghost small', textContent: 'Delete' });
+  const del = el('button', { type: 'button', className: 'btn ghost small nt-del', textContent: 'Delete' });
   const cancel = el('button', { type: 'button', className: 'btn ghost small', textContent: 'Cancel' });
   const save = el('button', { type: 'button', className: 'btn small', textContent: 'Save' });
   pop.append(grid, text, showRow, meta, el('div', { className: 'nt-row nt-act' }, del, el('span', { className: 'nt-sp' }), cancel, save));
@@ -78,7 +78,7 @@ export function createNotes({ id, send, roots, button }) {
   function open(d) {
     clearTimeout(waiting);
     save.disabled = del.disabled = false;
-    draft = { icon: 'talk', text: '', show: 'tap', ...d };
+    draft = { icon: 'talk', text: '', show: 'always', ...d };
     text.value = draft.text;
     meta.textContent = `${clock(draft.t)}${draft.by ? ` · ${draft.by}` : ''}`;
     paintPop();
@@ -130,8 +130,11 @@ export function createNotes({ id, send, roots, button }) {
     i.classList.add('nt');
     i.title = `${name}${n.text ? `: ${n.text}` : ''}${n.by ? ` (${n.by})` : ''}`;
     i.dataset.nid = n.id;
-    const wrap = el('span', { className: 'nt-w' }, i);
+    const x = el('button', { type: 'button', className: 'nt-x', title: 'Delete sticker', ariaLabel: 'Delete sticker', textContent: '×' });
+    x.dataset.nid = n.id;
+    const wrap = el('span', { className: 'nt-w' }, i, x);
     if (n.text && n.show !== 'tap') wrap.append(el('span', { className: `nt-say${n.show === 'hover' ? ' on-hover' : ''}`, textContent: n.text }));
+    wrap.style.setProperty('--c', (ICONS[n.icon] || ICONS.talk)[1]);
     return wrap;
   }
   const last = (items, t, of) => { let k = -1; for (let j = 0; j < items.length && of(items[j]) <= t; j++) k = j; return k; };
@@ -166,18 +169,66 @@ export function createNotes({ id, send, roots, button }) {
   function schedule() { if (!queued) queued = requestAnimationFrame(paint); }
 
   // ── interaction ──
-  const timeAt = (e) => {
-    const cell = e.target.closest('[data-t0]');
+  const timeAt = (e, target = e.target) => {
+    const cell = target?.closest?.('[data-t0]');
     if (cell) {
       const t0 = num(cell.dataset.t0), t1 = num(cell.dataset.t1);
       if (!(cell.classList.contains('tbar') || cell.classList.contains('tb')) || !(t1 > t0)) return t0;
       const r = cell.getBoundingClientRect();
       return t0 + Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width))) * (t1 - t0);
     }
-    const w = e.target.closest('.sy[data-t], .ly-brk[data-t], .ly-instr[data-t], .cell[data-t]');
+    const w = target?.closest?.('.sy[data-t], .ly-brk[data-t], .ly-instr[data-t], .cell[data-t]');
     return w ? num(w.dataset.t) : NaN;
   };
+
+  // Drag a sticker onto another word, chord or tab bar: it keeps its icon and text and takes the new time.
+  let drag = null;
+  document.addEventListener('pointerdown', (e) => {
+    const s = e.target.closest?.('.nt');
+    if (!s || e.button > 0) return;
+    drag = { s, x: e.clientX, y: e.clientY, ghost: null, id: s.dataset.nid };
+  }, true);
+  document.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    if (!drag.ghost) {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
+      drag.ghost = drag.s.cloneNode(true);
+      drag.ghost.className = 'nt-i nt-ghost';
+      drag.ghost.style.setProperty('--c', drag.s.style.getPropertyValue('--c'));
+      document.body.append(drag.ghost);
+      drag.s.classList.add('nt-lifted');
+      document.body.classList.add('nt-dragging');
+    }
+    e.preventDefault();
+    drag.ghost.style.transform = `translate(${e.clientX - 18}px, ${e.clientY - 18}px)`;
+  }, true);
+  const endDrag = (e, drop) => {
+    const d = drag;
+    drag = null;
+    if (!d?.ghost) return;
+    d.ghost.remove();
+    d.s.classList.remove('nt-lifted');
+    document.body.classList.remove('nt-dragging');
+    skipClick = true;
+    setTimeout(() => { skipClick = false; }, 0);
+    if (!drop) return;
+    const at = document.elementFromPoint(e.clientX, e.clientY);
+    const t = at && roots().some((r) => r?.contains(at)) ? timeAt(e, at) : NaN;
+    const n = list.find((x) => x.id === d.id);
+    if (n && Number.isFinite(t)) send({ t: 'note', op: 'edit', id: id(), note: { ...n, t: Math.round(t * 100) / 100 } });
+  };
+  let skipClick = false;
+  document.addEventListener('pointerup', (e) => endDrag(e, true), true);
+  document.addEventListener('pointercancel', (e) => endDrag(e, false), true);
   document.addEventListener('click', (e) => {
+    if (skipClick) { e.stopPropagation(); e.preventDefault(); return; }
+    const x = e.target.closest?.('.nt-x');
+    if (x) {
+      e.stopPropagation();
+      e.preventDefault();
+      send({ t: 'note', op: 'del', id: id(), note: { id: x.dataset.nid } });
+      return;
+    }
     const s = e.target.closest?.('.nt');
     if (s) {
       e.stopPropagation();

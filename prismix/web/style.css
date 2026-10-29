@@ -732,8 +732,8 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 /* studio: chord fingerings sit in the panes row, level with the chords */
 @media (min-width: 1180px) {
   main:has(#studio:not([hidden])) { width: min(1480px, 100% - 40px); }
-  .panes { grid-template-columns: minmax(300px, var(--ly, 1fr)) minmax(420px, var(--rc, 2fr)) 208px; }
-  .panes.solo { grid-template-columns: minmax(0, 1fr) 208px; }
+  .panes { grid-template-columns: minmax(300px, var(--ly, 1fr)) minmax(420px, var(--rc, 2fr)) 252px; }
+  .panes.solo { grid-template-columns: minmax(0, 1fr) 252px; }
   .panes > .fing-side { grid-column: -2; grid-row: 1 / span 2; align-self: start; margin-top: 0; max-height: calc(var(--pane-h) + 64px); }
   .panes:has(> #score.off) { grid-template-columns: minmax(300px, var(--ly, 1fr)) minmax(420px, var(--rc, 2fr)); }
   .panes.solo:has(> #score.off) { grid-template-columns: minmax(0, 1fr); }
@@ -1052,3 +1052,24 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
 .omni { min-width: 0; }
 .topbar { gap: 10px; }
 @media (max-width: 1360px) { .topbar .btn[data-ico]::before { display: none; } .omni #quality { display: none; } }
+
+/* Fingering: bigger diagrams, the panel gives its column back when hidden */
+.fg-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px; font-size: 13px; }
+.fg-pair { grid-template-columns: 1fr 1fr; }
+.fg-pair svg { max-width: 118px; }
+.fg-pair .next svg { max-width: 92px; }
+.fg-pair figcaption { font-size: 15px; }
+.fing-side .diagrams figcaption { font-size: 13px; font-weight: 650; }
+@media (min-width: 1180px) {
+  .panes:has(> .fing-side[hidden]) { grid-template-columns: minmax(300px, var(--ly, 1fr)) minmax(420px, var(--rc, 2fr)); }
+  .panes.solo:has(> .fing-side[hidden]) { grid-template-columns: minmax(0, 1fr); }
+}
+
+.btn.danger:hover { color: var(--danger, #ff6b6b); border-color: currentColor; }
+
+/* tab bars share a row with the lyric line they are played under */
+.tab.aligned { display: grid; gap: 6px; align-content: start; padding: 120px 0; }
+.arow.tarow { display: flex; flex-direction: column; flex-wrap: nowrap; justify-content: center; align-items: stretch; gap: 0; }
+.tarow .trow { margin-bottom: 0; }
+.tarow .trow + .trow { margin-top: 14px; }
+.tab.aligned .trow:last-child { margin-bottom: 0; }

@@ -2,6 +2,15 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.15.0
+
+- Stickers can be dragged to a new moment, deleted with a × on the sticker, and are readable on an opaque card.
+- Fingering is only for string instruments with a fretboard (not bass, drums or keys), has its own show/hide button, is larger, and its settings are open in the panel. The player strip no longer shows fingering, the chord grid no longer highlights it, and "Next" is no longer printed on the next chord.
+- Cloud: songs not in your library show their cover (with a fallback to the video thumbnail), and any cloud song can be deleted after a confirmation.
+- Tabs: fixed a crash while fitting tabs to a recording when notes carry technique flags, which left some songs without tabs.
+- Lyrics: "(unofficial)", "(audio)" and similar tags no longer break the lookup, audio-only results are retried once, speech recognition uses Whisper large-v3-turbo (about 1.6 GB, downloaded on first use), and impossible words are dropped.
+- With synced lyrics, tab and drum bars share a row with the lyric line they are played under, so both scroll together.
+
 ## 0.14.0
 
 - New "Play on" button (like Cast or Spotify Connect, no Spotify account needed): send Prismix's sound to another output on this computer (speakers, AirPlay, Bluetooth) or to a phone connected through Band. The choice is remembered.

@@ -13,8 +13,17 @@
 .nt-i b { font: 800 .95rem/1 system-ui, sans-serif; text-shadow: 0 1px 2px rgb(0 0 0 / .4); }
 .nt { opacity: .82; pointer-events: auto; transform: rotate(-6deg); transition: transform .12s, opacity .12s; }
 .nt:hover, .nt:focus-visible { opacity: 1; transform: rotate(0) scale(1.12); }
-.nt-say { margin-top: 2px; max-width: 14em; padding: 2px 6px; border-radius: 6px; font-size: .72rem; line-height: 1.25; white-space: pre-wrap;
-  background: color-mix(in srgb, var(--bg, #111) 82%, transparent); border: 1px solid var(--line, #444); color: var(--text, #fff); pointer-events: none; }
+.nt-say { margin-top: 3px; width: max-content; max-width: 16em; padding: 5px 9px; border-radius: 8px; font: 500 .85rem/1.3 system-ui, sans-serif; white-space: pre-wrap; text-align: left;
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--line-strong); border-left: 3px solid var(--c, var(--accent)); box-shadow: 0 6px 18px rgb(0 0 0 / .35); pointer-events: none; }
+.nt-w { --c: var(--accent); }
+.nt { touch-action: none; cursor: grab; }
+.nt-x { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; padding: 0; display: none; place-items: center; border-radius: 50%; border: 0; cursor: pointer;
+  font: 700 13px/1 system-ui, sans-serif; background: var(--danger); color: #fff; pointer-events: auto; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
+.nt-w:hover .nt-x, .nt-w:focus-within .nt-x { display: grid; }
+.nt-lifted { opacity: .25; }
+.nt-ghost { position: fixed; left: 0; top: 0; z-index: 90; width: 2.3rem; height: 2.3rem; pointer-events: none; cursor: grabbing; transform-origin: center; box-shadow: 0 10px 26px rgb(0 0 0 / .5), 0 0 0 3px #fff; }
+body.nt-dragging, body.nt-dragging * { cursor: grabbing !important; user-select: none; }
+.nt-del { color: var(--danger); border-color: var(--danger); margin-right: auto; }
 body.nt-mode .sy, body.nt-mode .cell, body.nt-mode .tbar, body.nt-mode .bar, body.nt-mode .ly-brk, body.nt-mode .ly-instr { cursor: copy; }
 #nt-toggle[aria-pressed="true"] { background: var(--accent, #7c9cff); color: #fff; }
 #nt-pop { position: fixed; z-index: 60; left: 50%; bottom: 1rem; transform: translateX(-50%); width: min(22rem, calc(100vw - 1.5rem));

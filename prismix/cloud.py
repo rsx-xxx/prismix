@@ -134,6 +134,13 @@ class Cloud:
         if r.status_code != 200:
             raise CloudError(f"Upload of {rel} failed ({r.status_code})", 502)
 
+    def delete_song(self, song_id: str) -> None:
+        r = self.request("DELETE", f"/api/v1/songs/{song_id}")
+        if r.status_code == 404:
+            return  # already gone
+        if r.status_code not in (200, 204):
+            raise CloudError(f"The cloud could not delete this song ({r.status_code})", 502)
+
     def commit(self, song_id: str, body: dict) -> dict:
         r = self.request("POST", f"/api/v1/songs/{song_id}/commit", json=body)
         if r.status_code == 409:

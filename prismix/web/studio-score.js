@@ -28,7 +28,7 @@ export function createScore({ player, api, notice, onSetup }) {
   let renderToken = 0;
   let last = { bar: -2, beat: -2, chord: -2 };
   const flag = (k, dflt) => { try { const v = localStorage.getItem(`stems:sc-${k}`); return v === null ? dflt : v === '1'; } catch { return dflt; } };
-  const opts = { easy: flag('easy', false), simple: flag('simple', false), useTab: flag('useTab', true), now: flag('now', true), hover: flag('hover', true) };
+  const opts = { easy: flag('easy', false), simple: flag('simple', false), useTab: flag('useTab', true), hover: flag('hover', true) };
   const loadCapoMode = () => { try { return localStorage.getItem('stems:sc-capoMode') || 'off'; } catch { return 'off'; } };
   let capoMode = loadCapoMode(); // 'off' | 'auto' | '1'..'7'
   const alts = new Map(); // chord shape -> which alternative fingering is showing
@@ -138,6 +138,7 @@ export function createScore({ player, api, notice, onSetup }) {
     $('sc-body').replaceChildren();
     $('fing').replaceChildren();
     $('fing').hidden = true;
+    fingChip.hidden = true;
     document.dispatchEvent(new Event('chords:change'));
   }
 
@@ -311,15 +312,13 @@ export function createScore({ player, api, notice, onSetup }) {
   function markChord(ci) {
     renderAhead(ci);
     const root = $('studio');
-    root.querySelectorAll('.chart .on, .diagrams .on, .ly-lines .ch.on, #sing .ch.on').forEach((n) => n.classList.remove('on'));
+    root.querySelectorAll('.chart .on, .ly-lines .ch.on, #sing .ch.on').forEach((n) => n.classList.remove('on'));
     if (ci < 0) return;
     root.querySelectorAll(`.chart [data-ci="${ci}"]`).forEach((n) => n.classList.add('on'));
     // the lyrics show merged chords only: light the latest one at or before this chord
     const shownCis = [...root.querySelectorAll('.ly-lines [data-ci], #sing [data-ci]')].map((n) => Number(n.dataset.ci));
     const lyHit = shownCis.findLast((x) => x <= ci);
     if (lyHit !== undefined) root.querySelectorAll(`.ly-lines [data-ci="${lyHit}"], #sing [data-ci="${lyHit}"]`).forEach((n) => n.classList.add('on'));
-    const fig = root.querySelector(`.diagrams [data-shape="${shapeKey(cur.data.structure.chords[ci])}"]`);
-    fig?.classList.add('on');
   }
   // ── "now and next" strip in the dock: always on screen, so upcoming chords never hide below the fold ──
   const AHEAD = 8;
@@ -337,7 +336,6 @@ export function createScore({ player, api, notice, onSetup }) {
       const b = el('button', { type: 'button', className: i === ci ? 'cur' : '', title: 'Jump to this chord' },
         el('b', { textContent: name(chords[i]) }), el('small'));
       paint(b, chords[i]);
-      if (opts.now && items.length < 2) { const svg = fingerSvg(chords[i]); if (svg) b.prepend(svg); }
       b.addEventListener('click', () => player.seek(beatSec(chords[i].b)));
       items.push({ c: chords[i], node: b, small: b.lastChild });
     }
@@ -444,9 +442,9 @@ export function createScore({ player, api, notice, onSetup }) {
 
   function alignRows() {
     const chart = $('sc-body').querySelector('.chart.aligned');
-    if (!chart) return;
+    if (!chart || chart.offsetParent === null) return; // swapped out for the tab, which lays the lyric rows out itself
     const kids = lyricKids(), rows = [...chart.children];
-    kids.forEach((k, i) => { k.style.minHeight = ''; if (rows[i]) rows[i].style.minHeight = ''; });
+    kids.forEach((k, i) => { k.style.minHeight = ''; k.style.paddingBlock = ''; if (rows[i]) rows[i].style.minHeight = ''; });
     kids.forEach((k, i) => {
       const r = rows[i];
       if (!r) return;
@@ -462,6 +460,7 @@ export function createScore({ player, api, notice, onSetup }) {
   let alignQueued = false;
   const queueAlign = () => { if (alignQueued) return; alignQueued = true; requestAnimationFrame(() => { alignQueued = false; alignRows(); }); };
   document.addEventListener('lyrics:data', (e) => { lyricLines = e.detail; if (cur?.data) renderChart($('sc-body')); });
+  document.addEventListener('blocks:change', queueAlign);
   document.addEventListener('layout:change', () => { if (cur?.data) renderChart($('sc-body')); });
   addEventListener('resize', () => { if (cur?.data) { const was = !!$('sc-body').querySelector('.chart.aligned'); if (was !== alignedMode()) renderChart($('sc-body')); else queueAlign(); } });
   new ResizeObserver(queueAlign).observe(document.querySelector('#lyrics .ly-body') || document.body);
@@ -491,8 +490,8 @@ export function createScore({ player, api, notice, onSetup }) {
       grid = el('div', { className: 'chart aligned' }, ...rows);
     } else grid = el('div', { className: 'chart' }, ...cells);
     body.replaceChildren(grid);
-    $('fing').replaceChildren(fingBlock('Now and next', 'fg-now', nowNext()), fingBlock('All chords', 'fg-all', diagrams()), fingBlock('Settings', 'fg-cfg', fingerOpts(), false));
-    $('fing').hidden = false;
+    $('fing').replaceChildren(fingHead(), fingBlock('Now and next', 'fg-now', nowNext()), fingBlock('Settings', 'fg-cfg', fingerOpts()), fingBlock('All chords', 'fg-all', diagrams()));
+    syncFing();
     if (aligned) alignRows();
     markBar(last.bar);
     markChord(last.chord);
@@ -512,9 +511,36 @@ export function createScore({ player, api, notice, onSetup }) {
     return [...t.values()].sort((p, q) => q.len - p.len);
   }
 
+  // The fingering panel is for a guitar: it is hidden while the tab on screen is a bass, drums, keys or anything else, and a
+  // chip in the block bar (or the × in the panel) shows or hides it for the guitar.
+  const fingChip = Object.assign(el('button', { type: 'button', className: 'chip', textContent: 'Fingering', title: 'Show or hide the chord fingerings' }), { hidden: true });
+  fingChip.addEventListener('click', () => { fingOn = !fingOn; try { localStorage.setItem('stems:sc-fingShow', fingOn ? '1' : '0'); } catch { /* ignore */ } syncFing(); });
+  let fingOn = flag('fingShow', true);
+  function fingIsGuitar() {
+    const t = $('tabview');
+    const onScreen = !t.hidden && !t.classList.contains('off') && !t.classList.contains('out');
+    return !onScreen || (t.dataset.kind || 'guitar') === 'guitar';
+  }
+  function syncFing() {
+    const has = !!cur?.data && fingIsGuitar();
+    const bar = $('blockbar'), eye = bar.querySelector('.btn');
+    if (eye && fingChip.nextElementSibling !== eye) bar.insertBefore(fingChip, eye);
+    fingChip.hidden = !has;
+    fingChip.setAttribute('aria-pressed', String(fingOn));
+    $('fing').hidden = !has || !fingOn;
+    document.dispatchEvent(new Event('fing:change'));
+  }
+  document.addEventListener('blocks:change', syncFing);
+  document.addEventListener('tab:kind', syncFing);
+  function fingHead() {
+    const x = el('button', { type: 'button', className: 'icon-btn', textContent: '×', title: 'Hide fingerings', ariaLabel: 'Hide fingerings' });
+    x.addEventListener('click', () => fingChip.click());
+    return el('div', { className: 'fg-head' }, el('b', { textContent: 'Fingering' }), x);
+  }
+
   function fingBlock(title, cls, body, open = true) {
     const d = el('details', { className: `fg-block ${cls}`, open }, el('summary', { textContent: title }), body);
-    const k = `stems:fg-${cls}`;
+    const k = `stems:fg2-${cls}`;
     try { if (localStorage.getItem(k) != null) d.open = localStorage.getItem(k) === '1'; } catch { /* ignore */ }
     d.addEventListener('toggle', () => { try { localStorage.setItem(k, d.open ? '1' : '0'); } catch { /* ignore */ } });
     return d;
@@ -535,7 +561,7 @@ export function createScore({ player, api, notice, onSetup }) {
     for (let i = first; i < chords.length && picks.length < 2; i++) if (!picks.length || name(chords[i]) !== name(chords[picks[0]])) picks.push(i);
     nowBox.replaceChildren(...picks.map((i, k) => {
       const svg = fingerSvg(chords[i]);
-      return el('figure', { className: k ? 'next' : 'cur' }, svg || el('span', { className: 'muted', textContent: '–' }), paint(el('figcaption', { textContent: `${k ? 'Next: ' : ''}${name(chords[i])}` }), chords[i]));
+      return el('figure', { className: k ? 'next' : 'cur' }, svg || el('span', { className: 'muted', textContent: '–' }), paint(el('figcaption', { textContent: name(chords[i]) }), chords[i]));
     }));
   }
 
@@ -548,7 +574,6 @@ export function createScore({ player, api, notice, onSetup }) {
     const row = el('div', { className: 'fing-opts' },
       toggle('easy', 'Easiest fingering', 'Pick the voicing with the fewest fingers and no stretch'),
       toggle('simple', 'Simpler chords', 'Play 7ths and 6ths as plain major/minor'),
-      toggle('now', 'Fingering in the chord strip', 'Show the current and next chord fingering in the strip above the controls'),
       toggle('hover', 'Fingering on hover or tap', 'Point at a chord (or tap it on a phone) to see how to play it'));
     row.append(chordKeyPicker(), capoPicker(), tuningPicker());
     return row;

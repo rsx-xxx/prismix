@@ -22,6 +22,13 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
   const inCloud = new Set();
   const ICON_CLOUD = (arrow, filled) => `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4.75 4.75 0 0 1-.5 9.5Z" fill="${filled ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>${arrow === 'up' ? `<path d="M12 16v-5m0 0-2 2m2-2 2 2" fill="none" stroke="${filled ? 'var(--bg, #000)' : 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` : arrow === 'down' ? '<path d="M12 10v5m0 0-2-2m2 2 2-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' : ''}</svg>`;
 
+  // Older uploads may lack cover.jpg: fall back to the YouTube thumbnail instead of a blank box.
+  function cover(s) {
+    const img = el('img', { className: 'cloud-cover', alt: '', loading: 'lazy', src: fileUrl(s.id, 'cover.jpg') });
+    img.addEventListener('error', () => { img.onerror = null; img.src = `https://i.ytimg.com/vi/${s.id}/mqdefault.jpg`; }, { once: true });
+    return img;
+  }
+
   function render() {
     inCloud.clear();
     state.songs.forEach((s) => inCloud.add(s.id));
@@ -41,12 +48,14 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
       play.addEventListener('click', () => toggle(s));
       const get = el('button', { className: 'btn small', type: 'button', innerHTML: ICON_CLOUD('down'), title: 'Download into your library', ariaLabel: 'Download into your library' });
       get.addEventListener('click', () => download(s, get));
+      const del = el('button', { className: 'btn small ghost danger', type: 'button', textContent: '✕', title: 'Delete from the cloud', ariaLabel: 'Delete from the cloud' });
+      del.addEventListener('click', () => remove(s));
       return el('li', { className: 'cloud-row' },
-        el('img', { className: 'cloud-cover', alt: '', loading: 'lazy', src: fileUrl(s.id, 'cover.jpg') }),
+        cover(s),
         el('div', { className: 'cloud-text' },
           el('b', { textContent: s.title || s.id }),
           el('span', { className: 'muted', textContent: `${s.artist || ''} · ${fmt(s.duration)} · ${(s.bytes / 1048576).toFixed(1)} MB` })),
-        play, get);
+        play, get, del);
     }));
     const { up, down } = plan();
     const sb = $('cloud-sync');
@@ -72,11 +81,12 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
     const song = state.songs.find((x) => x.id === id);
     const kind = !local ? 'get' : has ? 'on' : 'up';
     const b = el('button', { className: `pub ${kind}`, type: 'button', innerHTML: ICON_CLOUD(kind === 'up' ? 'up' : kind === 'get' ? 'down' : '', kind === 'on') });
-    b.title = b.ariaLabel = kind === 'on' ? `In ${state.band.name}` : kind === 'up' ? `Upload to ${state.band.name}` : 'Download into your library';
+    b.title = b.ariaLabel = kind === 'on' ? `In ${state.band.name}, click to delete it from there` : kind === 'up' ? `Upload to ${state.band.name}` : 'Download into your library';
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       if (kind === 'up') publish(local.item, local.model, b);
       else if (kind === 'get' && song) download(song, b);
+      else if (kind === 'on' && song) remove(song);
     });
     return b;
   }
@@ -123,6 +133,16 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
       await runJob('/api/cloud/publish', { videoId: item.id, model }, (t) => { button.textContent = t; }, 700, cancel);
       await refresh();
     } catch (e) { if (e.message !== 'Cancelled') notice(e.message); } finally { cancel.remove(); onChange?.(); }
+  }
+
+  /** Remove a song from the cloud for everyone, after a confirmation. */
+  async function remove(s) {
+    if (!confirm(`Delete "${s.title || s.id}" from ${state.band.name}? It disappears for the whole band.`)) return;
+    try {
+      await api(`/api/cloud/songs/${s.id}`, { method: 'DELETE' });
+      if (state.playing === s.id) stop();
+      await refresh();
+    } catch (e) { notice(e.message); }
   }
 
   async function download(s, button) {

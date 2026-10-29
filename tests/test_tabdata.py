@@ -220,3 +220,9 @@ def test_fill_inserts_bars_for_skipped_repeat_and_tail():
     tmap, stats = tabfill.fill(parts, [0, 1, 2, 3], rec)
     assert stats["inserted"] == 2 and tmap == [0, 1, 2, 3, 4, 5]
     assert len(parts["guitar"]["bars"]) == 6 and parts["guitar"]["bars"][5]["auto"] == 1
+
+
+def test_chroma_accepts_flagged_notes():
+    bar = {"len": 1, "n": [[0, 0.25, [[0, 3, "h"], [1, 0]]]]}
+    v = tabdata._chroma(bar, [40, 45])
+    assert v[(40 + 3) % 12] > 0 and v[45 % 12] > 0

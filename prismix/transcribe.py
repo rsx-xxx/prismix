@@ -1,7 +1,7 @@
 """Lyrics from the audio itself, for songs nobody has published (covers, small artists): Whisper on the vocal stem.
 
-English and Russian only. The speech model is downloaded on first use (about 1 GB for `whisper-small`, the smallest
-one that is decent at Russian) and cached by huggingface_hub; override it with PRISMIX_WHISPER_MODEL.
+English and Russian only. The speech model is downloaded on first use (about 1.6 GB for `whisper-large-v3-turbo`, far
+fewer invented words than the small models on sung Russian) and cached by huggingface_hub; override it with PRISMIX_WHISPER_MODEL.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import numpy as np
 from . import library
 from .config import MODELS, ffmpeg_exe
 
-MODEL_ID = os.environ.get("PRISMIX_WHISPER_MODEL", "openai/whisper-small")
+MODEL_ID = os.environ.get("PRISMIX_WHISPER_MODEL", "openai/whisper-large-v3-turbo")
 LANGS = ("en", "ru")
 RATE = 16000
 WINDOW = 30 * RATE
@@ -24,6 +24,17 @@ WINDOW = 30 * RATE
 _JUNK = re.compile(
     r"субтитр|редактор субтитров|продолжение следует|спасибо за (просмотр|внимание)|подписывайтесь|"
     r"thanks? for watching|subtitles? by|please subscribe|amara\.org|dimatorzok", re.I)
+
+# A "word" that cannot be one: no vowel at all, or a run of the same letter, or absurdly long
+_VOWELS = re.compile(r"[aeiouyаеёиоуыэюя]", re.I)
+
+
+def _plausible(word: str) -> bool:
+    w = re.sub(r"[^\w]", "", word)
+    if not w or w.isdigit():
+        return True
+    return len(w) <= 24 and not re.search(r"(.)\1{3,}", w) and (len(w) <= 2 or bool(_VOWELS.search(w)))
+
 
 _lock = threading.Lock()
 _loaded: tuple | None = None
@@ -93,6 +104,9 @@ def clean(chunks: list[dict]) -> list[dict]:
         text = re.sub(r"\s+", " ", c.get("text") or "").strip()
         start = (c.get("timestamp") or (None,))[0]
         if not text or start is None or _JUNK.search(text):
+            continue
+        text = " ".join(w for w in text.split() if _plausible(w))  # non-existing words are dropped, never shown
+        if not text:
             continue
         if len(out) >= 2 and text.lower() == out[-1]["text"].lower() == out[-2]["text"].lower():
             continue  # a line repeated three times in a row is almost always the model looping

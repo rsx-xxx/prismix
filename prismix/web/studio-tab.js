@@ -54,8 +54,8 @@ export function createTab({ player, chordsIn = () => [] }) {
     try { localStorage.setItem('prismix.tabZoom', String(zoom)); } catch { /* ignore */ }
   };
   applyZoom();
-  $('tab-zoom-in').addEventListener('click', () => applyZoom(0.15));
-  $('tab-zoom-out').addEventListener('click', () => applyZoom(-0.15));
+  $('tab-zoom-in').addEventListener('click', () => { applyZoom(0.15); queueAlign(); });
+  $('tab-zoom-out').addEventListener('click', () => { applyZoom(-0.15); queueAlign(); });
   let ro = null;
   let cur = null; // { id, tab, st, secs: bar start seconds, cells: [], row: -1 }
   let part = null;
@@ -88,6 +88,8 @@ export function createTab({ player, chordsIn = () => [] }) {
     variants.replaceChildren();
     tools.replaceChildren();
     credit.replaceChildren();
+    delete root.dataset.kind;
+    document.dispatchEvent(new Event('tab:kind'));
   }
 
   async function open(id) {
@@ -105,6 +107,39 @@ export function createTab({ player, chordsIn = () => [] }) {
     root.hidden = false;
     render();
   }
+  // With synced lyrics beside it, every bar sits in the row of the lyric line being sung: one line, one row.
+  let lyricLines = null;
+  const lyricKids = () => [...document.querySelectorAll('#lyrics .ly-lines > *')];
+  const alignedMode = () => !!lyricLines?.synced && matchMedia('(min-width: 900px)').matches && !$('lyrics').hidden
+    && !$('lyrics').classList.contains('off') && lyricKids().length >= lyricLines.lines.length + 2;
+
+  function alignRows() {
+    const box = body.querySelector('.tab.aligned');
+    if (!box || body.offsetParent === null) return;
+    const kids = lyricKids(), rows = [...box.children];
+    kids.forEach((k, i) => { k.style.minHeight = ''; k.style.paddingBlock = ''; if (rows[i]) rows[i].style.minHeight = ''; });
+    kids.forEach((k, i) => {
+      const r = rows[i];
+      if (!r) return;
+      r.hidden = k.offsetParent === null;
+      if (r.hidden || !k.classList.contains('ly-line') || k.classList.contains('gap')) return; // intro, breaks and outro keep their own height
+      // a line whose bars run far longer than its words (a long instrumental) is not stretched: the tab scrolls on alone
+      r.dataset.free = r.offsetHeight > Math.max(k.offsetHeight * 6, 360) ? '1' : '';
+      if (r.dataset.free) return;
+      const h = Math.max(k.offsetHeight, r.offsetHeight);
+      k.style.paddingBlock = `${(h - k.offsetHeight) / 2}px`; // the words sit mid-row, level with the staff
+      r.style.minHeight = `${h}px`;
+    });
+  }
+  let alignQueued = false;
+  function queueAlign() { if (alignQueued) return; alignQueued = true; requestAnimationFrame(() => { alignQueued = false; alignRows(); }); }
+  document.addEventListener('lyrics:data', (e) => { lyricLines = e.detail; if (cur && !root.hidden) render(); });
+  document.addEventListener('layout:change', () => { if (cur && !root.hidden) render(); });
+  document.addEventListener('blocks:change', queueAlign);
+  addEventListener('resize', () => { if (cur && !root.hidden) { if (!!body.querySelector('.tab.aligned') !== alignedMode()) render(); else queueAlign(); } });
+  new ResizeObserver(queueAlign).observe(document.querySelector('#lyrics .ly-body') || document.body);
+
+  const announce = () => { root.dataset.kind = cur?.tab.tracks[part]?.kind || ''; document.dispatchEvent(new Event('tab:kind')); };
 
   function render() {
     if (!cur) return;
@@ -113,6 +148,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     credit.replaceChildren(`${shortName(p, part)} · tab by `, el('a', { href: tab.url, target: '_blank', rel: 'noopener', textContent: tab.source === 'soundslice' ? 'Soundslice' : 'Songsterr' }), p.edited ? ' · edited' : '');
     paintPicker();
     paintTools();
+    announce();
 
     width = body.clientWidth;
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
@@ -127,16 +163,34 @@ export function createTab({ player, chordsIn = () => [] }) {
     const strings = p.tuning.length;
     const lay = SCORE_KINDS.has(p.kind) ? scoreLayout(p, st.key) : null;
     cur.lay = lay;
-    const box = el('div', { className: 'tab', style: `--strings:${strings}` });
+    const aligned = alignedMode();
+    const kids = aligned ? lyricKids() : [];
+    const box = el('div', { className: aligned ? 'tab aligned' : 'tab', style: `--strings:${strings}` });
+    const arows = kids.map((k) => {
+      const r = el('div', { className: 'arow tarow' });
+      if (k.dataset.t != null) r.dataset.t = k.dataset.t;
+      if (!k.classList.contains('ly-line') || k.classList.contains('gap')) r.dataset.free = '1';
+      box.append(r);
+      return r;
+    });
+    let lineOf = 0; // the lyric row a bar belongs to: the last one that has started by the middle of the bar
+    const rowOfBar = (i) => {
+      const mid = (starts[i] + ends[i]) / 2;
+      kids.forEach((k, r) => { if (k.dataset.t != null && Number(k.dataset.t) <= mid && r > lineOf) lineOf = r; });
+      return lineOf;
+    };
+    let rowLine = -1;
     const need = (tb) => 3 + 1.5 * new Set(tb.n.map((b) => b[0])).size; // rem a bar wants: more notes, more room
     const avail = Math.max(10, body.clientWidth / rem - 2);
     let row = null, used = 0;
     p.bars.forEach((tb, i) => {
       const w = Math.max(need(tb), 5);
-      if (!row || (used + w > avail && used > 0)) {
+      const line = aligned ? rowOfBar(i) : -1;
+      if (!row || line !== rowLine || (used + w > avail && used > 0)) {
+        rowLine = line;
         row = el('div', { className: 'trow' }, lay ? clefColumn(lay)
           : el('div', { className: 'strs', 'aria-hidden': 'true' }, ...p.tuning.map((m) => el('span', { textContent: NOTES[m % 12] }))));
-        box.append(row);
+        (aligned ? arows[line] : box).append(row);
         cur.rows.push({ row, first: i });
         used = 0;
       }
@@ -167,6 +221,7 @@ export function createTab({ player, chordsIn = () => [] }) {
       row.append(cell);
     });
     body.replaceChildren(box);
+    if (aligned) alignRows();
     cur.row = -1;
     cur.now = -1;
     declutter();
@@ -493,10 +548,18 @@ export function createTab({ player, chordsIn = () => [] }) {
       active: () => !!cur && !root.hidden && !root.classList.contains('off') && body.offsetParent !== null,
       hold: manual,
       following: () => follow && Date.now() >= holdUntil,
-      track: () => (cur?.rows ?? []).map(({ row, first }, i) => {
-        const last = (cur.rows[i + 1]?.first ?? cur.cells.length) - 1;
-        return { y: row.offsetTop + row.offsetHeight / 2, t: (cur.secs[first] + cur.ends[last]) / 2 };
-      }),
+      track: () => {
+        const point = ({ row, first }, i) => {
+          const last = (cur.rows[i + 1]?.first ?? cur.cells.length) - 1;
+          return { y: row.offsetTop + row.offsetHeight / 2, t: (cur.secs[first] + cur.ends[last]) / 2 };
+        };
+        const rows = cur?.rows ?? [];
+        if (!body.querySelector('.tab.aligned')) return rows.map(point);
+        // aligned: a row of the lyrics' own height maps to the line's start, so both panes agree on every moment
+        return [...body.querySelector('.tab').children].flatMap((r) => (r.hidden ? [] : r.dataset.free || !r.dataset.t
+          ? rows.map((x, i) => [x, i]).filter(([x]) => x.row.parentElement === r).map(([x, i]) => point(x, i))
+          : [{ y: r.offsetTop + r.offsetHeight / 2, t: Number(r.dataset.t) }]));
+      },
       resume: () => { resume(); const c = cur?.cells[cur.now]; if (c) centre(c, true); },
       away: () => {
         const c = cur?.cells[cur.now];

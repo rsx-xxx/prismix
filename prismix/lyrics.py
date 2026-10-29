@@ -24,12 +24,15 @@ API = "https://lrclib.net/api"
 HEADERS = {"User-Agent": "prismix (personal use; https://lrclib.net/docs)"}
 TIMEOUT = 25
 SCHEMA = 3
+AUDIO_REV = 2  # bumped when finding published lyrics or recognising the audio got better
 MIN_TITLE_COVERAGE = 0.6
 MAX_CANDIDATES = 10
 
 _STAMP = re.compile(r"\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]")
 _ALT = re.compile(
-    r"[\(\[][^)\]]*(караоке|karaoke|cover|live|clip|клип|remix|instrumental)[^)\]]*[\)\]]", re.I)
+    r"[\(\[][^)\]]*(караоке|karaoke|cover|live|clip|клип|remix|instrumental|official|unofficial|неофициальн|официальн|"
+    r"audio|аудио|video|видео|lyric|текст|слова|visuali[sz]er|remaster|hd|4k|mv|full|session|version|версия)[^)\]]*[\)\]]", re.I)
+_ANY_BRACKET = re.compile(r"\s*[\(\[][^)\]]*[\)\]]")
 
 
 class LyricsError(RuntimeError):
@@ -167,6 +170,9 @@ def candidates(info: dict) -> list[tuple[str | None, str]]:
     if cover and base_pair:  # 'Performer - Song (cover)': the performer is not the artist, so ask by title alone
         found += [(base_pair[0], base_pair[1]), (None, base_pair[1]), (base_pair[1], base_pair[0])]
     found.append((None, base_title or title))
+    # whatever sits in brackets is more often a tag than part of the name: try the bare title last
+    found += [(a, _ANY_BRACKET.sub("", t).strip(" -_.")) for a, t in ((artist, title), (None, base_title or title))
+              if _ANY_BRACKET.search(t or "")]
     if cover:
         found += [(t, base_title or title) for t in (info.get("tags") or [])[:6] if len(t) > 2]
 
@@ -418,7 +424,8 @@ def lookup(video_id: str, query: str | None = None, *, refresh: bool = False, li
         if not (refresh or query or listen):
             try:
                 cached = json.loads(path.read_text())
-                if cached.get("version") == SCHEMA:
+                # audio-only lyrics saved before the title cleanup may have had a published version all along: look once more
+                if cached.get("version") == SCHEMA and not (cached.get("source") == "audio" and cached.get("rev") != AUDIO_REV):
                     return cached
             except (OSError, ValueError):
                 pass
@@ -501,5 +508,5 @@ def lookup(video_id: str, query: str | None = None, *, refresh: bool = False, li
         artist, title = guess(info)
         return _store(video_id, {
             "version": SCHEMA, "source": "audio", "language": heard["language"], "artist": artist, "title": title,
-            "synced": True, "lines": heard["lines"],
+            "synced": True, "lines": heard["lines"], "rev": AUDIO_REV,
         })

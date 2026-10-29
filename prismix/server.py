@@ -384,6 +384,20 @@ def create_app() -> FastAPI:
         return StreamingResponse(r.iter_raw(), status_code=r.status_code, headers={k: v for k, v in r.headers.items() if k in keep},
                                  background=BackgroundTask(lambda: (r.close(), cl.close())))
 
+    @app.delete("/api/cloud/songs/{video_id}")
+    def cloud_delete(video_id: str, request: Request):
+        cl = cloud_for(request)
+        if not library.VIDEO_ID_RE.match(video_id):
+            cl.close()
+            raise HTTPException(404, "Not found")
+        try:
+            cl.delete_song(video_id)
+        except cloud.CloudError as e:
+            raise HTTPException(e.status, str(e)) from None
+        finally:
+            cl.close()
+        return {"ok": True}
+
     @app.post("/api/cloud/publish")
     def cloud_publish(req: CloudPublish, request: Request):
         cl = cloud_for(request)

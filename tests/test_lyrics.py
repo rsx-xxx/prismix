@@ -79,3 +79,9 @@ def test_find_original_picks_best_matching_lyrics(monkeypatch):
     hit, score = lyrics.find_original({"title": "Sound of Silence (cover)"}, heard)
     assert hit["id"] == 1 and score > 0.8
     assert lyrics.find_original({"title": "x"}, [{"t": 0, "text": "too short"}]) is None
+
+
+def test_unofficial_tag_is_not_part_of_the_title():
+    info = {"title": "Noize MC - Жвачка (неофициальный).", "channel": "AUTHOR", "duration": 184}
+    assert lyrics.guess(info) == ("Noize MC", "Жвачка")
+    assert ("Noize MC", "Жвачка") in lyrics.candidates(info)

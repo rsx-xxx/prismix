@@ -55,7 +55,7 @@ def _clean(raw: dict, by: str) -> dict:
         "t": round(t, 2),
         "icon": icon if icon in ICONS else "talk",
         "text": re.sub(r"\s+\n", "\n", str(raw.get("text") or "")).strip()[:MAX_TEXT],
-        "show": show if show in SHOW else "tap",
+        "show": show if show in SHOW else "always",
         "by": by.strip()[:24] or "Someone",
     }
 

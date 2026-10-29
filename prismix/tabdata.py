@@ -291,7 +291,7 @@ def compact(part: dict) -> list[dict]:
 def _chroma(bar: dict, tuning: list[int]) -> list[float]:
     v = [0.0] * 12
     for _, dur, frets, *_ in bar["n"]:
-        for s, f in frets:
+        for s, f, *_ in frets:  # a note may carry technique flags after the fret
             if 0 <= s < len(tuning):
                 v[(tuning[s] + f) % 12] += max(dur, 0.03)
     return v
