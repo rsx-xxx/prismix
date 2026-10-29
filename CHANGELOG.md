@@ -2,6 +2,13 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.19.0
+
+- The desktop sidebar is a slim icon rail that opens on hover, shows the band avatar once you are signed in to the cloud, and drops the Library and Playlists items.
+- Stickers are saved and deleted over HTTP, so "Not connected" is gone; the cross button is removed and stickers still drag to any lyric, chord or tab bar.
+- Lyrics for titles like "Artist - и Guest - Song" now try each part on its own, and looped Whisper output is discarded; the player dock keeps a fixed height.
+- Drum tabs scroll with the lyrics and line up with their lines again; the paged view is now opt-in through the Pages button.
+
 ## 0.18.0
 
 - Desktop gets a left sidebar (Library, Upload, Playlists, Band cloud, Band, Settings) with the search bar left on top; phones keep the bottom bar.

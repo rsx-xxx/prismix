@@ -17,9 +17,6 @@
   background: var(--surface-2); color: var(--text); border: 1px solid var(--line-strong); border-left: 3px solid var(--c, var(--accent)); box-shadow: 0 6px 18px rgb(0 0 0 / .35); pointer-events: none; }
 .nt-w { --c: var(--accent); }
 .nt { touch-action: none; cursor: grab; }
-.nt-x { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; padding: 0; display: none; place-items: center; border-radius: 50%; border: 0; cursor: pointer;
-  font: 700 13px/1 system-ui, sans-serif; background: var(--danger); color: #fff; pointer-events: auto; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
-.nt-w:hover .nt-x, .nt-w:focus-within .nt-x { display: grid; }
 .nt-lifted { opacity: .25; }
 .nt-ghost { position: fixed; left: 0; top: 0; z-index: 90; width: 2.3rem; height: 2.3rem; pointer-events: none; cursor: grabbing; transform-origin: center; box-shadow: 0 10px 26px rgb(0 0 0 / .5), 0 0 0 3px #fff; }
 body.nt-dragging, body.nt-dragging * { cursor: grabbing !important; user-select: none; }

@@ -1324,7 +1324,6 @@ function dispatch(e) {
 
 const stickers = createNotes({
   id: () => state.current?.id || null,
-  send: (m) => band.send(m),
   roots: () => [$('ly-body'), $('sc-body'), $('tabview')],
   button: $('nt-toggle'),
 });

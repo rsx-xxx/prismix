@@ -126,6 +126,11 @@ class AnalyzeRequest(BaseModel):
     force: bool = False
 
 
+class NoteRequest(BaseModel):
+    op: str = Field(pattern="^(add|edit|del)$")
+    note: dict
+
+
 class ExportRequest(BaseModel):
     video_id: str = Field(alias="videoId")
     model: str
@@ -792,6 +797,18 @@ def create_app() -> FastAPI:
         if not library.VIDEO_ID_RE.match(video_id):
             raise HTTPException(404, "Not found")
         return await asyncio.to_thread(notes.load, video_id)
+
+    @app.post("/api/notes/{video_id}")
+    async def edit_notes(video_id: str, req: NoteRequest):
+        """Add, edit or delete a sticker over plain HTTP, so it works whether or not the band socket is up."""
+        if not library.VIDEO_ID_RE.match(video_id):
+            raise HTTPException(404, "Not found")
+        try:
+            items = await asyncio.to_thread(notes.apply, video_id, req.op, req.note, "Host")
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        await band.broadcast({"t": "notes", "id": video_id, "notes": items})
+        return items
 
     @app.post("/api/export")
     async def export_audio(req: ExportRequest):

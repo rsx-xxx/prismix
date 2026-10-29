@@ -125,11 +125,19 @@ def _segments(out, tokenizer) -> list[dict]:
     return [{"text": text, "timestamp": (0.0, None)}]
 
 
+def _looped(text: str) -> bool:
+    """Whisper's stuck-record failure: one word repeated through the whole line."""
+    words = [w for w in re.findall(r"\w+", text.lower())]
+    return len(words) >= 6 and max(words.count(w) for w in set(words)) / len(words) > 0.6
+
+
 def vet_lines(lines: list[dict], lang: str, allow: set[str] = frozenset()) -> tuple[list[dict], float]:
     """Every word checked against the dictionaries: unknown ones are repaired or dropped, invented lines vanish.
     Returns (lines, share of the recognised words that were real to begin with)."""
     out, checked, real = [], 0, 0
     for ln in lines:
+        if _looped(ln["text"]):
+            continue
         text, n, ok = vocab.vet(ln["text"], lang, allow=allow)
         checked += n
         real += ok

@@ -30,17 +30,23 @@ const num = (v) => (v == null ? NaN : Number(v));
 /**
  * @param {object} o
  * @param {() => string|null} o.id      the song on screen
- * @param {(msg: object) => boolean} o.send  band socket send
  * @param {() => HTMLElement[]} o.roots  containers whose cells carry times
  * @param {HTMLElement} o.button         toggles note mode
  */
-export function createNotes({ id, send, roots, button }) {
+export function createNotes({ id, roots, button }) {
   let list = [];
   let mode = false;
   let draft = null; // {id?, t, icon, text, show, by?}
   let token = 0;
   let queued = 0;
   const obs = new MutationObserver(() => schedule());
+  /** Change a sticker on the host over HTTP (the band socket may be down); resolves to the new list or throws. */
+  async function push(op, note) {
+    const sid = id();
+    const r = await fetch(`/api/notes/${sid}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ op, note }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Could not save');
+    if (sid === id()) { list = await r.json(); paint(); }
+  }
 
   const pop = el('div', { id: 'nt-pop', hidden: true, role: 'dialog', ariaLabel: 'Note' });
   const grid = el('div', { className: 'nt-grid' });
@@ -76,7 +82,6 @@ export function createNotes({ id, send, roots, button }) {
     del.hidden = !draft.id;
   }
   function open(d) {
-    clearTimeout(waiting);
     save.disabled = del.disabled = false;
     draft = { icon: 'talk', text: '', show: 'always', ...d };
     text.value = draft.text;
@@ -85,13 +90,11 @@ export function createNotes({ id, send, roots, button }) {
     pop.hidden = false;
     if (!draft.id) text.focus({ preventScroll: true });
   }
-  let waiting = 0;
-  function close() { clearTimeout(waiting); pop.hidden = true; draft = null; }
-  /** The panel closes when the host answers; silence means a host that predates notes. */
-  function waitAnswer() {
+  function close() { pop.hidden = true; draft = null; }
+  async function commit(op, note) {
     save.disabled = del.disabled = true;
     meta.textContent = 'Saving…';
-    waiting = setTimeout(() => { save.disabled = del.disabled = false; meta.textContent = 'No answer from the host. Restart Prismix on the computer to update it.'; }, 3000);
+    try { await push(op, note); close(); } catch (e) { save.disabled = del.disabled = false; meta.textContent = e.message; }
   }
 
   grid.addEventListener('click', (e) => {
@@ -103,13 +106,11 @@ export function createNotes({ id, send, roots, button }) {
   save.onclick = () => {
     if (!draft) return;
     const note = { id: draft.id, t: draft.t, icon: draft.icon, text: text.value.trim(), show: draft.show };
-    if (!send({ t: 'note', op: draft.id ? 'edit' : 'add', id: id(), note })) { meta.textContent = 'Not connected: try again in a moment.'; return; }
-    waitAnswer();
+    commit(draft.id ? 'edit' : 'add', note);
   };
   del.onclick = () => {
     if (!draft?.id) return;
-    if (!send({ t: 'note', op: 'del', id: id(), note: { id: draft.id } })) { meta.textContent = 'Not connected: try again in a moment.'; return; }
-    waitAnswer();
+    commit('del', { id: draft.id });
   };
 
   // ── drawing ──
@@ -130,9 +131,7 @@ export function createNotes({ id, send, roots, button }) {
     i.classList.add('nt');
     i.title = `${name}${n.text ? `: ${n.text}` : ''}${n.by ? ` (${n.by})` : ''}`;
     i.dataset.nid = n.id;
-    const x = el('button', { type: 'button', className: 'nt-x', title: 'Delete sticker', ariaLabel: 'Delete sticker', textContent: '×' });
-    x.dataset.nid = n.id;
-    const wrap = el('span', { className: 'nt-w' }, i, x);
+    const wrap = el('span', { className: 'nt-w' }, i);
     if (n.text && n.show !== 'tap') wrap.append(el('span', { className: `nt-say${n.show === 'hover' ? ' on-hover' : ''}`, textContent: n.text }));
     wrap.style.setProperty('--c', (ICONS[n.icon] || ICONS.talk)[1]);
     return wrap;
@@ -215,20 +214,13 @@ export function createNotes({ id, send, roots, button }) {
     const at = document.elementFromPoint(e.clientX, e.clientY);
     const t = at && roots().some((r) => r?.contains(at)) ? timeAt(e, at) : NaN;
     const n = list.find((x) => x.id === d.id);
-    if (n && Number.isFinite(t)) send({ t: 'note', op: 'edit', id: id(), note: { ...n, t: Math.round(t * 100) / 100 } });
+    if (n && Number.isFinite(t)) push('edit', { ...n, t: Math.round(t * 100) / 100 }).catch(() => {});
   };
   let skipClick = false;
   document.addEventListener('pointerup', (e) => endDrag(e, true), true);
   document.addEventListener('pointercancel', (e) => endDrag(e, false), true);
   document.addEventListener('click', (e) => {
     if (skipClick) { e.stopPropagation(); e.preventDefault(); return; }
-    const x = e.target.closest?.('.nt-x');
-    if (x) {
-      e.stopPropagation();
-      e.preventDefault();
-      send({ t: 'note', op: 'del', id: id(), note: { id: x.dataset.nid } });
-      return;
-    }
     const s = e.target.closest?.('.nt');
     if (s) {
       e.stopPropagation();
@@ -271,8 +263,8 @@ export function createNotes({ id, send, roots, button }) {
     },
     /** A `notes` message from the hub. */
     onMessage(m) {
-      if (m.t === 'noteerr') { clearTimeout(waiting); save.disabled = del.disabled = false; if (draft) meta.textContent = m.error || 'Could not save'; return; }
-      if (m.t === 'notes' && m.id === id() && Array.isArray(m.notes)) { list = m.notes; paint(); if (draft && waiting) close(); }
+      if (m.t === 'noteerr') { save.disabled = del.disabled = false; if (draft) meta.textContent = m.error || 'Could not save'; return; }
+      if (m.t === 'notes' && m.id === id() && Array.isArray(m.notes)) { list = m.notes; paint(); }
     },
     paint,
     close,

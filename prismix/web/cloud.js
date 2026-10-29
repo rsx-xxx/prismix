@@ -35,6 +35,13 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
     const btn = $('cloud-btn');
     btn.replaceChildren(...(state.signedIn && state.band.logo ? [el('img', { className: 'band-logo', alt: '', src: logoUrl() })] : []),
       document.createTextNode(state.signedIn ? state.band.name : 'Band cloud sign-in'));
+    const side = $('side-cloud');
+    if (side) {
+      side.dataset.icon ||= side.querySelector('svg').outerHTML;
+      const label = side.querySelector('span');
+      side.querySelector('svg, img').replaceWith(...(state.signedIn && state.band.logo ? [el('img', { className: 'side-avatar', alt: '', src: logoUrl() })] : [new DOMParser().parseFromString(side.dataset.icon, 'text/html').body.firstChild]));
+      label.textContent = state.signedIn ? state.band.name : 'Band cloud';
+    }
     $('cloud-title').textContent = state.band.logo ? `${state.band.name} cloud` : state.band.name;
     $('cloud-logo').hidden = !state.band.logo;
     $('cloud-logo').src = logoUrl();

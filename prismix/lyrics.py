@@ -26,7 +26,7 @@ TIMEOUT = 25
 SCHEMA = 3
 AUDIO_REV = 3  # bumped when finding published lyrics or recognising the audio got better
 MIN_TITLE_COVERAGE = 0.6
-MAX_CANDIDATES = 10
+MAX_CANDIDATES = 14
 
 _STAMP = re.compile(r"\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]")
 _ALT = re.compile(
@@ -170,6 +170,11 @@ def candidates(info: dict) -> list[tuple[str | None, str]]:
     if cover and base_pair:  # 'Performer - Song (cover)': the performer is not the artist, so ask by title alone
         found += [(base_pair[0], base_pair[1]), (None, base_pair[1]), (base_pair[1], base_pair[0])]
     found.append((None, base_title or title))
+    # 'Artist A - Artist B - Song' or a title with a stray dash: every dash-separated piece may be the real name
+    parts = [p for p in (_name(x) for x in _DASH.split(_TRAIL_COVER.sub("", head))) if p]
+    if len(parts) >= 2:
+        found += [(None, p) for p in reversed(parts)]
+        found += [(p, parts[-1]) for p in parts[:-1]]
     # whatever sits in brackets is more often a tag than part of the name: try the bare title last
     found += [(a, _ANY_BRACKET.sub("", t).strip(" -_.")) for a, t in ((artist, title), (None, base_title or title))
               if _ANY_BRACKET.search(t or "")]

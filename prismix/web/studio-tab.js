@@ -63,7 +63,7 @@ export function createTab({ player, chordsIn = () => [] }) {
   let holdUntil = 0;
   let width = 0;
   let follow = true;
-  const isPaged = () => !!cur && cur.tab.tracks[part]?.kind === 'drums' && localStorage.getItem('stems:tab-paged') !== '0';
+  const isPaged = () => !!cur && cur.tab.tracks[part]?.kind === 'drums' && localStorage.getItem('stems:tab-paged') === '1';
   let editing = false;
   let sel = null; // { i: tab bar, slot, s: string } while editing
   let typed = { at: 0, fret: 0 };

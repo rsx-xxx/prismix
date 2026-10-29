@@ -10,6 +10,7 @@ const el = (tag, props = {}, ...kids) => {
   return n;
 };
 const SING_LEAD = 0.18; // output-latency estimates run short (Bluetooth, AirPlay), so colour syllables a touch ahead
+const DOCK_MAX = 150; // a longer line would grow the player: it stays in the lyrics block only
 const LEAD = 0.35; // light a line slightly early: reading is faster than singing
 const MAX_WORD = 6; // seconds; no sung word or silence between words is longer
 const BREAK_S = 6; // a pause between sung lines at least this long gets a ♪ row
@@ -282,7 +283,7 @@ export function createLyrics({ player, api, chords = () => [] }) {
   function dock(i) {
     const box = $('sing'), n = cur.nodes[i];
     cur.dsy = null;
-    const show = !!n && !!cur.timed[i] && (n.classList.contains('with-ch') || chords().length === 0);
+    const show = !!n && !!cur.timed[i] && n.textContent.length <= DOCK_MAX && (n.classList.contains('with-ch') || chords().length === 0);
     box.hidden = !show;
     $('dock').classList.toggle('has-sing', show);
     if (show) {

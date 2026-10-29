@@ -57,3 +57,11 @@ def test_band_broadcast_even_when_locked(client):
         phone.send_json({"t": "note", "op": "add", "id": "bad", "note": {"t": 5}})
         while (m := phone.receive_json())["t"] != "noteerr":
             pass
+
+
+def test_http_sticker_roundtrip(client):
+    r = client.post(f"/api/notes/{VID}", json={"op": "add", "note": {"t": 2, "text": "hi"}})
+    assert r.status_code == 200 and r.json()[0]["text"] == "hi"
+    nid = r.json()[0]["id"]
+    assert client.post(f"/api/notes/{VID}", json={"op": "del", "note": {"id": nid}}).json() == []
+    assert client.post("/api/notes/not-an-id", json={"op": "add", "note": {}}).status_code == 404

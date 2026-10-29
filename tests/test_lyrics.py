@@ -85,3 +85,15 @@ def test_unofficial_tag_is_not_part_of_the_title():
     info = {"title": "Noize MC - Жвачка (неофициальный).", "channel": "AUTHOR", "duration": 184}
     assert lyrics.guess(info) == ("Noize MC", "Жвачка")
     assert ("Noize MC", "Жвачка") in lyrics.candidates(info)
+
+
+def test_dash_separated_title_tries_each_part_alone():
+    found = _cands(title="Noize MC Lyapis Trubetskoy Capital - и Ляпис Трубецкой - Капитал", channel="Dario J")
+    assert (None, "Капитал") in found
+
+
+def test_looped_whisper_line_is_detected():
+    from prismix import transcribe
+
+    assert transcribe._looped("город город город город город город город")
+    assert not transcribe._looped("мы идём по городу вместе с тобой")
