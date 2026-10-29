@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.30.3
+
+The Settings panel on desktop now opens by growing upward from the bottom of the sidebar instead of appearing at once, and honours reduced motion.
+
 ## 0.30.2
 
 The release build of 0.29.0 to 0.30.1 stopped at a lint error in the new Chordify reader; this version fixes it and carries everything from those releases (ranked tab choice, compact player with the scroll magnet, no more answering for other local apps).
