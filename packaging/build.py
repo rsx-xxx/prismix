@@ -19,6 +19,7 @@ COLLECT_ALL = [
     "demucs", "beat_this", "librosa", "soundfile", "pylibrb", "imageio_ffmpeg", "yt_dlp", "yt_dlp_ejs",
     "transformers", "huggingface_hub", "einops", "rotary_embedding_torch", "beartype", "numba", "llvmlite",
     "lazy_loader", "webview", "uvicorn", "certifi", "zeroconf", "segno",
+    "bs_roformer", "ml_collections", "torchaudio", "websockets",  # bs_roformer reads data/*.json next to its code
 ]
 HIDDEN = ["uvicorn.logging", "uvicorn.loops.auto", "uvicorn.protocols.http.auto", "uvicorn.lifespan.on", "multipart"]
 EXCLUDE = ["tkinter", "matplotlib", "IPython", "pytest", "torch.utils.tensorboard", "sklearn", "onnxruntime", "tensorflow", "pandas"]

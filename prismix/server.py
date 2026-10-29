@@ -191,11 +191,22 @@ def create_app() -> FastAPI:
     jobs = JobManager()
     prefetcher = Prefetcher(jobs)
 
+    def busy() -> str | None:
+        """Why the app must not restart right now, or None."""
+        if any(not j.finished for j in jobs.listing()):
+            return "splitting songs"
+        if prefetcher.status().get("active"):
+            return "preparing songs"
+        if any(j["state"] == "running" for j in list(app.state.publisher.jobs.values())):
+            return "syncing the band cloud"
+        return None
+
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
         jobs.start()
         prefetcher.start()
+        updates.auto(busy, lambda: os._exit(0))
         yield
         await prefetcher.stop()
         await jobs.stop()
@@ -431,7 +442,15 @@ def create_app() -> FastAPI:
     def update_install(request: Request):
         own_window(request)
         try:
-            return updates.install(lambda: os._exit(0))
+            return updates.install(lambda: os._exit(0), busy)
+        except RuntimeError as e:
+            raise HTTPException(409, str(e)) from e
+
+    @app.post("/api/update/restart")
+    def update_restart(request: Request):
+        own_window(request)
+        try:
+            return updates.restart(lambda: os._exit(0), busy)
         except RuntimeError as e:
             raise HTTPException(409, str(e)) from e
 

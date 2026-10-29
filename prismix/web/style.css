@@ -838,16 +838,22 @@ body.dragging * { cursor: grabbing !important; }
 #settings-btn[data-update]::after { content: ""; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #4c8dff); }
 
 /* processing queue */
-#queue-btn[data-count]:not([data-count=""])::after { content: attr(data-count); margin-left: 6px; font-size: 11px; opacity: .8; }
-.queue-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; min-width: min(420px, 80vw); }
-.queue-list li { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
-.queue-list li:first-child { border-top: 0; }
+.qdock { position: fixed; right: 16px; bottom: 16px; z-index: 40; width: min(300px, calc(100vw - 32px)); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 6px 22px rgb(0 0 0 / .16); font-size: 13px; }
+.qdock[hidden] { display: none; }
+.qhead { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; width: 100%; padding: 8px 12px; cursor: pointer; }
+.qhead #queue-sum { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qbar { grid-column: 1 / -1; height: 3px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.qbar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+.qchev { grid-row: 1; grid-column: 2; color: var(--muted); transition: transform .15s; }
+.qdock.open .qchev { transform: rotate(180deg); }
+.queue-list { list-style: none; margin: 0; padding: 0 12px 8px; display: grid; max-height: min(50vh, 420px); overflow: auto; }
+.queue-list[hidden] { display: none; }
+.queue-list li { display: grid; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); }
 .q-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
 .q-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.queue-list .btn { justify-self: start; }
+.queue-list .q-acts { display: flex; gap: 6px; }
 #band-note { position: fixed; left: 50%; bottom: 1.2rem; transform: translate(-50%, 12px); padding: .5rem 1rem; border-radius: 999px; background: var(--ink, #222); color: var(--bg, #fff); font-size: .85rem; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 60; }
 #band-note.on { opacity: 1; transform: translate(-50%, 0); }
-#queue-btn[hidden] { display: none; }
 
 /* background fill-in of lyrics, chords and tabs */
 #prefetch { position: fixed; right: 1rem; bottom: 9rem; width: min(300px, calc(100vw - 2rem)); display: grid; gap: 4px; padding: .7rem .9rem; border-radius: 14px; background: color-mix(in srgb, var(--bg, #fff) 72%, transparent); border: 1px solid var(--line); box-shadow: 0 8px 28px rgb(0 0 0 / .25); backdrop-filter: blur(14px); z-index: 50; font-size: .85rem; pointer-events: none; transition: opacity .3s; }

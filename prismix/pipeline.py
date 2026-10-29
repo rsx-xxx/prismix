@@ -407,7 +407,11 @@ def _separate_roformer(wav: np.ndarray, report: Report) -> dict[str, np.ndarray]
     import torch
 
     report("model", 0.0, "Loading model (first run downloads ~700 MB)")
-    model, cfg = _load_roformer()
+    try:
+        model, cfg = _load_roformer()
+    except (OSError, ImportError) as e:  # missing bundled data, offline first download, disk full
+        raise PipelineError(f"Could not load the instrument-separation model ({e.__class__.__name__}: {e}). "
+                            "Check the internet connection and free disk space, then try again.") from e
     device = pick_device()
     tensor = torch.from_numpy(wav)
     report("separate", 0.0, "Separating instruments")

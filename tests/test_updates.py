@@ -106,3 +106,26 @@ def test_brew_upgrade_gives_up_on_other_errors(monkeypatch):
     monkeypatch.setattr(updates, "_BREW", ("/bin/sh",))
     monkeypatch.setattr(updates.subprocess, "run", lambda cmd, **kw: R())
     assert not updates._brew_upgrade()
+
+
+def test_restart_refuses_while_busy(monkeypatch):
+    monkeypatch.setitem(updates._staged, "path", "/tmp/Prismix.dmg")
+    started = []
+    monkeypatch.setattr(updates, "_apply", lambda quit_app: started.append(1))
+    try:
+        updates.restart(lambda: None, lambda: "splitting songs")
+    except RuntimeError as e:
+        assert "splitting songs" in str(e)
+    else:
+        raise AssertionError("restart ran while busy")
+    assert not started
+
+
+def test_restart_needs_a_staged_update(monkeypatch):
+    monkeypatch.setitem(updates._staged, "path", None)
+    try:
+        updates.restart(lambda: None)
+    except RuntimeError as e:
+        assert "ready" in str(e)
+    else:
+        raise AssertionError("restart ran without a download")

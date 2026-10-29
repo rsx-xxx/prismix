@@ -1,6 +1,6 @@
-// The processing queue on the host: what is running, what waits, and a button to run a waiting song next.
+// The processing queue on the host: a small dock showing the running song, expandable to the whole queue with cancel / run-next.
 export function createQueue({ $, api }) {
-  const dlg = $('queue');
+  const dock = $('queue');
   let timer = 0;
 
   function row(j) {
@@ -26,13 +26,15 @@ export function createQueue({ $, api }) {
       bar.append(i);
       li.append(bar);
     }
+    const acts = document.createElement('div');
+    acts.className = 'q-acts';
     if (j.stage !== 'done' && j.stage !== 'error') {
       const stop = document.createElement('button');
       stop.type = 'button';
       stop.className = 'btn small ghost';
       stop.textContent = 'Cancel';
       stop.onclick = async () => { stop.disabled = true; try { await api(`/api/jobs/${j.id}/cancel`, { method: 'POST' }); } catch { /* already finished */ } refresh(); };
-      li.append(stop);
+      acts.append(stop);
     }
     if (j.stage === 'queued') {
       const go = document.createElement('button');
@@ -40,20 +42,29 @@ export function createQueue({ $, api }) {
       go.className = 'btn small ghost';
       go.textContent = 'Run next';
       go.onclick = async () => { go.disabled = true; try { await api(`/api/jobs/${j.id}/promote`, { method: 'POST' }); } catch { /* already started */ } refresh(); };
-      li.append(go);
+      acts.append(go);
     }
+    if (acts.children.length) li.append(acts);
     return li;
   }
 
   async function refresh() {
     let jobs;
     try { jobs = await api('/api/jobs'); } catch { return; }
-    const busy = jobs.filter((j) => j.stage !== 'done' && j.stage !== 'error').length;
-    const btn = $('queue-btn');
-    btn.hidden = !busy && !dlg.open;
-    btn.dataset.count = busy || '';
-    $('queue-list').replaceChildren(...jobs.map(row));
-    $('queue-empty').hidden = jobs.length > 0;
+    const live = jobs.filter((j) => j.stage !== 'done' && j.stage !== 'error');
+    dock.hidden = !live.length;
+    if (!live.length) { setOpen(false); return; }
+    const run = live.find((j) => j.stage !== 'queued') || live[0];
+    const pct = run.stage === 'queued' ? 0 : Math.round(run.progress * 100);
+    $('queue-sum').textContent = `${run.title}${pct ? ` · ${pct}%` : ''}${live.length > 1 ? ` · +${live.length - 1} waiting` : ''}`;
+    $('queue-bar').style.width = `${pct}%`;
+    $('queue-list').replaceChildren(...live.map(row));
+  }
+
+  function setOpen(on) {
+    dock.classList.toggle('open', on);
+    $('queue-list').hidden = !on;
+    $('queue-head').setAttribute('aria-expanded', String(on));
   }
 
   const WHAT = { chords: 'chords', lyrics: 'lyrics', tabs: 'tabs' };
@@ -68,8 +79,7 @@ export function createQueue({ $, api }) {
     $('prefetch-bar').style.width = `${Math.round((st.done / Math.max(st.total, 1)) * 100)}%`;
   }
 
-  $('queue-btn').addEventListener('click', () => { dlg.showModal(); refresh(); });
-  $('queue-close').addEventListener('click', () => dlg.close());
+  $('queue-head').addEventListener('click', () => setOpen(!dock.classList.contains('open')));
   timer = setInterval(() => { if (!document.hidden) { refresh(); prefetch(); } }, 3000);
   refresh();
   prefetch();

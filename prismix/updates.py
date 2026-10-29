@@ -1,6 +1,7 @@
 """Check GitHub for a newer release than the running build."""
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import re
@@ -77,7 +78,10 @@ def check(*, force: bool = False, client: httpx.Client | None = None) -> dict:
 
 # ── installing ──
 _ALLOWED = ("https://github.com/" + REPO.removeprefix("https://github.com/") + "/releases/download/",)
-_job: dict = {"state": "idle", "progress": 0.0, "error": None}
+_job: dict = {"state": "idle", "progress": 0.0, "error": None, "ready": None}
+_staged: dict = {"path": None, "version": None}
+_lock = threading.Lock()
+BUSY_POLL = 30  # while work is running, look again this often before offering the restart
 
 
 def installable() -> bool:
@@ -195,10 +199,19 @@ def _run(url: str, quit_app) -> None:
         _job.update(state="error", error=str(e) or e.__class__.__name__)
 
 
-def install(quit_app) -> dict:
-    """Update the running app: through Homebrew when brew installed it, else from the project's own releases."""
+def _guard(busy) -> None:
+    why = busy()
+    if why:
+        raise RuntimeError(f"Prismix is busy ({why}). Restart to update when it finishes.")
+
+
+def install(quit_app, busy=lambda: None) -> dict:
+    """Update the running app now: through Homebrew when brew installed it, else from the project's own releases."""
     if not installable():
         raise RuntimeError("Updating in place works in the installed app only")
+    _guard(busy)
+    if _staged["path"]:
+        return restart(quit_app, busy)
     if _job["state"] in ("downloading", "installing", "restarting"):
         return status()
     info = check(force=True)
@@ -208,3 +221,91 @@ def install(quit_app) -> dict:
     threading.Thread(target=_run, args=(url, quit_app), daemon=True).start()
     _job.update(state="downloading", progress=0.0, error=None)
     return status()
+
+
+def stage(info: dict) -> bool:
+    """Download the newer release in the background so installing it later is instant. True when it is ready."""
+    url = info.get("download")
+    if not info.get("available") or not url or not url.startswith(_ALLOWED) or not installable():
+        return False
+    with _lock:
+        if _staged["version"] == info["latest"] and _staged["path"] and Path(_staged["path"]).is_file():
+            return True
+        if _job["state"] in ("downloading", "installing", "restarting"):
+            return False
+        try:
+            if brew_managed():  # brew fetches and swaps in one step, nothing to pre-download
+                _staged.update(path="brew", version=info["latest"])
+            else:
+                _job.update(state="downloading", progress=0.0, error=None)
+                dest = Path(tempfile.mkdtemp(prefix="prismix-update-")) / url.rsplit("/", 1)[-1]
+                _download(url, dest)
+                _staged.update(path=str(dest), version=info["latest"])
+            _job.update(state="ready", progress=1.0, ready=info["latest"])
+            return True
+        except Exception as e:  # noqa: BLE001 - the manual install button still works
+            log.warning("background update download failed: %s", e)
+            _job.update(state="idle", progress=0.0, error=None)
+            return False
+
+
+def restart(quit_app, busy=lambda: None) -> dict:
+    """Install the staged update and relaunch. Refuses while stems are processing or the cloud is syncing."""
+    if not _staged["path"]:
+        raise RuntimeError("No update is ready yet")
+    _guard(busy)
+    threading.Thread(target=_apply, args=(quit_app,), daemon=True).start()
+    _job.update(state="installing", progress=1.0, error=None)
+    return status()
+
+
+def _apply(quit_app) -> None:
+    try:
+        if _staged["path"] == "brew":
+            if not _brew_upgrade():
+                raise RuntimeError("Homebrew could not update Prismix")
+            _reopen_after_exit()
+        else:
+            _hand_over(Path(_staged["path"]))
+        _job.update(state="restarting", progress=1.0)
+        time.sleep(1.5)
+        quit_app()
+    except Exception as e:  # noqa: BLE001
+        log.exception("update install failed")
+        _staged.update(path=None, version=None)
+        _job.update(state="error", error=str(e) or e.__class__.__name__)
+
+
+def _ask_mac(version: str) -> bool:
+    """Native macOS alert with a Restart button; True when the user chose it."""
+    script = (f'display alert "Prismix {version} is ready" message "The update is downloaded. Restart Prismix to finish installing it." '
+              'buttons {"Later", "Restart Now"} default button "Restart Now" cancel button "Later"')
+    try:
+        return subprocess.run(["/usr/bin/osascript", "-e", script], capture_output=True, timeout=3600).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def auto(busy, quit_app, interval: float = TTL) -> None:
+    """Background loop: look for a release, download it quietly, then offer the restart once nothing is running."""
+    declined: set[str] = set()
+
+    def loop() -> None:
+        while True:
+            try:
+                info = check(force=True)
+                if stage(info):
+                    version = info["latest"]
+                    while busy():
+                        time.sleep(BUSY_POLL)
+                    if sys.platform == "darwin" and version not in declined:
+                        declined.add(version)  # ask once per version; the Settings entry stays for later
+                        if _ask_mac(version):
+                            with contextlib.suppress(RuntimeError):  # work started while the alert was open: retry from Settings
+                                restart(quit_app, busy)
+            except Exception:  # noqa: BLE001 - never let the updater loop die
+                log.exception("update loop failed")
+            time.sleep(interval if not _staged["path"] else BUSY_POLL * 10)
+
+    if installable():
+        threading.Thread(target=loop, name="prismix-update", daemon=True).start()

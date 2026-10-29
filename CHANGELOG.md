@@ -4,6 +4,12 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.7.0
+
+- Updates install themselves: the app downloads a new release in the background and, once nothing is running, shows a native macOS alert with a Restart Now button (Settings offers the same on every platform). It never restarts by itself, and refuses while songs are being split or prepared or the Band cloud is syncing.
+- The processing queue is now a small dock in the corner showing the running song, expandable to the whole queue. Starting a second song no longer hides the first one's progress.
+- Fixed "No such file or directory … bs_models.json" in the packaged app: the separation model's data files are now bundled. A model that cannot load now gives a readable error.
+
 ## 0.6.1
 
 - Guitar tunings: pick Drop D, half or whole step down, Drop C, DADGAD or an open tuning (or the one the song's tab uses) and the chord diagrams and names follow it. Prismix says in plain words how to fret a down-tuned guitar and suggests a tuning when it makes the chords easier.

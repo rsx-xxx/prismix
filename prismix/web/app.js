@@ -58,7 +58,7 @@ async function api(path, opts) {
 }
 
 const state = {
-  plist: null, models: [], defaultModel: 'htdemucs_ft', library: [], current: null, token: 0, es: null,
+  plist: null, models: [], defaultModel: 'htdemucs_ft', library: [], current: null, token: 0, streams: new Set(),
 };
 const STEM_ICONS = [[/vocal|voice|sing/, 'mic'], [/drum|perc/, 'drum'], [/bass/, 'wave'], [/guitar/, 'guitar'], [/piano|key|synth/, 'piano'], [/other|fx|rest/, 'spark']];
 const stemIcon = (name) => STEM_ICONS.find(([re]) => re.test(name.toLowerCase()))?.[1] ?? 'note';
@@ -358,45 +358,24 @@ async function startProcess(urlOrId, model, tasks = $('task').value, urgent = fa
   }
 }
 
+// Progress lives in the queue dock; this only reacts to the end of a job. Each job has its own stream,
+// so starting another song never drops the first one.
 function trackJob(job) {
-  state.es?.close();
-  const box = $('job');
-  const info = state.library.find((i) => i.id === job.videoId);
-  const title = el('div', { className: 't', textContent: info?.title || 'Preparing…' });
-  const msg = el('span', { textContent: 'Queued' });
-  const pct = el('span', { textContent: '0%' });
-  const bar = el('i');
-  const stop = el('button', { className: 'btn small ghost', type: 'button', textContent: 'Cancel' });
-  stop.addEventListener('click', async () => {
-    stop.disabled = true;
-    try { await api(`/api/jobs/${job.id}/cancel`, { method: 'POST' }); } catch { /* already finished */ }
-  });
-  box.replaceChildren(
-    el('img', { src: ytThumb(job.videoId), alt: '' }),
-    el('div', { className: 'body' }, title, el('div', { className: 'bar' }, bar), el('div', { className: 'row' }, msg, pct)),
-    stop,
-  );
-  box.hidden = false;
-  box.classList.remove('fresh'); void box.offsetWidth; box.classList.add('fresh');
-  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   const es = new EventSource(`/api/jobs/${job.id}/events`);
-  state.es = es;
+  state.streams.add(es);
+  const end = () => { es.close(); state.streams.delete(es); };
   es.onmessage = async (ev) => {
     const j = JSON.parse(ev.data);
-    bar.style.width = `${Math.round(j.progress * 100)}%`;
-    pct.textContent = `${Math.round(j.progress * 100)}%`;
-    msg.textContent = j.message || j.stage;
     if (j.stage === 'error') {
-      es.close(); box.hidden = true; if (j.message !== 'Cancelled') notice(j.message || 'Processing failed');
+      end(); queue.refresh(); if (j.message !== 'Cancelled') notice(j.message || 'Processing failed');
     } else if (j.stage === 'done') {
-      es.close(); box.hidden = true;
+      end(); queue.refresh();
       await loadLibrary();
-      location.hash = `#/v/${j.videoId}/${j.model}`;
+      if (state.streams.size === 0) location.hash = `#/v/${j.videoId}/${j.model}`;
     }
   };
-  es.onerror = () => {
-    if (es.readyState === EventSource.CLOSED) { box.hidden = true; notice('Lost connection to the server'); }
-  };
+  es.onerror = () => { if (es.readyState === EventSource.CLOSED) { end(); queue.refresh(); } };
+  queue.refresh();
 }
 
 // ── library ──
@@ -553,7 +532,6 @@ async function openStudio(id, model) {
   lyrics.close();
   markers.close();
   video.hide();
-  state.es?.close();
   $('home').hidden = true;
   $('studio').hidden = false;
   $('dock').hidden = true;
@@ -630,41 +608,47 @@ api('/api/version').then((v) => {
 api('/api/update').then((u) => {
   if (!u.available) return;
   const a = $('upd');
-  a.textContent = `Update to v${u.latest}`;
   a.hidden = false;
   $('upd-none').hidden = true;
   $('settings-btn').dataset.update = '1';
   $('settings-btn').title = `Settings · update to v${u.latest} available`;
+  a.textContent = `Update to v${u.latest}`;
   if (!u.installable) {
     a.href = u.download || u.url;
     a.title = u.download ? 'Download the new installer, then run it' : 'Open the release page';
     return;
   }
-  // Packaged app: one click downloads the release, swaps the app and reopens it.
+  // Packaged app: the server downloads the release by itself; the user only picks when to restart.
   a.removeAttribute('target');
   a.href = u.url;
-  a.title = 'Download and install the update, then restart Prismix';
   const label = { downloading: 'Downloading', installing: 'Installing', restarting: 'Restarting' };
   let busy = false;
   const fail = (why) => { busy = false; a.textContent = 'Update failed, open download'; a.href = u.download || u.url; a.target = '_blank'; a.title = why; };
+  const show = (st) => {
+    a.textContent = st.state === 'ready' ? `Restart to update to v${u.latest}` : st.state === 'downloading' && st.progress ? `Downloading ${Math.round(st.progress * 100)}%` : `${label[st.state] || `Update to v${u.latest}`}${label[st.state] ? '…' : ''}`;
+    a.title = st.state === 'ready' ? 'The update is downloaded. Restart Prismix to finish installing it' : 'Download and install the update, then restart Prismix';
+  };
   const poll = async () => {
     const st = await api('/api/update').catch(() => null);
     if (!st) { a.textContent = 'Restarting…'; return setTimeout(poll, 800); } // server gone: the app is swapping itself
     if (st.state === 'error') return fail(st.error);
-    a.textContent = st.state === 'downloading' && st.progress ? `Downloading ${Math.round(st.progress * 100)}%` : `${label[st.state] || 'Updating'}…`;
-    setTimeout(poll, 600);
+    show(st);
+    if (st.state === 'ready' && !busy) { setTimeout(poll, 10000); return; }
+    setTimeout(poll, st.state === 'idle' ? 10000 : 600);
   };
   a.addEventListener('click', async (e) => {
     if (a.target === '_blank') return; // after a failure it is a plain download link
     e.preventDefault();
     if (busy) return;
     busy = true;
+    const ready = a.textContent.startsWith('Restart');
     a.textContent = 'Starting…';
-    const r = await fetch('/api/update/install', { method: 'POST' });
+    const r = await fetch(ready ? '/api/update/restart' : '/api/update/install', { method: 'POST' });
+    if (r.status === 409) { busy = false; a.textContent = 'Restart to update'; notice((await r.text().then((t) => { try { return JSON.parse(t).detail; } catch { return t; } }))); return; }
     if (!r.ok) return fail(await r.text());
     poll();
   });
-  if (label[u.state]) { busy = true; poll(); }
+  poll();
 }).catch(() => { /* the update notice is optional */ });
 
 function renderModelSwitch(id, current, available) {
