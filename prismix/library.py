@@ -135,6 +135,30 @@ def find_source(video_id: str) -> Path | None:
     return next(iter(sorted(video_dir(video_id).glob("source.*"))), None)
 
 
+_TAB_KINDS = ("guitar", "bass", "keys", "drums", "other")
+_kinds_cache: dict[str, tuple[float, list[str]]] = {}
+
+
+def tab_kinds(video_id: str) -> list[str]:
+    """Instrument kinds that have a tab for the song (one entry per kind, however many parts), cached by file time."""
+    path = video_dir(video_id) / "tabdata.json"
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return []
+    hit = _kinds_cache.get(video_id)
+    if hit and hit[0] == mtime:
+        return hit[1]
+    try:
+        tracks = json.loads(path.read_text()).get("tracks") or {}
+    except (OSError, ValueError, AttributeError):
+        tracks = {}
+    found = {(p.get("kind") if isinstance(p, dict) else None) or re.sub(r"\d+$", "", k) for k, p in tracks.items()}
+    kinds = [k for k in _TAB_KINDS if k in found]
+    _kinds_cache[video_id] = (mtime, kinds)
+    return kinds
+
+
 def list_library() -> list[dict]:
     items = []
     if not LIBRARY_DIR.is_dir():
@@ -148,7 +172,7 @@ def list_library() -> list[dict]:
         models = [m for m in MODELS if read_meta(d.name, m)]
         if models:
             analyzed = models if (d / "structure.json").is_file() else []
-            items.append({**info, "models": models, "analyzed": analyzed})
+            items.append({**info, "models": models, "analyzed": analyzed, "tabs": tab_kinds(d.name)})
     items.sort(key=lambda i: i.get("added", 0), reverse=True)
     return items
 

@@ -53,3 +53,13 @@ def test_stamp_records_version_and_stage(tmp_path, monkeypatch):
     info = library.read_info(VID)
     assert info["title"] == "T" and info["stages"] == {"structure": 3} and info["prismix"]
     library.stamp("zzzzzzzzzzz", "structure", 3)  # unknown item: no-op
+
+
+def test_tab_kinds_one_per_instrument(tmp_path, monkeypatch):
+    import json
+
+    from prismix import library
+
+    monkeypatch.setattr(library, "video_dir", lambda _id: tmp_path)
+    (tmp_path / "tabdata.json").write_text(json.dumps({"found": True, "tracks": {"guitar": {"kind": "guitar"}, "guitar2": {"kind": "guitar"}, "drums": {}, "bass": {"kind": "bass"}}}))
+    assert library.tab_kinds("abcdefghijk") == ["guitar", "bass", "drums"]

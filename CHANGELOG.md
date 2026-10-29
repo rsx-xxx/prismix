@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.24.0
+
+Songs on the main page and in playlists now show a small icon for each instrument that has a tab (guitar, bass, keys, drums, other). Several parts of one instrument, like lead and rhythm guitar, show a single icon.
+
 ## 0.23.0
 
 The studio (stems) page now has the same left navigation rail as the main page. Moving a sticker no longer fails silently: if the host can't save it you get the reason, and stickers can be dragged by touch. A "Method Not Allowed" on deleting or moving a sticker means the running host is an older build, so restart it.

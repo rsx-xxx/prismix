@@ -17,6 +17,7 @@ import { createOutput } from './output.js';
 import { setAccent, clearAccent } from './accent.js';
 import { createNotes } from './notes.js';
 import { createJoin } from './join.js';
+import { instrumentMarks } from './instruments.js';
 import { createCloud } from './cloud.js';
 import { createQueue } from './queue.js';
 import { createMedia } from './media.js';
@@ -438,7 +439,7 @@ function renderLibrary() {
       el('div', { className: 'meta' },
         el('div', { className: 'title', textContent: it.title }),
         el('div', { className: 'sub', textContent: it.channel }),
-        el('div', { className: 'badges' }, ...it.models.map((m) => el('span', { className: 'badge', textContent: modelLabel(m) })))));
+        el('div', { className: 'badges' }, ...it.models.map((m) => el('span', { className: 'badge', textContent: modelLabel(m) })), ...[instrumentMarks(it.tabs)].filter(Boolean))));
     const del = el('button', { className: 'del', type: 'button', innerHTML: ICON.trash, title: 'Remove from library', ariaLabel: 'Remove from library' });
     del.addEventListener('click', async (e) => {
       e.stopPropagation();

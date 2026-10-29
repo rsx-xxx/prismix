@@ -1,6 +1,7 @@
 // Saved playlists on the home page: a row of playlist cards, a playlist page with its tracks,
 // and the "add to playlist" picker used from library cards.
 
+import { instrumentMarks } from './instruments.js';
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
   const n = Object.assign(document.createElement(tag), props);
@@ -69,6 +70,8 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
         el('span', { className: 'pl-meta' }, el('b', { textContent: it.title || it.id }),
           el('small', { className: 'muted', textContent: [it.channel, it.duration ? fmt(it.duration) : ''].filter(Boolean).join(' · ') })),
         el('span', { className: 'pl-tag', textContent: '' }));
+      const marks = instrumentMarks(lib(it.id)?.tabs);
+      if (marks) go.querySelector('.pl-meta').after(marks);
       go.addEventListener('click', () => open(it.id, id));
       const rm = el('button', { type: 'button', className: 'icon-btn', ariaLabel: 'Remove from playlist', title: 'Remove from playlist', textContent: '×' });
       rm.addEventListener('click', async () => {
