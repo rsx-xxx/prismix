@@ -4,6 +4,10 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.9.1
+
+- Notices that are not errors ("Added to …", "Moved to …", sync done) are no longer red: successes are green, hints are neutral, and both fade after a few seconds. Red stays for errors.
+
 ## 0.9.0
 
 - Updating shows overall progress in Settings: a percentage, a progress bar and a short live note (download size and speed, refreshing Homebrew, installing, restarting).

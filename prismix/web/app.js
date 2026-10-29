@@ -64,7 +64,7 @@ const STEM_ICONS = [[/vocal|voice|sing/, 'mic'], [/drum|perc/, 'drum'], [/bass/,
 const stemIcon = (name) => STEM_ICONS.find(([re]) => re.test(name.toLowerCase()))?.[1] ?? 'note';
 const player = new StemPlayer();
 window.stemPlayer = player; // debug handle
-const score = createScore({ player, api, notice: (m) => notice(m), onSetup: () => saveSetup() });
+const score = createScore({ player, api, notice: (m, k) => notice(m, k), onSetup: () => saveSetup() });
 const tabView = createTab({ player, chordsIn: (j) => score.chordsIn(j) });
 document.addEventListener('tab:seek', (e) => player.seek(e.detail));
 const lyrics = createLyrics({ player, api, chords: () => score.timeline() });
@@ -85,10 +85,10 @@ const right = {
 };
 linkScroll(lyrics.pane(), right); // scrolling one box moves the other to the same moment
 const followBoth = linkFollow(lyrics.pane(), right, player); // …and while playing, the lit line and the lit bar share one height
-const video = createVideo({ player, notice: (m) => notice(m) });
+const video = createVideo({ player, notice: (m, k) => notice(m, k) });
 
 const plPicker = createPlaylists({
-  api, library: () => state.library, notice: (m) => notice(m),
+  api, library: () => state.library, notice: (m, k) => notice(m, k),
   startProcess: (id) => startProcess(id, $('quality').value),
   saveAll: (name, items) => plview.save(name, items),
   importUrl: (url) => plview.importUrl(url),
@@ -96,7 +96,7 @@ const plPicker = createPlaylists({
 });
 
 const plview = createPlaylistView({
-  api, library: () => state.library, notice: (m) => notice(m), quality: () => $('quality').value,
+  api, library: () => state.library, notice: (m, k) => notice(m, k), quality: () => $('quality').value,
   open: (id, plId) => openFrom(id, plId),
   cloudMark: (id) => cloud.mark(id),
 });
@@ -113,10 +113,15 @@ function openFrom(id, plId) {
 }
 
 // ── notices ──
-function notice(msg) {
+let noticeTimer = 0;
+/** kind: 'error' (default, red), 'ok' (green) or 'info' (neutral); the last two fade on their own. */
+function notice(msg, kind = 'error') {
   const n = $('notice');
+  clearTimeout(noticeTimer);
   n.textContent = msg || '';
   n.hidden = !msg;
+  n.dataset.kind = kind;
+  if (msg && kind !== 'error') noticeTimer = setTimeout(() => { n.hidden = true; }, 5000);
 }
 
 // ── omnibox ──
@@ -650,7 +655,7 @@ api('/api/update').then((u) => {
     const ready = a.textContent.startsWith('Restart to');
     a.textContent = 'Starting…';
     const r = await fetch(ready ? '/api/update/restart' : '/api/update/install', { method: 'POST' });
-    if (r.status === 409) { busy = false; a.textContent = 'Restart to update'; notice((await r.text().then((t) => { try { return JSON.parse(t).detail; } catch { return t; } }))); return; }
+    if (r.status === 409) { busy = false; a.textContent = 'Restart to update'; notice((await r.text().then((t) => { try { return JSON.parse(t).detail; } catch { return t; } })), 'info'); return; }
     if (!r.ok) return fail(await r.text());
     poll();
   });

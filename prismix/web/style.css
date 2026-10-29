@@ -9,6 +9,7 @@
   --muted: oklch(0.7 0.012 275);
   --accent: oklch(0.8 0.13 285);
   --danger: oklch(0.7 0.18 25);
+  --ok: oklch(0.76 0.15 155);
   --on-primary: oklch(0.16 0.01 275);
   --primary: oklch(0.97 0.004 275);
   --glow: oklch(0.45 0.12 285 / 0.35);
@@ -134,6 +135,8 @@ main { width: min(1180px, 100% - 40px); margin: 0 auto; padding: 28px 0 calc(var
   margin-bottom: 20px; padding: 12px 16px; border-radius: 12px; background: color-mix(in oklab, var(--danger) 16%, var(--surface));
   border: 1px solid color-mix(in oklab, var(--danger) 45%, transparent);
 }
+.notice[data-kind=ok] { background: color-mix(in oklab, var(--ok) 16%, var(--surface)); border-color: color-mix(in oklab, var(--ok) 45%, transparent); }
+.notice[data-kind=info] { background: var(--surface-2); border-color: var(--line-strong); }
 
 /* ── library grid ── */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; }

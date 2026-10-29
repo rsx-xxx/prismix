@@ -144,7 +144,7 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
     if (state.syncing || !state.signedIn) return;
     const { up, down } = plan();
     const total = up.length + down.length;
-    if (!total) { notice(`Everything is in sync with ${state.band.name}`); return; }
+    if (!total) { notice(`Everything is in sync with ${state.band.name}`, 'ok'); return; }
     state.syncing = true;
     const btn = $('cloud-sync');
     btn.disabled = true;
@@ -166,7 +166,7 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
       state.syncing = false;
       btn.disabled = false;
       await onDownloaded?.();
-      notice(failed ? `Synced with ${failed} problem${failed > 1 ? 's' : ''}` : `Synced with ${state.band.name}`);
+      notice(failed ? `Synced with ${failed} problem${failed > 1 ? 's' : ''}` : `Synced with ${state.band.name}`, failed ? 'error' : 'ok');
     }
   }
   $('cloud-sync').addEventListener('click', syncAll);

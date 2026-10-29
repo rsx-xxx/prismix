@@ -40,8 +40,8 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
         card.classList.remove('drop');
         const song = lib(e.dataTransfer.getData(SONG));
         if (!song) return;
-        if (p.items.some((i) => i.id === song.id)) { notice(`Already in "${p.name}"`); return; }
-        try { await api(`/api/playlists/${p.id}/items`, JSON_POST('POST', [itemOf(song)])); await load(); notice(`Added to "${p.name}"`); } catch (err) { notice(err.message); }
+        if (p.items.some((i) => i.id === song.id)) { notice(`Already in "${p.name}"`, 'info'); return; }
+        try { await api(`/api/playlists/${p.id}/items`, JSON_POST('POST', [itemOf(song)])); await load(); notice(`Added to "${p.name}"`, 'ok'); } catch (err) { notice(err.message); }
       });
       return card;
     }));
@@ -119,7 +119,7 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
       if (target !== 'lib') await api(`/api/playlists/${target}/items`, JSON_POST('POST', [it]));
       await api(`/api/playlists/${p.id}/items/${vid}`, { method: 'DELETE' });
       await load();
-      notice(target === 'lib' ? 'Taken out of the playlist; it stays in the library' : `Moved to "${find(target)?.name}"`);
+      notice(target === 'lib' ? 'Taken out of the playlist; it stays in the library' : `Moved to "${find(target)?.name}"`, 'ok');
     } catch (e) { notice(e.message); }
     show(p.id);
   }
@@ -217,7 +217,7 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
     if (!current) return;
     try {
       const r = await api(`/api/playlists/${current}/process?model=${encodeURIComponent(quality())}`, { method: 'POST' });
-      notice(r.queued ? '' : 'Every song is already prepared.');
+      notice(r.queued ? '' : 'Every song is already prepared.', 'info');
       clearTimeout(timer);
       poll();
     } catch (e) { notice(e.message); }
