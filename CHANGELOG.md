@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.30.1
+
+Prismix no longer answers for other local apps. Its bare-name ports 80 and 443 (for `https://prismix.local/`) were open on every interface, so `https://nsgen.localhost/` on the same computer landed in Prismix. They now listen on the Wi-Fi address only, following it when it changes, and any request for a `*.localhost` name other than `stems.localhost` is refused. Restart Prismix to release the old listeners.
+
 ## 0.30.0
 
 The player is more compact: smaller margins and padding around the header and the blocks, so more of the lyrics, chords and tabs fits on screen. Scrolling down from the stems now settles the lyrics, chords and tabs row so it fills the screen above the dock. The pull is gentle and only works near that position, so a deliberate scroll is never blocked, and it is off when the system asks for reduced motion.

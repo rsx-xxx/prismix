@@ -223,6 +223,14 @@ def create_app() -> FastAPI:
     app.state.upstream = None  # the host this desktop has joined, if any
 
     @app.middleware("http")
+    async def own_hosts_only(request: Request, call_next):
+        # Another local app may live at https://nsgen.localhost/: a request for any other *.localhost name is not ours.
+        host = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]").lower()
+        if host.endswith(".localhost") and host != "stems.localhost":
+            return Response(f"{host} is not Prismix", status_code=421)
+        return await call_next(request)
+
+    @app.middleware("http")
     async def lan_guard(request: Request, call_next):
         # Phones on the LAN may read the library and play it, never change or delete it.
         if not band_mod.is_loopback(request.client.host if request.client else None):

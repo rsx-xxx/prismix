@@ -163,17 +163,17 @@ def advertise(ip: str, port: int):
     return move
 
 
-def _free(port: int) -> bool:
-    """True when this process may listen on `port` (ports below 1024 need rights on some systems)."""
+def _free(port: int, ip: str) -> bool:
+    """True when this process may listen on `ip:port` (ports below 1024 need rights on some systems)."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.bind(("0.0.0.0", port))
+            s.bind((ip, port))
             return True
         except OSError:
             return False
 
 
-def _redirect_http(name: str, port: int) -> None:
+def _redirect_http(name: str, port: int, ip: str) -> ThreadingHTTPServer | None:
     """Plain http://prismix.local goes to the https page; a browser tries http first when only a name is typed."""
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -189,10 +189,11 @@ def _redirect_http(name: str, port: int) -> None:
             pass
 
     try:
-        srv = ThreadingHTTPServer(("0.0.0.0", STANDARD_HTTP), Handler)
+        srv = ThreadingHTTPServer((ip, STANDARD_HTTP), Handler)
     except OSError:
-        return
+        return None
     threading.Thread(target=srv.serve_forever, daemon=True, name="band-http-redirect").start()
+    return srv
 
 
 def _share_url(name: str, ip: str, port: int, clean: bool) -> str:
@@ -234,21 +235,39 @@ def start(app, port: int = HTTPS_PORT) -> uvicorn.Server | None:
         log.warning("band: the cryptography package is missing, sharing is off")
         return None
 
-    def serve(on: int) -> uvicorn.Server:
+    def serve(on: int, host: str = "0.0.0.0") -> uvicorn.Server:
         # a vanished phone is noticed within ~20 s instead of the TCP timeout
         server = uvicorn.Server(uvicorn.Config(
-            app, host="0.0.0.0", port=on, ssl_certfile=str(crt), ssl_keyfile=str(key),
+            app, host=host, port=on, ssl_certfile=str(crt), ssl_keyfile=str(key),
             log_level="warning", log_config=None, ws_ping_interval=10, ws_ping_timeout=10))
         threading.Thread(target=server.run, daemon=True).start()
         return server
 
     server = serve(port)
-    clean = bool(name) and _free(STANDARD_HTTPS)
+    # The bare-name ports 80/443 listen on the LAN address only. Bound to every interface they would also take
+    # 127.0.0.1:443 and answer for https://anything.localhost/, hiding other local apps behind this one.
+    clean = bool(name) and _free(STANDARD_HTTPS, ip)
+    std: dict = {}
+
+    def standard(on: str) -> None:
+        std["https"] = serve(STANDARD_HTTPS, on)
+        std["http"] = _redirect_http(name, STANDARD_HTTPS, on)
+
     if clean:
-        serve(STANDARD_HTTPS)
-        _redirect_http(name, STANDARD_HTTPS)
+        standard(ip)
     app.state.band.share_url = _share_url(name, ip, port, clean)
-    move = advertise(ip, port)
+    advertised = advertise(ip, port)
+
+    def move(now: str) -> None:
+        advertised(now)
+        if clean:  # the listeners follow the address
+            std["https"].should_exit = True
+            if std["http"]:
+                std["http"].shutdown()
+                std["http"].server_close()
+            time.sleep(1)
+            standard(now)
+
     _watch_network(app, move, name, port, clean, ip)
     log.info("band: phones open %s", app.state.band.share_url)
     return server
