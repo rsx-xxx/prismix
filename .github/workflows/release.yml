@@ -145,11 +145,11 @@ jobs:
             export PRISMIX_KEYSTORE="$RUNNER_TEMP/band.keystore"
           fi
           sh android/build.sh
-          cp android/build/prismix-band.apk android/build/Prismix-Band.apk
+          cp android/build/prismix.apk android/build/Prismix.apk
       - uses: actions/upload-artifact@v7
         with:
           name: android
-          path: android/build/Prismix-Band.apk
+          path: android/build/Prismix.apk
 
   # Tag pushes get a versioned release; everything else updates a rolling 'latest' release.
   release:
@@ -186,7 +186,7 @@ jobs:
           files: |
             artifacts/windows/Prismix-Setup.exe
             artifacts/mac/Prismix.dmg
-            artifacts/android/Prismix-Band.apk
+            artifacts/android/Prismix.apk
           draft: false
           prerelease: false
           make_latest: true

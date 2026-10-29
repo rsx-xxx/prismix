@@ -278,7 +278,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/band")
     def band_status():
-        # the app's own scheme makes the camera open Prismix Band directly; https opens any phone's browser
+        # the app's own scheme makes the camera open the Prismix app directly; https opens any phone's browser
         app_url = re.sub(r"^https:", "prismix:", band.share_url)
         return {**band.status(), "name": lan.display_name(), "url": band.share_url, "qr": band_qr(band.share_url), "appQr": band_qr(app_url)}
 

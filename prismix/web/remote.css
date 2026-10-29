@@ -1,4 +1,4 @@
-/* Prismix Band: phone and tablet client. Warm neutrals, one accent, chords keep their circle-of-fifths hue. */
+/* Prismix phone and tablet client. Warm neutrals, one accent, chords keep their circle-of-fifths hue. */
 :root {
   color-scheme: light dark;
   --bg: light-dark(#f6f3ec, #121110);

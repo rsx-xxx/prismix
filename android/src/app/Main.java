@@ -603,7 +603,7 @@ public class Main extends Activity {
         scroll.setVisibility(View.VISIBLE);
         scroll.scrollTo(0, 0);
         bars(BG, false);
-        panel.addView(text("Prismix Band", 28, Color.WHITE, 6));
+        panel.addView(text("Prismix", 28, Color.WHITE, 6));
         panel.addView(text(title, 16, Color.parseColor("#e8e2da"), 4));
         if (sub != null) panel.addView(text(sub, 14, Color.parseColor("#9b948b"), 20));
     }

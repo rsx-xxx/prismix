@@ -14,7 +14,7 @@
 |---|---|
 | macOS (Apple Silicon) | `brew tap rsx-xxx/prismix && brew install --cask prismix` |
 | Windows | [`Prismix-Setup.exe`](https://github.com/rsx-xxx/prismix/releases/latest) |
-| Android (band phone) | [`Prismix-Band.apk`](https://github.com/rsx-xxx/prismix/releases/latest) |
+| Android | [`Prismix.apk`](https://github.com/rsx-xxx/prismix/releases/latest) |
 | Any (from source) | `uv sync && uv run prismix` (Python 3.11–3.13, [uv](https://docs.astral.sh/uv/)) |
 
 All installers are on the [latest release](https://github.com/rsx-xxx/prismix/releases/latest). They are unsigned, so macOS or Windows asks for confirmation on first launch.
@@ -49,7 +49,7 @@ Your library lives in `~/Library/Application Support/Prismix` (macOS) or `%LOCAL
 ## Band mode
 
 1. Open Prismix on the computer and click **Band**.
-2. Scan the QR code with a phone on the same Wi-Fi. The Prismix Band app opens by itself, or tap Scan in the app. In a browser, accept the one-time certificate warning (the host uses a self-signed certificate).
+2. Scan the QR code with a phone on the same Wi-Fi. The Prismix app opens by itself, or tap Scan in the app. In a browser, accept the one-time certificate warning (the host uses a self-signed certificate).
 3. Pick your part. The phone follows the host's position, or plays the song itself in step with the room.
 
 What phones can do:

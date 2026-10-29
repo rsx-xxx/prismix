@@ -4,6 +4,10 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.9.4
+
+- The Android app is now just "Prismix": its name on the phone, its title screen and the release file (`Prismix.apk`, was `Prismix-Band.apk`). It installs over the old one and keeps its settings.
+
 ## 0.9.3
 
 - Releases made in quick succession no longer queue up: starting a new build cancels the one still running for the previous version.

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds a debug-signed APK with the bare SDK tools (no Gradle). Output: android/build/prismix-band.apk
+# Builds a debug-signed APK with the bare SDK tools (no Gradle). Output: android/build/prismix.apk
 set -e
 cd "$(dirname "$0")"
 SDK=${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}
@@ -38,5 +38,5 @@ $BT/aapt2 link -o build/base.apk -I "$JAR" -A build/assets --manifest build/Andr
 $BT/zipalign -f 4 build/base.apk build/aligned.apk
 KS=${PRISMIX_KEYSTORE:-$HOME/.android/debug.keystore}
 [ -f "$KS" ] || { mkdir -p "$(dirname "$KS")"; keytool -genkeypair -keystore "$KS" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1; }
-$BT/apksigner sign --ks "$KS" --ks-pass pass:android --key-pass pass:android --out build/prismix-band.apk build/aligned.apk
-echo build/prismix-band.apk
+$BT/apksigner sign --ks "$KS" --ks-pass pass:android --key-pass pass:android --out build/prismix.apk build/aligned.apk
+echo build/prismix.apk

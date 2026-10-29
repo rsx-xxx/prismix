@@ -108,7 +108,7 @@ export function createBand({ player, current, open, onNotes, $ }) {
     $('band-qr').innerHTML = qr || '';
     $('band-qr').hidden = !qr;
     $('band-hint').textContent = kind === 'app'
-      ? 'Scan with the phone camera and the Prismix Band app opens by itself, or use Scan in the app.'
+      ? 'Scan with the phone camera and the Prismix app opens by itself, or use Scan in the app.'
       : 'Phones on the same Wi-Fi scan this code. The first time, the browser warns about the certificate: choose Advanced, then continue.';
     document.querySelectorAll('#band-tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.kind === kind)));
     $('band-url').textContent = status.url?.replace(/\?ip=.*$/, '') || 'No LAN address found. Connect this computer to the band Wi-Fi (sharing is off with --no-share).';
