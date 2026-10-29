@@ -4,6 +4,10 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.9.3
+
+- Releases made in quick succession no longer queue up: starting a new build cancels the one still running for the previous version.
+
 ## 0.9.2
 
 - The Follow button no longer lingers on the main page after leaving a song, and it now appears while a song is paused when you scroll the lyrics or chords away. Its icon is centered in the button.
