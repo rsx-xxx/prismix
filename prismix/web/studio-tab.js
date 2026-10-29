@@ -13,7 +13,25 @@ const NOTES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A�
 const BAR_MIN = 11; // rem a bar needs before a row takes one more
 const PART_KEY = 'stems:tab-part';
 const KINDS = ['guitar', 'bass', 'keys', 'other', 'drums'];
-const PAGE = 8; // bars per page of the drum chart
+const NEXT = 4; // bars before a drum pattern ends when the one after it appears below
+
+// Runs of repeated bars: one pattern of 1, 2 or 4 bars played over and over, shown once instead of scrolled past.
+function segmentsOf(bars) {
+  const sig = bars.map((b) => JSON.stringify([b.n, b.mark || '']));
+  const out = [];
+  for (let i = 0; i < sig.length;) {
+    let best = { p: 1, len: 1 };
+    for (const p of [1, 2, 4]) {
+      if (i + 2 * p > sig.length) continue;
+      let len = p;
+      while (i + len < sig.length && sig[i + len] === sig[i + len - p]) len++;
+      if (len >= 2 * p && len > best.len) best = { p, len };
+    }
+    out.push({ first: i, ...best });
+    i += best.len;
+  }
+  return out;
+}
 const GRID = 16; // editing slots per whole note
 const kindOf = (k) => k.replace(/\d+$/, '');
 const cap = (k) => k[0].toUpperCase() + k.slice(1);
@@ -63,7 +81,7 @@ export function createTab({ player, chordsIn = () => [] }) {
   let holdUntil = 0;
   let width = 0;
   let follow = true;
-  const isPaged = () => !!cur && cur.tab.tracks[part]?.kind === 'drums' && localStorage.getItem('stems:tab-paged') === '1';
+  const isPat = () => !!cur && cur.tab.tracks[part]?.kind === 'drums' && localStorage.getItem('stems:tab-pattern') !== '0';
   let editing = false;
   let sel = null; // { i: tab bar, slot, s: string } while editing
   let typed = { at: 0, fret: 0 };
@@ -165,10 +183,14 @@ export function createTab({ player, chordsIn = () => [] }) {
     const strings = p.tuning.length;
     const lay = SCORE_KINDS.has(p.kind) ? scoreLayout(p, st.key) : null;
     cur.lay = lay;
-    const paged = isPaged();
-    const aligned = alignedMode() && !paged;
+    const pat = isPat();
+    const aligned = alignedMode() && !pat;
+    const segs = pat ? segmentsOf(p.bars) : null;
+    cur.segs = segs;
+    cur.segOf = [];
+    segs?.forEach((g, k) => { for (let i = g.first; i < g.first + g.len; i++) cur.segOf[i] = k; });
     const kids = aligned ? lyricKids() : [];
-    const box = el('div', { className: aligned ? 'tab aligned' : paged ? 'tab paged' : 'tab', style: `--strings:${strings}` });
+    const box = el('div', { className: aligned ? 'tab aligned' : pat ? 'tab pat' : 'tab', style: `--strings:${strings}` });
     const arows = kids.map((k) => {
       const r = el('div', { className: 'arow tarow' });
       if (k.dataset.t != null) r.dataset.t = k.dataset.t;
@@ -189,13 +211,13 @@ export function createTab({ player, chordsIn = () => [] }) {
     p.bars.forEach((tb, i) => {
       const w = Math.max(need(tb), 5);
       const line = aligned ? rowOfBar(i) : -1;
-      if (!row || line !== rowLine || (used + w > avail && used > 0) || (paged && i % PAGE === 0)) {
+      const seg = segs?.[cur.segOf[i]];
+      if (pat ? i === seg.first : !row || line !== rowLine || (used + w > avail && used > 0)) {
         rowLine = line;
         row = el('div', { className: 'trow' }, lay ? clefColumn(lay)
           : el('div', { className: 'strs', 'aria-hidden': 'true' }, ...p.tuning.map((m) => el('span', { textContent: NOTES[m % 12] }))));
         (aligned ? arows[line] : box).append(row);
-        row.dataset.page = String(Math.floor(i / PAGE));
-        cur.rows.push({ row, first: i });
+        cur.rows.push({ row, first: i, seg: cur.segOf[i] });
         used = 0;
       }
       used += w;
@@ -206,7 +228,7 @@ export function createTab({ player, chordsIn = () => [] }) {
       if (tb.auto) { cell.classList.add('auto'); cell.title = 'Filled in from a matching bar'; }
       if (tb.mark) cell.append(el('span', { className: 'tag', textContent: tb.mark }));
       const chs = el('div', { className: 'tch' });
-      if (j != null) {
+      if (j != null && p.kind !== 'drums') {
         let before = j > 0 ? chordsIn(j - 1).at(-1)?.name : '';
         for (const c of chordsIn(j)) {
           chs.append(el('span', { className: c.name === before ? 'same' : '', textContent: c.name, style: `left:${c.f * 100}%` }));
@@ -222,15 +244,16 @@ export function createTab({ player, chordsIn = () => [] }) {
         if (editing && e.target.closest('.stf')) { pickSpot(cell, e); return; }
         document.dispatchEvent(new CustomEvent('tab:seek', { detail: starts[i] }));
       });
-      row.append(cell);
+      if (!pat || i - seg.first < seg.p) row.append(cell);
     });
     body.replaceChildren(box);
-    if (paged) body.prepend(el('div', { className: 'tab-count', 'aria-live': 'off' }));
-    cur.page = -1;
+    if (pat) body.prepend(el('div', { className: 'tab-count', 'aria-live': 'off' }));
+    cur.seg = -1;
+    cur.nowCell = null;
     if (aligned) alignRows();
     cur.row = -1;
     cur.now = -1;
-    cur.shown = -1;
+    cur.shown = -2;
     declutter();
     if (!ro && window.ResizeObserver) { ro = new ResizeObserver(() => declutter()); ro.observe(body); }
   }
@@ -304,7 +327,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     const edit = btn(editing ? 'Done' : 'Edit', 'Edit this tab: click a spot on the staff, type a fret number. Arrows move, Backspace deletes, Ctrl/⌘+Z undoes. Changes are saved.', () => { editing = !editing; if (!editing) { flush(); sel = null; } render(); });
     edit.setAttribute('aria-pressed', String(editing));
     const kids = SCORE_KINDS.has(p.kind) ? [] : [edit];
-    if (p.kind === 'drums') kids.unshift(btn(isPaged() ? 'Scroll' : 'Pages', 'Drums: show one page of bars at a time with a countdown, or scroll the whole chart', () => { localStorage.setItem('stems:tab-paged', isPaged() ? '0' : '1'); render(); }));
+    if (p.kind === 'drums') kids.unshift(btn(isPat() ? 'Scroll' : 'Patterns', 'Drums: show each repeated pattern once with a bar countdown, or scroll the whole chart', () => { localStorage.setItem('stems:tab-pattern', isPat() ? '0' : '1'); render(); }));
     if (editing) {
       const u = btn('Undo', 'Undo (Ctrl/⌘+Z)', undo);
       u.disabled = !hist.length;
@@ -535,35 +558,37 @@ export function createTab({ player, chordsIn = () => [] }) {
     body.scrollTop = player.playing && Math.abs(d) < 600 ? body.scrollTop + d * 0.18 : want;
   }
 
-  // Drums: one page of bars at a time with a countdown of the bars left, the next page waiting dimmed below. Fast fills read
-  // better as a stable page the eye can settle on than as a chart sliding past.
-  function pageTo(j) {
-    const pg = Math.floor(Math.max(j, 0) / PAGE);
-    if (pg !== cur.page) {
-      cur.page = pg;
-      for (const { row } of cur.rows) {
-        const rp = Number(row.dataset.page);
-        row.hidden = rp !== pg && rp !== pg + 1;
-        row.classList.toggle('next', rp === pg + 1);
+  // Drums: a pattern that repeats stays put while a line sweeps its bars and a countdown runs; a few bars before it ends
+  // the next pattern appears dimmed below, and takes its place when its time comes. Nothing scrolls.
+  function patternTo(j) {
+    const sg = cur.segOf[Math.max(j, 0)], seg = cur.segs[sg];
+    const left = seg.first + seg.len - 1 - Math.max(j, 0);
+    const nextOn = left < NEXT && !!cur.segs[sg + 1];
+    const key = `${sg}:${nextOn}`;
+    if (key !== cur.seg) {
+      cur.seg = key;
+      for (const { row, seg: rs } of cur.rows) {
+        row.hidden = !(rs === sg || (nextOn && rs === sg + 1));
+        row.classList.toggle('next', rs === sg + 1);
       }
-      body.scrollTop = 0;
     }
-    const left = Math.min((pg + 1) * PAGE, cur.cells.length) - 1 - j;
     const c = body.querySelector('.tab-count');
-    if (c) c.textContent = left > 0 ? `${left} bar${left === 1 ? '' : 's'} left` : 'last bar of this page';
+    if (c) c.textContent = (left > 0 ? `${left} bar${left === 1 ? '' : 's'} left` : 'last bar') + (nextOn ? ' · next pattern below' : '');
   }
 
   function frame(pos) {
     if (!cur || root.hidden || root.classList.contains('off') || body.offsetParent === null) return;
     if (body.clientWidth !== width && Math.abs(body.clientWidth - width) > 40) render();
     const j = floorIndex(cur.secs, pos);
-    const cell = cur.cells[j];
-    if (j !== cur.now) {
-      cur.cells[cur.now]?.classList.remove('now');
-      cur.now = j;
+    const sg = cur.segs?.[cur.segOf[j]];
+    const cell = sg ? cur.cells[sg.first + ((j - sg.first) % sg.p)] : cur.cells[j];
+    if (j !== cur.now) cur.now = j;
+    if (cell !== cur.nowCell) {
+      cur.nowCell?.classList.remove('now');
+      cur.nowCell = cell;
       cell?.classList.add('now');
     }
-    if (body.querySelector('.tab.paged')) { if (cell && (j !== cur.shown)) { cur.shown = j; pageTo(j); } }
+    if (cur.segs) { if (cell && j !== cur.shown) { cur.shown = j; patternTo(j); } }
     else if (cell && !lockstep.on && follow && Date.now() >= holdUntil) glideTo(pos);
     if (cell) cell.querySelector('.cursor').style.setProperty('--x', `${Math.min(1, Math.max(0, (pos - cur.secs[j]) / Math.max(1e-6, cur.ends[j] - cur.secs[j]))) * 100}%`);
   }
@@ -581,7 +606,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     pane: () => ({
       root: $('tabview'), anchor: 0.4,
       box: () => body,
-      active: () => !!cur && !root.hidden && !root.classList.contains('off') && body.offsetParent !== null && !body.querySelector('.tab.paged'),
+      active: () => !!cur && !root.hidden && !root.classList.contains('off') && body.offsetParent !== null && !cur.segs,
       hold: manual,
       following: () => follow && Date.now() >= holdUntil,
       track: () => {

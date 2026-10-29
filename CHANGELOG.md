@@ -2,6 +2,13 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.20.0
+
+- Drum tabs show each repeated pattern once with a sweeping line and a bars-left countdown; a few bars before it changes the next pattern appears dimmed below and replaces it on time. Nothing scrolls. The Scroll button brings the full chart back.
+- Chord names no longer appear on drum bars, and the dock's upcoming-chords strip is hidden while a tab is on screen.
+- The lyrics column is narrower by default, ignoring very long lines when sizing it.
+- The Playlists button is gone from the desktop top bar (the Playlists block on the main page stays) and the band logo in the sidebar keeps its proportions.
+
 ## 0.19.0
 
 - The desktop sidebar is a slim icon rail that opens on hover, shows the band avatar once you are signed in to the cloud, and drops the Library and Playlists items.

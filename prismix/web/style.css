@@ -753,6 +753,11 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .seg-btns button[aria-pressed=true] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .tab-body { --row: 1.2rem; position: relative; height: var(--pane-h); overflow-y: auto; overscroll-behavior: contain; padding: 24px 4px; mask-image: linear-gradient(transparent, #000 10%, #000 90%, transparent); }
 .tabview #tab-credit a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.tab-body:has(.tab.pat) { overflow: hidden; mask-image: none; padding: 10px 4px; }
+.tab.pat { display: flex; flex-direction: column; gap: 22px; }
+.tab.pat .trow { margin-bottom: 0; }
+.tab.pat .trow[hidden] { display: none; }
+.tab.pat .trow.next { opacity: .4; }
 .tab-count { position: sticky; top: 0; z-index: 2; width: max-content; margin: 0 0 8px auto; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--accent); color: var(--on-primary); }
 .tab.paged .trow.next { opacity: .35; }
 .tab.paged .trow[hidden] { display: none; }
@@ -1101,7 +1106,7 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
   .sidebar span { white-space: nowrap; opacity: 0; transition: opacity .12s; }
   .sidebar:hover span, .sidebar:focus-within span { opacity: 1; }
   .sidebar svg, .sidebar .side-avatar { flex: none; }
-  .sidebar .side-avatar { width: 24px; height: 24px; margin: -2px; border-radius: 50%; object-fit: cover; }
+  .sidebar .side-avatar { width: 26px; height: 22px; object-fit: contain; }
   .sidebar > :not(.brand) {
     display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 12px; border: 0; border-radius: 12px; background: none;
     color: var(--muted); font: inherit; font-size: 14px; font-weight: 550; text-decoration: none; cursor: pointer; text-align: left;
@@ -1112,7 +1117,7 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
   .sidebar .push { margin-top: auto; }
   body:not(:has(#studio:not([hidden]))) .topbar { padding-left: 24px; }
   body:not(:has(#studio:not([hidden]))) .topbar .brand,
-  body:not(:has(#studio:not([hidden]))) .topbar #up-btn,
+  body:not(:has(#studio:not([hidden]))) .topbar #up-btn, body:not(:has(#studio:not([hidden]))) .topbar #pl-btn,
   body:not(:has(#studio:not([hidden]))) .topbar #cloud-btn, body:not(:has(#studio:not([hidden]))) .topbar #band-btn,
   body:not(:has(#studio:not([hidden]))) .topbar #settings-btn { display: none; }
   body:not(:has(#studio:not([hidden]))) main { width: min(1180px, 100% - 56px); }
@@ -1133,3 +1138,6 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
 .grid.list .card .del { left: auto; right: 12px; }
 @media (max-width: 760px) { .grid.list .card .meta { grid-template-columns: minmax(0, 1fr); gap: 2px; } .grid.list .card .badges { display: none; } }
 .section-head .sync-btn { margin-left: 0; }
+
+/* the dock's upcoming-chords strip adds nothing while a tab is on screen */
+body:has(#tabview:not([hidden], .off, .out)) #ahead { display: none !important; }

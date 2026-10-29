@@ -2,7 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'stems:split';
-const MIN = 0.34, MAX = 0.6;
+const MIN = 0.3, MAX = 0.6, AUTO_MAX = 0.4; // the divider can be dragged wider, but the automatic width leaves the tabs the larger share
 
 export function createSplit() {
   const panes = $('panes'), grip = $('split'), ly = $('lyrics');
@@ -16,7 +16,7 @@ export function createSplit() {
   };
 
   function wanted() {
-    const lines = [...ly.querySelectorAll('.ly-line:not(.gap)')];
+    const lines = [...ly.querySelectorAll('.ly-line:not(.gap)')].filter((l) => l.textContent.length <= 60);
     if (!lines.length) return null;
     const cs = getComputedStyle(lines[0]);
     ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
@@ -29,7 +29,7 @@ export function createSplit() {
     grip.hidden = !two();
     if (!two()) { panes.style.removeProperty('--ly'); panes.style.removeProperty('--rc'); return; }
     const raw = manual || wanted() || 1 / 3;
-    const p = Math.min(MAX, Math.max(MIN, raw));
+    const p = Math.min(manual ? MAX : AUTO_MAX, Math.max(MIN, raw));
     panes.style.setProperty('--ly', `${p}fr`);
     panes.style.setProperty('--rc', `${1 - p}fr`);
     grip.style.left = `${ly.offsetLeft + ly.offsetWidth + 8}px`;
