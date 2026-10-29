@@ -4,6 +4,17 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.6.1
+
+- Guitar tunings: pick Drop D, half or whole step down, Drop C, DADGAD or an open tuning (or the one the song's tab uses) and the chord diagrams and names follow it. Prismix says in plain words how to fret a down-tuned guitar and suggests a tuning when it makes the chords easier.
+- The key you set for a song (audio key, chords-only shift, guitar tuning) is saved with the song and shared through the Band cloud, so everybody opens it the same way. The cloud server must keep the new `setup` field of the song manifest.
+- Uploaded files can be renamed by clicking the title. "(Караоке)" is no longer part of song titles.
+- Lighter on memory: the separation, lyrics and alignment models are released when the queue is empty.
+
+## 0.6.0
+
+- Tag cut without its version bump; 0.6.1 is the same code, properly versioned.
+
 ## 0.5.0
 
 - Dragging a song into a playlist moves the whole card (it lifts off as a tilted ghost, and playlists pulse as drop targets), not just the cover.
