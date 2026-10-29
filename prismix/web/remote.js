@@ -3,6 +3,7 @@
 // and can drive the host, hear it locally, or go solo.
 import { chordName, chordPaint, keyName, useFlats, getAccidentals, setAccidentals, simplify } from './theory.js';
 import { createMedia } from './media.js';
+import { offsetIn } from './scroll.js';
 import { describe } from './band.js';
 import { timeLine, splitAt } from './lyrics.js';
 import { createSocket } from './socket.js';
@@ -311,7 +312,7 @@ async function loadTrack(id, model) {
     if (S.pl && !S.pl.items.some((x) => x.id === id)) S.pl = null;
     syncPlNav();
     render();
-    if (S.mode !== 'follow') ensureLocal().then(claimSpeaker, () => {});
+    if (S.mode !== 'follow') ensureLocal().then(claimSpeaker, (e) => notice(`Could not load audio: ${e?.message || e}`));
     if (store.autosave && !OFFLINE && !off.have.has(id)) keep(id, model);
   } catch (err) {
     if (mine !== loadToken) return;
@@ -373,8 +374,12 @@ let last = {};
 let nodes = { chords: [] }; // per-view handles for cheap per-frame updates
 const scrollLock = { until: 0 };
 
-const roleKey = () => (store.role === 'bass' ? 'bass' : store.role === 'keys' ? 'keys' : 'guitar');
-const KINDS = ['guitar', 'bass', 'keys', 'other'];
+const roleKey = () => (store.role === 'bass' ? 'bass' : store.role === 'keys' ? 'keys' : store.role === 'drums' ? 'drums' : 'guitar');
+const KINDS = ['guitar', 'bass', 'keys', 'drums', 'other'];
+// Drum lanes, top to bottom: cymbals/hats, toms, snare, kick. Each hit becomes a mark in its lane.
+const DRUM_LANES = 4;
+const drumLane = (m) => ([35, 36].includes(m) ? 3 : [37, 38, 39, 40].includes(m) ? 2 : [41, 43, 45, 47, 48, 50].includes(m) ? 1 : 0);
+const drumMark = (m) => (m === 46 ? 'o' : drumLane(m) === 0 ? 'x' : '●');
 const firstOf = (tab, kind) => Object.keys(tab.tracks).find((k) => tab.tracks[k].kind === kind);
 const cap = (k) => k[0].toUpperCase() + k.slice(1);
 
@@ -527,7 +532,8 @@ function renderTab(stage, t) {
   const first = [...of.keys()].reduce((a, b) => Math.min(a, b), Infinity);
   const last = [...of.keys()].reduce((a, b) => Math.max(a, b), -1);
   const words = tabWords(t);
-  const strings = part.tuning.length;
+  const drums = part.kind === 'drums';
+  const strings = drums ? DRUM_LANES : part.tuning.length;
   const box = el('div', { className: `tab${S.tabChords ? ' with-chords' : ''}`, style: `--strings:${strings}` });
   box.append(el('p', { className: 'tab-src' },
     `${part.name.split('|').at(-1).trim() || S.part} · tab by `,
@@ -555,9 +561,10 @@ function renderTab(stage, t) {
     const stf = el('div', { className: 'stf' });
     if (tb) {
       for (const [pos, , frets] of tb.n) for (const [s, f] of frets) {
-        const n = el('span', { className: 'f', textContent: String(f) });
+        const lane = drums ? drumLane(f) : s;
+        const n = el('span', { className: drums ? `f dr${lane ? '' : ' hat'}` : 'f', textContent: drums ? drumMark(f) : String(f) });
         n.style.left = `${pos * 100}%`;
-        n.style.top = `calc(${s} * var(--row))`;
+        n.style.top = `calc(${lane} * var(--row))`;
         stf.append(n);
       }
     }
@@ -596,6 +603,7 @@ function renderTab(stage, t) {
 // Words are placed at their time; push right the ones that would overlap the previous word.
 function fitTab() {
   if (S.view !== 'tab') return;
+  last.bi = null; // lane heights change below: aim again
   document.querySelectorAll('.tly').forEach((lane) => {
     const w = lane.clientWidth;
     let edge = 0, level = 0;
@@ -682,9 +690,14 @@ function paintLine(node, p) {
 }
 // Scrolling is eased by hand each frame: restarting a native smooth scroll on every line change stutters.
 const aim = { top: null, v: 0 };
-function centre(node, frac) {
+// Aim so the span node..end (end defaults to node) sits at `frac` of the stage height, or is top-aligned when taller.
+function centre(node, frac, end = node) {
   if (Date.now() < scrollLock.until) return;
-  aim.top = Math.max(0, node.offsetTop + node.offsetHeight / 2 - $('stage').clientHeight * frac);
+  const stage = $('stage');
+  const top = offsetIn(stage, node) + stage.scrollTop;
+  const h = offsetIn(stage, end) + end.offsetHeight - offsetIn(stage, node);
+  const room = stage.clientHeight;
+  aim.top = Math.max(0, h > room * 0.7 ? top - room * 0.12 : top + h / 2 - room * frac);
 }
 function glide(dt) {
   const stage = $('stage');
@@ -699,6 +712,12 @@ function glide(dt) {
   aim.v = (aim.v - w * tmp) * e;
   if (Math.abs(d) < 0.4 && Math.abs(aim.v) < 4) { stage.scrollTop = aim.top; aim.top = null; aim.v = 0; return; }
   stage.scrollTop = aim.top + nx;
+}
+// Tabs: keep the playing row together with its lyric lane in view.
+function centreBar(j) {
+  const cell = nodes.bars[j];
+  const lane = S.view === 'tab' ? cell.parentElement?.nextElementSibling : null;
+  centre(cell, 0.3, lane?.classList.contains('tly') && !lane.hidden ? lane : cell);
 }
 const LEAD = 0.25; // light a line slightly early: reading is faster than singing
 
@@ -756,7 +775,7 @@ function update() {
     if (bi !== last.bi) {
       nodes.bars.forEach((n, j) => { n.classList.toggle('now', j === bi); n.classList.toggle('past', j < bi); });
       last.bi = bi;
-      if (bi >= 0 && nodes.bars[bi]) centre(nodes.bars[bi], 0.3);
+      if (bi >= 0 && nodes.bars[bi]) centreBar(bi);
     }
     if (last.ci !== ci) { nodes.chords.forEach((r) => r.el.classList.toggle('on', r.i === ci)); last.ci = ci; }
     if (S.view === 'tab' && bi >= 0 && nodes.tabCells[bi]) {
@@ -911,8 +930,13 @@ document.addEventListener('pointerdown', (e) => {
 // ── stem volumes (on the host in "Follow"; on this phone in "Hear here" and "Solo") ──
 const mixer = $('mixer');
 const mix = store.mix || {};
-const mixOf = (n) => mix[n] || (mix[n] = { v: 1, m: false });
-const mixMuted = () => Object.keys(mix).filter((n) => mix[n].m);
+const mixOf = (n) => mix[n] || (mix[n] = { v: 1, m: false, s: false });
+// Names to silence on this phone: everything but the soloed stems, else the muted ones.
+function mixMuted() {
+  const names = (S.track?.meta.stems || []).map((x) => x.name);
+  const solos = names.filter((n) => mix[n]?.s);
+  return solos.length ? names.filter((n) => !solos.includes(n)) : names.filter((n) => mix[n]?.m);
+}
 function applyMix() {
   const p = S.local;
   if (!p) return;
@@ -925,13 +949,22 @@ const mixRemote = () => S.mode === 'follow';
 function paintMixer() {
   const names = (S.track?.meta.stems || []).map((s) => s.name);
   const remote = mixRemote();
-  $('mix-note').textContent = !names.length ? 'No song yet.' : remote ? 'Changes apply to the host, so everyone hears them.' : 'Changes apply to the sound on this phone only.';
+  $('mix-note').textContent = !names.length ? 'No song yet.' : remote ? 'M mutes, S solos. Changes apply to the host, so everyone hears them.' : 'M mutes, S solos. Changes apply to the sound on this phone only.';
   $('mix-list').replaceChildren(...names.map((n) => {
-    const m = remote ? { v: S.host?.volumes?.[n] ?? 1, m: !!S.host?.muted?.includes(n) } : mixOf(n);
+    const m = remote ? { v: S.host?.volumes?.[n] ?? 1, m: !!S.host?.muted?.includes(n), s: !!S.host?.solo?.includes(n) } : mixOf(n);
     const out = el('output', { textContent: `${Math.round(m.v * 100)}%` });
     const range = el('input', { type: 'range', min: 0, max: 150, step: 5, value: Math.round(m.v * 100), ariaLabel: `${n} volume` });
-    const btn = el('button', { type: 'button', className: 'mute', textContent: m.m ? 'Muted' : 'On', ariaPressed: String(m.m) });
-    const row = el('div', { className: `mrow${m.m ? ' off' : ''}` }, el('b', { textContent: n[0].toUpperCase() + n.slice(1) }), btn, range, out);
+    const tog = (kind, txt, label) => el('button', { type: 'button', className: 'tog', textContent: txt, ariaLabel: label });
+    const bm = tog('mute', 'M', `Mute ${n}`), bs = tog('solo', 'S', `Solo ${n}`);
+    bm.dataset.kind = 'mute'; bs.dataset.kind = 'solo';
+    const row = el('div', { className: 'mrow' }, el('b', { textContent: n[0].toUpperCase() + n.slice(1) }), el('span', { className: 'btns' }, bm, bs), range, out);
+    const paint = () => {
+      bm.ariaPressed = String(m.m); bs.ariaPressed = String(m.s);
+      bm.ariaLabel = `${m.m ? 'Unmute' : 'Mute'} ${n}`; bm.title = bm.ariaLabel;
+      bs.ariaLabel = `${m.s ? 'Unsolo' : 'Solo'} ${n}`; bs.title = bs.ariaLabel;
+      row.classList.toggle('off', m.m && !m.s);
+    };
+    paint();
     const setVol = throttle((v) => send('volume', { name: n, v }), 90);
     range.oninput = () => {
       m.v = range.value / 100; out.textContent = `${range.value}%`;
@@ -939,11 +972,13 @@ function paintMixer() {
       store.mix = mix; save(); applyMix();
     };
     range.onchange = () => { if (remote) send('volume', { name: n, v: range.value / 100 }); };
-    btn.onclick = () => {
-      m.m = !m.m; btn.textContent = m.m ? 'Muted' : 'On'; btn.ariaPressed = String(m.m); row.classList.toggle('off', m.m);
-      if (remote) { send('mute', { name: n, on: m.m }); return; }
+    const flip = (key, msg) => () => {
+      m[key] = !m[key]; paint();
+      if (remote) { send(msg, { name: n, on: m[key] }); return; }
       store.mix = mix; save(); applyMix(); syncLocal(false);
     };
+    bm.onclick = flip('m', 'mute');
+    bs.onclick = flip('s', 'solo');
     return row;
   }));
 }
@@ -951,7 +986,7 @@ $('mix-btn').onclick = () => { paintMixer(); mixer.showModal(); };
 $('mixer-close').onclick = () => mixer.close();
 mixer.addEventListener('click', (e) => { if (e.target === mixer) mixer.close(); });
 $('mix-reset').onclick = () => {
-  if (mixRemote()) { for (const s of S.track?.meta.stems || []) { send('volume', { name: s.name, v: 1 }); send('mute', { name: s.name, on: false }); } setTimeout(paintMixer, 300); return; }
+  if (mixRemote()) { for (const s of S.track?.meta.stems || []) { send('volume', { name: s.name, v: 1 }); send('mute', { name: s.name, on: false }); send('solo', { name: s.name, on: false }); } setTimeout(paintMixer, 300); return; }
   for (const k of Object.keys(mix)) delete mix[k]; store.mix = mix; save(); applyMix(); syncLocal(false); paintMixer(); };
 
 // ── save to this phone (Android app only) ──
@@ -972,7 +1007,7 @@ if (droid?.download) {
 const openSheet = () => { sheet.showModal(); showHostName(); modeUi(); $('me').textContent = `${store.name || 'You'} · ${ROLES[store.role] || ''}`; };
 $('more').onclick = openSheet;
 $('where').onclick = openSheet;
-$('tune').onclick = openSheet;
+$('tune').onclick = () => { paintMixer(); mixer.showModal(); };
 $('sheet-close').onclick = () => sheet.close();
 sheet.addEventListener('click', (e) => { if (e.target === sheet) sheet.close(); });
 $('lat').value = String(S.lat);
@@ -1253,19 +1288,46 @@ async function ensureLocal() {
     modeUi('This browser cannot play the stems here (it needs a secure page). Open the host link over HTTPS or use the app.');
     return;
   }
-  if (S.local && S.localTrack === `${t.id}/${t.model}`) return;
-  const { StemPlayer } = await import('./player.js');
-  S.local?.dispose();
-  const p = new StemPlayer();
-  note.dataset.busy = '1';
-  note.textContent = 'Loading audio…';
-  await p.load(t.meta, `/media/${t.id}/${t.model}`, (f) => { note.textContent = `Loading audio ${Math.round(f * 100)}%`; });
-  delete note.dataset.busy;
-  S.local = p;
-  S.localTrack = `${t.id}/${t.model}`;
-  applyMix();
-  modeUi();
-  p.addEventListener('ended', () => { if (S.mode === 'solo') last = {}; });
+  const key = `${t.id}/${t.model}`;
+  if (S.local && S.localTrack === key) return;
+  if (pending?.key === key) return pending.promise; // one download per song, however many callers
+  const promise = (async () => {
+    const { StemPlayer } = await import('./player.js');
+    const p = new StemPlayer();
+    note.dataset.busy = '1';
+    loading(0);
+    try {
+      await p.load(t.meta, `/media/${t.id}/${t.model}`, loading);
+    } catch (err) {
+      p.dispose();
+      throw err;
+    } finally {
+      delete note.dataset.busy;
+      if (pending?.key === key) pending = null;
+      if (!pending) loading(null);
+    }
+    if (S.track !== t) { p.dispose(); return; } // another song was picked while this one downloaded
+    S.local?.dispose();
+    S.local = p;
+    S.localTrack = key;
+    applyMix();
+    modeUi();
+    p.addEventListener('ended', () => { if (S.mode === 'solo') last = {}; });
+    p.addEventListener('blocked', () => notice('Sound is blocked. Tap anywhere, then press play.'));
+  })();
+  pending = { key, promise };
+  return promise;
+}
+let pending = null;
+// Download progress strip above the transport; f = 0..1, null hides it.
+function loading(f) {
+  const box = $('loading');
+  box.hidden = f == null;
+  if (f == null) return;
+  const pct = Math.round(f * 100);
+  box.style.setProperty('--p', `${pct}%`);
+  $('load-txt').textContent = f > 0 ? `Loading audio ${pct}%` : 'Loading audio…';
+  $('m-note').textContent = $('load-txt').textContent;
 }
 
 let lastFix = 0;

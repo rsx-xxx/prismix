@@ -58,7 +58,7 @@
       <div class="who" id="who"><b id="title">Waiting for the host…</b><span id="sub"></span></div>
       <span id="dot" class="dot" title="Connection"></span>
       <button id="nt-btn" class="icon" type="button" aria-label="Stickers: tap a word or bar to pin a remark" title="Stickers" aria-pressed="false">📌</button>
-      <button id="mix-btn" class="icon" type="button" aria-label="Stem volumes"><svg><use href="#i-mixer"/></svg></button>
+      <button id="mix-btn" class="icon" type="button" aria-label="Playback and stems"><svg><use href="#i-mixer"/></svg></button>
       <button id="songs-btn" class="icon" type="button" aria-label="Songs"><svg><use href="#i-list"/></svg></button>
       <button id="more" class="icon" type="button" aria-label="Controls and settings"><svg><use href="#i-more"/></svg></button>
     </header>
@@ -81,6 +81,7 @@
     <section id="stage" class="stage" aria-live="off"></section>
 
     <footer class="dock">
+      <div id="loading" class="loading" role="status" hidden><span class="spin"></span><span id="load-txt">Loading audio…</span><i id="load-bar"></i></div>
       <div class="seekrow">
         <time id="t-cur">0:00</time>
         <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Position">
@@ -114,19 +115,11 @@
   </dialog>
 
   <dialog id="mixer">
-    <div class="sheet-bar"><h2>Stem volumes</h2><button id="mixer-close" class="icon" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button></div>
+    <div class="sheet-bar"><h2>Playback &amp; stems</h2><button id="mixer-close" class="icon" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button></div>
     <div class="sheet-body">
-      <p id="mix-note" class="hint"></p>
-      <div id="mix-list" class="mix"></div>
-      <button id="mix-reset" class="btn wide" type="button">Reset all</button>
-    </div>
-  </dialog>
-
-  <dialog id="sheet">
-    <div class="sheet-bar"><h2>Controls</h2><button id="sheet-close" class="icon" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button></div>
-    <div class="sheet-body">
-      <section class="group">
+      <section class="group" id="play-grp">
         <h3>Playback</h3>
+        
         <div class="stepper">
           <div class="s-head"><span>Tempo</span><output id="t-out">100%</output><button id="t-reset" class="link" type="button">Reset</button></div>
           <div class="s-ctl"><button id="t-down" class="icon round" type="button" aria-label="Slower"><svg><use href="#i-minus"/></svg></button><input id="t-range" type="range" min="50" max="150" step="5" value="100"><button id="t-up" class="icon round" type="button" aria-label="Faster"><svg><use href="#i-plus"/></svg></button></div>
@@ -141,6 +134,18 @@
         </div>
       </section>
 
+      <section class="group">
+        <h3>Stems</h3>
+        <p id="mix-note" class="hint"></p>
+        <div id="mix-list" class="mix"></div>
+        <button id="mix-reset" class="btn wide" type="button">Reset all</button>
+      </section>
+    </div>
+  </dialog>
+
+  <dialog id="sheet">
+    <div class="sheet-bar"><h2>Controls</h2><button id="sheet-close" class="icon" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button></div>
+    <div class="sheet-body">
       <section class="group">
         <h3>Sound</h3>
         <div class="seg wide" id="mode-seg" role="radiogroup">

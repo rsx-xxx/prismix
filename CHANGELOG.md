@@ -4,6 +4,15 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.10.0
+
+- Phone page: picking a song shows a loading bar with progress while its audio downloads, so it no longer looks stuck.
+- Phone page: sound is more stable. Overlapping downloads are merged, a stale player can no longer replace a new one, and a suspended audio engine is woken up or reported instead of silently "playing".
+- Tempo, key and chord key moved next to the stems in one Playback & stems panel.
+- Stems get "M" (mute) and "S" (solo) buttons, as on the desktop; they name their action (Mute/Unmute, Solo/Unsolo) for screen readers and work on the host in Follow mode and on the phone otherwise.
+- Drum tabs now show (hi-hat/cymbals, toms, snare, kick lanes); the Drums role opens them by default.
+- Tab, chord and lyric views keep the playing row, with its lyrics, in view instead of drifting to the bottom of the screen.
+
 ## 0.9.4
 
 - The Android app is now just "Prismix": its name on the phone, its title screen and the release file (`Prismix.apk`, was `Prismix-Band.apk`). It installs over the old one and keeps its settings.

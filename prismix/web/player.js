@@ -29,6 +29,11 @@ export class StemPlayer extends EventTarget {
     this.meta = meta;
     this.duration = meta.duration;
     this.ctx = new AudioContext({ sampleRate: meta.sampleRate, latencyHint: 'playback' });
+    const ctx = this.ctx;
+    // A context the OS suspended mid-song (call, lock screen) is woken as soon as we are visible again.
+    this._wakeUp = () => { if (this.playing && ctx.state !== 'running' && !document.hidden) ctx.resume().catch(() => {}); };
+    ctx.addEventListener('statechange', this._wakeUp);
+    document.addEventListener('visibilitychange', this._wakeUp);
     this.master = this.ctx.createGain(); // user volume
     this.out = this.ctx.createGain(); // silences this device when another one plays the room's sound
     this.out.gain.value = this.held ? 0 : 1;
@@ -122,9 +127,18 @@ export class StemPlayer extends EventTarget {
     this._each((n) => n.schedule(params));
   }
 
+  /** Resume a suspended context (autoplay policy, phone call, background); false if it stays blocked. */
+  async _wake() {
+    const ctx = this.ctx;
+    if (ctx.state === 'running') return true;
+    await Promise.race([ctx.resume().catch(() => {}), new Promise((r) => setTimeout(r, 800))]);
+    return ctx.state === 'running';
+  }
+
   async play() {
     if (!this.ctx || this.playing) return;
-    await this.ctx.resume();
+    const ctx = this.ctx;
+    if (!(await this._wake()) || ctx !== this.ctx || this.playing) return this._emit('blocked'); // never claim to play while silent
     if (this._anchor.pos >= this.duration - 0.05) this._anchor.pos = this.loop?.a ?? 0;
     const t = this.ctx.currentTime + this._latency;
     const pos = this._anchor.pos;
@@ -245,6 +259,7 @@ export class StemPlayer extends EventTarget {
     this.stems = [];
     this.playing = false;
     this.loop = null;
+    if (this._wakeUp) { document.removeEventListener('visibilitychange', this._wakeUp); this._wakeUp = null; }
     if (this.ctx) { this.ctx.close().catch(() => {}); this.ctx = null; }
   }
 }
