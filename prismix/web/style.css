@@ -1095,13 +1095,13 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
 @media (min-width: 900px) {
   :root { --side-w: 68px; --side-open: 216px; }
   .view-btn { display: inline-grid; }
-  body:not(:has(#studio:not([hidden]))) { padding-left: var(--side-w); }
-  body:not(:has(#studio:not([hidden]))) .sidebar {
+  body { padding-left: var(--side-w); }
+  body .sidebar {
     position: fixed; z-index: 30; inset: 0 auto 0 0; width: var(--side-w); display: flex; flex-direction: column; gap: 2px; overflow: hidden; transition: width .18s ease, box-shadow .18s;
     padding: 18px 12px 16px; background: var(--glass); backdrop-filter: blur(28px) saturate(1.5); -webkit-backdrop-filter: blur(28px) saturate(1.5);
     border-right: 1px solid var(--line);
   }
-  body:not(:has(#studio:not([hidden]))) .sidebar:hover, body:not(:has(#studio:not([hidden]))) .sidebar:focus-within { width: var(--side-open); box-shadow: 12px 0 40px -18px #000; }
+  body .sidebar:hover, body .sidebar:focus-within { width: var(--side-open); box-shadow: 12px 0 40px -18px #000; }
   .sidebar .brand { padding: 4px 10px 18px; font-size: 17px; white-space: nowrap; }
   .sidebar span { white-space: nowrap; opacity: 0; transition: opacity .12s; }
   .sidebar:hover span, .sidebar:focus-within span { opacity: 1; }
@@ -1115,12 +1115,12 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
   .sidebar > :not(.brand):hover { background: var(--surface-2); color: var(--text); }
   .sidebar [aria-current] { background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent); }
   .sidebar .push { margin-top: auto; }
-  body:not(:has(#studio:not([hidden]))) .topbar { padding-left: 24px; }
-  body:not(:has(#studio:not([hidden]))) .topbar .brand,
-  body:not(:has(#studio:not([hidden]))) .topbar #up-btn, body:not(:has(#studio:not([hidden]))) .topbar #pl-btn,
-  body:not(:has(#studio:not([hidden]))) .topbar #cloud-btn, body:not(:has(#studio:not([hidden]))) .topbar #band-btn,
-  body:not(:has(#studio:not([hidden]))) .topbar #settings-btn { display: none; }
-  body:not(:has(#studio:not([hidden]))) main { width: min(1180px, 100% - 56px); }
+  body .topbar { padding-left: 24px; }
+  body .topbar .brand,
+  body .topbar #up-btn, body .topbar #pl-btn,
+  body .topbar #cloud-btn, body .topbar #band-btn,
+  body .topbar #settings-btn { display: none; }
+  body main { width: min(1180px, 100% - 56px); }
 }
 
 /* list mode: one dense row per song */

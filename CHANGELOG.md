@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.23.0
+
+The studio (stems) page now has the same left navigation rail as the main page. Moving a sticker no longer fails silently: if the host can't save it you get the reason, and stickers can be dragged by touch. A "Method Not Allowed" on deleting or moving a sticker means the running host is an older build, so restart it.
+
 ## 0.22.1
 
 Selecting a drum tab now opens the lyrics side by side with the tab instead of with chords above the words, since drums have no chords. Your saved layout comes back on other instruments, and a manual switch while on drums only lasts until you leave them.

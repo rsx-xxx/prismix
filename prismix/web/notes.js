@@ -214,7 +214,7 @@ export function createNotes({ id, roots, button }) {
     const at = document.elementFromPoint(e.clientX, e.clientY);
     const t = at && roots().some((r) => r?.contains(at)) ? timeAt(e, at) : NaN;
     const n = list.find((x) => x.id === d.id);
-    if (n && Number.isFinite(t)) push('edit', { ...n, t: Math.round(t * 100) / 100 }).catch(() => {});
+    if (n && Number.isFinite(t)) push('edit', { ...n, t: Math.round(t * 100) / 100 }).catch((err) => { d.s.title = `Could not move: ${err.message}`; alert(`Could not move the sticker: ${err.message}`); });
   };
   let skipClick = false;
   document.addEventListener('pointerup', (e) => endDrag(e, true), true);
