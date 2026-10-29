@@ -5,15 +5,17 @@
 
 const droid = window.Android;
 
+/** One second of 16-bit audio whose only signal is a 1-LSB, 50 Hz square wave (about -90 dB, inaudible). Firefox/Zen and WebKit
+ *  give media controls only to audio that actually produces samples, so exact silence would never reach Now Playing. */
 function silence() {
-  const rate = 8000, n = rate; // one second of 8-bit silence
+  const rate = 8000, n = rate * 2;
   const b = new DataView(new ArrayBuffer(44 + n));
   const tag = (o, s) => [...s].forEach((c, i) => b.setUint8(o + i, c.charCodeAt(0)));
   tag(0, 'RIFF'); b.setUint32(4, 36 + n, true); tag(8, 'WAVEfmt ');
   b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true);
-  b.setUint32(24, rate, true); b.setUint32(28, rate, true); b.setUint16(32, 1, true); b.setUint16(34, 8, true);
+  b.setUint32(24, rate, true); b.setUint32(28, rate * 2, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true);
   tag(36, 'data'); b.setUint32(40, n, true);
-  new Uint8Array(b.buffer, 44).fill(128);
+  for (let i = 0; i < rate; i++) b.setInt16(44 + i * 2, Math.floor(i / 80) % 2 ? 1 : -1, true); // 80-sample halves = 50 Hz
   return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
 }
 

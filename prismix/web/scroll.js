@@ -23,6 +23,21 @@ export function glide(box, top) {
   running.set(box, requestAnimationFrame(step));
 }
 
+/** The part of `box` actually on screen (the page may be scrolled, the dock covers the bottom): { top, height } in box pixels. */
+export function visible(box) {
+  const r = box.getBoundingClientRect(), dock = document.getElementById('dock');
+  const floor = Math.min(innerHeight, dock && !dock.hidden ? dock.getBoundingClientRect().top : innerHeight);
+  const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, floor);
+  if (bottom - top < 120) return { top: 0, height: box.clientHeight };
+  return { top: top - r.top, height: bottom - top };
+}
+
+/** Where, in box pixels, the follow anchor (0..1 of what is on screen) sits. */
+export function anchorAt(box, frac) {
+  const v = visible(box);
+  return v.top + v.height * frac;
+}
+
 /** Where `node` sits inside the scrolled `box`, independent of offsetParent. */
 export const offsetIn = (box, node) => node.getBoundingClientRect().top - box.getBoundingClientRect().top;
 
@@ -52,12 +67,12 @@ export function linkScroll(a, b) {
     if (driver !== from || Date.now() > until || e.target !== from.box() || !from.active() || !to.active()) return;
     until = Date.now() + 800;
     const src = from.box(), dst = to.box();
-    const t = yToT(from.track(), src.scrollTop + src.clientHeight * from.anchor);
+    const t = yToT(from.track(), src.scrollTop + anchorAt(src, from.anchor));
     const y = t == null ? null : tToY(to.track(), t);
     if (y == null) return;
     to.hold();
     cancelGlide(dst);
-    dst.scrollTop = y - dst.clientHeight * to.anchor;
+    dst.scrollTop = y - anchorAt(dst, to.anchor);
   }, { passive: true, capture: true });
   drive(a, b);
   drive(b, a);
@@ -89,9 +104,9 @@ export function linkFollow(a, b, player) {
       const box = pane.box(), y = tToY(track(pane), pos);
       if (y == null) continue;
       cancelGlide(box);
-      const want = Math.max(0, Math.min(y - box.clientHeight * pane.anchor, box.scrollHeight - box.clientHeight));
+      const want = Math.max(0, Math.min(y - anchorAt(box, pane.anchor), box.scrollHeight - box.clientHeight));
       const d = want - box.scrollTop;
-      box.scrollTop = player.playing && Math.abs(d) < 600 ? box.scrollTop + d * 0.3 : want;
+      box.scrollTop = player.playing && Math.abs(d) < 600 ? box.scrollTop + d * 0.18 : want;
     }
   };
 }

@@ -7,7 +7,7 @@ const el = (tag, props = {}, ...kids) => {
   n.append(...kids);
   return n;
 };
-import { glide, cancelGlide, offsetIn, lockstep } from './scroll.js';
+import { glide, cancelGlide, offsetIn, lockstep, anchorAt, tToY } from './scroll.js';
 import { SCORE_KINDS, scoreLayout, paintScore, clefColumn } from './studio-staff.js';
 const NOTES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const BAR_MIN = 11; // rem a bar needs before a row takes one more
@@ -511,9 +511,21 @@ export function createTab({ player, chordsIn = () => [] }) {
   addEventListener('beforeunload', flush);
 
   const centre = (cell, soft) => {
-    const r = cell.parentElement, want = r.offsetTop - body.clientHeight * 0.4 + r.offsetHeight / 2;
+    const r = cell.parentElement, want = r.offsetTop - anchorAt(body, 0.4) + r.offsetHeight / 2;
     soft ? glide(body, want) : body.scrollTo({ top: want });
   };
+
+  // Continuous follow: the pane drifts so the playing moment stays at the anchor, rows slide up as their time comes (no jumps).
+  let trackKey = '', trackPts = null;
+  function glideTo(pos) {
+    const key = `${body.scrollHeight}/${body.clientHeight}/${cur.cells.length}`;
+    if (key !== trackKey || !trackPts) { trackKey = key; trackPts = api.pane().track(); }
+    const y = tToY(trackPts, pos);
+    if (y == null) return;
+    cancelGlide(body);
+    const want = Math.max(0, Math.min(y - anchorAt(body, 0.4), body.scrollHeight - body.clientHeight)), d = want - body.scrollTop;
+    body.scrollTop = player.playing && Math.abs(d) < 600 ? body.scrollTop + d * 0.18 : want;
+  }
 
   function frame(pos) {
     if (!cur || root.hidden || root.classList.contains('off') || body.offsetParent === null) return;
@@ -524,11 +536,8 @@ export function createTab({ player, chordsIn = () => [] }) {
       cur.cells[cur.now]?.classList.remove('now');
       cur.now = j;
       cell?.classList.add('now');
-      if (cell && !lockstep.on && follow && Date.now() >= holdUntil) {
-        const m = offsetIn(body, cell.parentElement) + cell.parentElement.offsetHeight / 2;
-        if (m < body.clientHeight * 0.3 || m > body.clientHeight * 0.6) centre(cell, true);
-      }
     }
+    if (cell && !lockstep.on && follow && Date.now() >= holdUntil) glideTo(pos);
     if (cell) cell.querySelector('.cursor').style.setProperty('--x', `${Math.min(1, Math.max(0, (pos - cur.secs[j]) / Math.max(1e-6, cur.ends[j] - cur.secs[j]))) * 100}%`);
   }
 
@@ -540,7 +549,7 @@ export function createTab({ player, chordsIn = () => [] }) {
   let wasPlaying = false;
   player.addEventListener('state', () => { if (player.playing && !wasPlaying) resume(); wasPlaying = player.playing; });
 
-  return {
+  const api = {
     open, close, frame,
     pane: () => ({
       root: $('tabview'), anchor: 0.4,
@@ -569,4 +578,5 @@ export function createTab({ player, chordsIn = () => [] }) {
       },
     }),
   };
+  return api;
 }

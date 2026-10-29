@@ -1,7 +1,7 @@
 // Spotify-style lyrics: the current line is lit and kept centred, click a line to jump to it.
 // Lines come from LRCLIB or Genius through the server (first open of a track only); Genius text is timed against the audio, and when nothing is published the words are recognised from the audio.
 
-import { glide, cancelGlide, offsetIn, lockstep } from './scroll.js';
+import { glide, cancelGlide, offsetIn, lockstep, anchorAt, visible } from './scroll.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -136,6 +136,7 @@ export function createLyrics({ player, api, chords = () => [] }) {
     cur = { id, data, nodes, active: -2, timed: [], intro: el('div', { className: 'ly-instr' }), outro: el('div', { className: 'ly-instr' }) };
     const credit = $('ly-credit');
     if (data.source === 'audio') credit.replaceChildren(`recognised from audio (${data.language}), may contain mistakes`);
+    else if (data.matched === 'words') credit.replaceChildren('matched to published lyrics by its words');
     else credit.replaceChildren(data.web ? el('a', { href: data.web, target: '_blank', rel: 'noopener', textContent: 'Genius' }) : 'LRCLIB');
     body.replaceChildren(el('div', { className: `ly-lines${data.synced ? '' : ' plain'}` }, ...(data.synced ? [cur.intro] : []), ...nodes, ...(data.synced ? [cur.outro] : [])));
     body.scrollTop = 0;
@@ -298,9 +299,9 @@ export function createLyrics({ player, api, chords = () => [] }) {
   function center(i) {
     const n = cur.nodes[i];
     if (!n || lockstep.on || Date.now() < manualUntil || Date.now() < holdUntil || body.offsetParent === null) return;
-    const view = body.clientHeight, mid = offsetIn(body, n) + n.offsetHeight / 2;
-    if (mid > view * 0.3 && mid < view * 0.6) return;
-    glide(body, body.scrollTop + mid - view * 0.4);
+    const v = visible(body), mid = offsetIn(body, n) + n.offsetHeight / 2 - v.top;
+    if (mid > v.height * 0.3 && mid < v.height * 0.55) return;
+    glide(body, body.scrollTop + mid + v.top - anchorAt(body, 0.4));
   }
 
   ['wheel', 'touchmove'].forEach((t) => body.addEventListener(t, () => { manualUntil = Date.now() + PAUSE_MS; cancelGlide(body); }, { passive: true }));
@@ -347,7 +348,7 @@ export function createLyrics({ player, api, chords = () => [] }) {
       resume: () => {
         manualUntil = 0; holdUntil = 0;
         const n = cur?.nodes[cur.active];
-        if (n) glide(body, body.scrollTop + offsetIn(body, n) + n.offsetHeight / 2 - body.clientHeight * 0.4);
+        if (n) glide(body, body.scrollTop + offsetIn(body, n) + n.offsetHeight / 2 - anchorAt(body, 0.4));
       },
       away: () => {
         const n = cur?.nodes[cur.active];

@@ -24,7 +24,7 @@ API = "https://lrclib.net/api"
 HEADERS = {"User-Agent": "prismix (personal use; https://lrclib.net/docs)"}
 TIMEOUT = 25
 SCHEMA = 3
-AUDIO_REV = 2  # bumped when finding published lyrics or recognising the audio got better
+AUDIO_REV = 3  # bumped when finding published lyrics or recognising the audio got better
 MIN_TITLE_COVERAGE = 0.6
 MAX_CANDIDATES = 10
 
@@ -308,6 +308,71 @@ def find_original(info: dict, heard_lines: list[dict]) -> tuple[dict, float] | N
     return hit, score
 
 
+MIN_WORDS_MATCH = 0.6  # share of the recognised words a text must contain to be taken for the same song
+MAX_WEB_PAGES = 5
+
+
+def _allow_words(info: dict) -> set[str]:
+    """Words that are real for this song though a dictionary may not list them: its title and artist."""
+    artist, title = guess(info)
+    return set(_words(f"{artist or ''} {title} {info.get('title') or ''}"))
+
+
+def _library_texts(skip: str) -> list[dict]:
+    """Published lyrics of other library songs (found by name, so trusted): possible texts of this recording."""
+    out = []
+    for item in library.list_library():
+        if item["id"] == skip:
+            continue
+        try:
+            data = json.loads((library.video_dir(item["id"]) / "lyrics.json").read_text())
+        except (OSError, ValueError):
+            continue
+        if data.get("source") in ("lrclib", "genius") and sum(1 for ln in data.get("lines", []) if ln.get("text")) >= 4:
+            out.append({"url": data.get("web"), "artist": data.get("artist"), "title": data.get("title"),
+                        "lines": [{"text": ln["text"], **({"sec": ln["sec"]} if ln.get("sec") else {})}
+                                  for ln in data["lines"] if ln.get("text")]})
+    return out
+
+
+def _text_match(heard: list[str], lines: list[dict]) -> float:
+    return heard_match(heard, {"plainLyrics": " ".join(ln["text"] for ln in lines if ln.get("text"))})
+
+
+def find_by_words(video_id: str, heard_lines: list[dict]) -> dict | None:
+    """Published lyrics of this recording found by what is sung, when the title led nowhere: first the lyrics already
+    in the library (other uploads, covers, karaoke cuts of the same song), then a web search for the sung lines.
+    The text must contain most of the recognised words. {'url', 'artist', 'title', 'lines', 'score'} or None."""
+    heard = [w for ln in heard_lines for w in _words(ln.get("text") or "")]
+    if len(heard) < 8:
+        return None
+    local = [(_text_match(heard, c["lines"]), c) for c in _library_texts(video_id)]
+    if local and (best := max(local, key=lambda x: x[0]))[0] >= MIN_WORDS_MATCH:
+        return {**best[1], "score": round(best[0], 2)}
+    sung = sorted((ln["text"] for ln in heard_lines if len(_words(ln["text"])) >= 4), key=len, reverse=True)[:2]
+    if not sung:
+        return None
+    found, seen = None, set()
+    try:
+        with httpx.Client(headers={"User-Agent": genius.UA, "Accept-Language": "en,ru;q=0.8"}, timeout=genius.TIMEOUT,
+                          follow_redirects=True) as client:
+            urls: list[str] = []
+            for q in (f'"{sung[0]}" lyrics genius', f'"{" ".join(sung)[:120]}" genius lyrics'):
+                urls += [u for u in genius.search_urls(client, q) if u not in urls]
+            for url in urls[:MAX_WEB_PAGES]:
+                if url in seen or not (r := genius._get(client, url)):
+                    continue
+                seen.add(url)
+                lines = [ln for ln in genius.parse_lyrics(r.text) if ln["text"]]
+                score = _text_match(heard, lines)
+                if score >= MIN_WORDS_MATCH and (found is None or score > found["score"]):
+                    got = genius.page_title(r.text) or ("", "")
+                    found = {"url": url, "artist": got[0], "title": got[1], "lines": genius.parse_lyrics(r.text), "score": round(score, 2)}
+    except Exception as e:  # a bonus lookup: any failure leaves the recognised text as it is
+        log.info("lookup by words failed: %s", e)
+    return found
+
+
 def _entry_or_none(hit: dict) -> dict | None:
     try:
         return _entry(hit)
@@ -446,7 +511,7 @@ def lookup(video_id: str, query: str | None = None, *, refresh: bool = False, li
                 else:
                     if is_cover(info):  # the uploader is not the artist: check candidates against the sung words
                         try:
-                            heard = transcribe.transcribe(video_id)
+                            heard = transcribe.transcribe(video_id, _allow_words(info))
                             if found := find_original(info, heard["lines"]):
                                 hit, score = found
                                 original = {"artist": hit.get("artistName"), "title": hit.get("trackName"), "match": round(score, 2)}
@@ -502,11 +567,18 @@ def lookup(video_id: str, query: str | None = None, *, refresh: bool = False, li
         if query:
             raise LyricsError("No lyrics found for this search")
         try:
-            heard = heard or transcribe.transcribe(video_id)
+            heard = heard or transcribe.transcribe(video_id, _allow_words(info))
         except transcribe.TranscribeError as e:
             raise LyricsError(f"No published lyrics found. {e}") from e
         artist, title = guess(info)
+        # nothing by that name: what is sung may still be a song we know, under another name
+        if (found := find_by_words(video_id, heard["lines"])) and (timed := _timed_from_web(video_id, found["lines"])):
+            return _store(video_id, {
+                "version": SCHEMA, "source": "genius", "web": found["url"], "artist": found["artist"] or artist,
+                "title": found["title"] or title, "synced": True, "lines": timed, "matched": "words",
+                "original": {"artist": found["artist"], "title": found["title"], "match": found["score"]},
+            })
         return _store(video_id, {
             "version": SCHEMA, "source": "audio", "language": heard["language"], "artist": artist, "title": title,
-            "synced": True, "lines": heard["lines"], "rev": AUDIO_REV,
+            "synced": True, "lines": heard["lines"], "rev": AUDIO_REV, "quality": heard.get("quality"),
         })

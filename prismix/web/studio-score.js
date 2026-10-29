@@ -1,7 +1,7 @@
 // Bars and chords for the open track: ruler, chart, fingering diagrams, capo, chart PDF.
 import { GUITAR_TUNINGS, bestCapo, capoSavings, chordName, chordPaint, keyName, shapeTuning, tuningById, tuningFromPitches, tuningSavings, useFlats, simplify, voicing, voicingCount } from './theory.js';
 import { chartPdf } from './score.js';
-import { cancelGlide, glide, offsetIn, lockstep } from './scroll.js';
+import { cancelGlide, glide, offsetIn, lockstep, anchorAt } from './scroll.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -802,7 +802,7 @@ export function createScore({ player, api, notice, onSetup }) {
       resume: () => {
         setFollow(true); holdUntil = 0;
         const now = $('sc-body').querySelector('.cell.now'), chart = now?.closest('.chart');
-        if (now && chart.offsetParent !== null) glide(chart, chart.scrollTop + offsetIn(chart, now) + now.offsetHeight / 2 - chart.clientHeight * 0.4);
+        if (now && chart.offsetParent !== null) glide(chart, chart.scrollTop + offsetIn(chart, now) + now.offsetHeight / 2 - anchorAt(chart, 0.4));
       },
       away: () => {
         const now = $('sc-body').querySelector('.cell.now'), chart = now?.closest('.chart');

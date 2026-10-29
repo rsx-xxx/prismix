@@ -17,7 +17,22 @@ const net = createSocket({
   },
   onclose: () => { S.host = null; paint(); },
 });
-const cmd = (op, v) => net.send({ t: 'cmd', op, v });
+// Optimistic: the controls answer at once; the host's next state message confirms or corrects.
+const local = {
+  play: (h) => { h.pos = pos(); h.playing = true; },
+  pause: (h) => { h.pos = pos(); h.playing = false; },
+  seek: (h, v) => { h.pos = v; },
+  tempo: (h, v) => { h.pos = pos(); h.tempo = v; },
+  pitch: (h, v) => { h.semitones = v; },
+  master: (h, v) => { h.master = v; },
+  volume: (h, v) => { h.volumes = { ...h.volumes, [v.name]: v.v }; },
+  mute: (h, v) => { h.muted = (h.muted || []).filter((n) => n !== v.name).concat(v.on ? [v.name] : []); },
+  solo: (h, v) => { h.solo = (h.solo || []).filter((n) => n !== v.name).concat(v.on ? [v.name] : []); },
+};
+const cmd = (op, v) => {
+  net.send({ t: 'cmd', op, v });
+  if (S.host && local[op]) { local[op](S.host, v); S.at = performance.now(); paint(); }
+};
 
 function take(m) {
   S.host = m;

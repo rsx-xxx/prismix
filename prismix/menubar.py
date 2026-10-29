@@ -39,6 +39,7 @@ def _build(url: str) -> None:
         web.setValue_forKey_(False, "drawsBackground")
         controller = NSViewController.alloc().init()
         controller.setView_(web)
+        web.loadRequest_(NSURLRequest.requestWithURL_(NSURL.URLWithString_(f"{url}/mini")))  # once: its socket stays live, so opening is instant
         popover = NSPopover.alloc().init()
         popover.setBehavior_(1)  # transient: closes when the user clicks elsewhere
         popover.setContentSize_(SIZE)
@@ -49,7 +50,6 @@ def _build(url: str) -> None:
                 if popover.isShown():
                     popover.performClose_(sender)
                     return
-                web.loadRequest_(NSURLRequest.requestWithURL_(NSURL.URLWithString_(f"{url}/mini")))
                 popover.showRelativeToRect_ofView_preferredEdge_(sender.bounds(), sender, 1)  # 1 = below the bar
                 NSApp.activateIgnoringOtherApps_(True)
 

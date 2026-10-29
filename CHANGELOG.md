@@ -2,6 +2,13 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.16.0
+
+- Lyrics: every recognised word is checked against English and Russian dictionaries (misspellings repaired, invented lines dropped), and when nothing is found by title the recognised words are matched against lyrics already in the library and a web search, so covers and odd uploads get the real, timed text.
+- Tabs follow playback continuously instead of jumping, and the follow position is measured in the visible area, so the current bar no longer hides under the player dock.
+- Mini player controls react instantly and the popover no longer reloads on every open.
+- Media controls: the background audio now carries an inaudible signal so Firefox/Zen and WebKit list Prismix in their media controls.
+
 ## 0.15.0
 
 - Stickers can be dragged to a new moment, deleted with a × on the sticker, and are readable on an opaque card.

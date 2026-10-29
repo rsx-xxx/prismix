@@ -12,7 +12,7 @@ import threading
 
 import numpy as np
 
-from . import library
+from . import library, vocab
 from .config import MODELS, ffmpeg_exe
 
 MODEL_ID = os.environ.get("PRISMIX_WHISPER_MODEL", "openai/whisper-large-v3-turbo")
@@ -125,8 +125,22 @@ def _segments(out, tokenizer) -> list[dict]:
     return [{"text": text, "timestamp": (0.0, None)}]
 
 
-def transcribe(video_id: str) -> dict:
-    """{'language': 'en'|'ru', 'lines': [{'t', 'text'}]}. Slow: a minute or two on CPU for a typical song."""
+def vet_lines(lines: list[dict], lang: str, allow: set[str] = frozenset()) -> tuple[list[dict], float]:
+    """Every word checked against the dictionaries: unknown ones are repaired or dropped, invented lines vanish.
+    Returns (lines, share of the recognised words that were real to begin with)."""
+    out, checked, real = [], 0, 0
+    for ln in lines:
+        text, n, ok = vocab.vet(ln["text"], lang, allow=allow)
+        checked += n
+        real += ok
+        if text:
+            out.append({**ln, "text": text})
+    return out, (real / checked if checked else 0.0)
+
+
+def transcribe(video_id: str, allow: set[str] = frozenset()) -> dict:
+    """{'language': 'en'|'ru', 'lines': [{'t', 'text'}], 'quality'}. Slow: a minute or two on CPU for a typical song.
+    `allow`: words that are real here though no dictionary lists them (the song's own title, names)."""
     audio = _audio(video_id)
     if float(np.sqrt(np.mean(audio ** 2))) < 1e-4:
         raise TranscribeError("This track has no audible vocals")
@@ -153,7 +167,7 @@ def transcribe(video_id: str) -> dict:
         raise
     except Exception as e:  # download problems, out of memory, unsupported hardware
         raise TranscribeError(f"Could not recognise the lyrics ({type(e).__name__}). Check your connection and try again") from e
-    lines = clean(chunks)
+    lines, quality = vet_lines(clean(chunks), lang, allow)
     if len(lines) < 3:
         raise TranscribeError("No sung words were recognised in this track")
-    return {"language": lang, "lines": lines}
+    return {"language": lang, "lines": lines, "quality": round(quality, 2)}
