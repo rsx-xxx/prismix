@@ -1131,6 +1131,12 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
   .sidebar > :not(.brand):hover { background: var(--surface-2); color: var(--text); }
   .sidebar [aria-current] { background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent); }
   .sidebar .push { margin-top: auto; }
+  /* Settings unfolds upward inside the rail, above its own entry */
+  body .sidebar > #settings.pop { position: static; display: block; height: auto; width: auto; margin: auto 0 6px; padding: 8px 14px 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; box-shadow: none; color: var(--text); cursor: default; font-size: 14px; }
+  body .sidebar > #settings.pop[hidden] { display: none; }
+  body .sidebar:has(#settings:not([hidden])) { width: 300px; box-shadow: 12px 0 40px -18px #000; }
+  body .sidebar:has(#settings:not([hidden])) .push { margin-top: 0; }
+  .sidebar:has(#settings:not([hidden])) span { opacity: 1; }
   body .topbar { padding-left: 24px; }
   body .topbar .brand,
   body .topbar #up-btn, body .topbar #pl-btn,

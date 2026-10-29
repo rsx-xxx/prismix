@@ -904,7 +904,7 @@ function renderMiniStems(meta) {
       b.addEventListener('click', () => on(player._stem(s.name)));
       return b;
     };
-    const vol = el('input', { type: 'range', className: 'vol', min: 0, max: 150, value: Math.round(player._stem(s.name).volume * 100), ariaLabel: `${s.name} volume` });
+    const vol = el('input', { type: 'range', className: 'vol', min: 0, max: 150, value: Math.round((player.stems.find((st) => st.name === s.name)?.volume ?? 1) * 100), ariaLabel: `${s.name} volume` });
     vol.addEventListener('input', () => { setPct(vol); player.setVolume(s.name, vol.value / 100); });
     setPct(vol);
     const row = el('div', { className: 'mini-stem' }, el('span', { className: 'name', textContent: s.name }),
@@ -1482,11 +1482,12 @@ $('settings-btn').addEventListener('click', () => {
   const box = settingsPanel.style;
   const side = $('sidebar');
   if (getComputedStyle(side).display !== 'none') {
-    // desktop: the control lives in the sidebar's bottom-left corner; open beside the rail, bottom-aligned with it
-    const r = side.getBoundingClientRect();
-    box.left = `${Math.round(r.right + 8)}px`; box.right = 'auto'; box.top = 'auto'; box.bottom = '16px';
+    // desktop: the rail's Settings entry unfolds upward inside the rail itself
+    box.cssText = '';
+    side.insertBefore(settingsPanel, side.querySelector('.push'));
   } else {
     const r = $('settings-btn').getBoundingClientRect();
+    document.body.append(settingsPanel);
     box.top = `${Math.round(r.bottom + 8)}px`; box.bottom = 'auto'; box.left = 'auto';
     box.right = `${Math.max(8, Math.round(innerWidth - r.right))}px`;
   }

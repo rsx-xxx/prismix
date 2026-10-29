@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.32.1
+
+Opening a song hung on "Loading stems…" forever: the mixer's small stem list, added in 0.28.0, read volumes from stems that had not loaded yet and threw before loading began. It now starts at full volume and loads normally. Settings in the desktop sidebar now unfolds upward inside the sidebar instead of opening as a floating panel beside it.
+
 ## 0.32.0
 
 Installing an update now shows an "Updating Prismix" popup with a pulsing icon, a progress bar and what is happening (downloading, installing, restarting) from the moment you click, so it is clear it started. The restart buttons are renamed "Install update", since Prismix restarts by itself afterwards.
