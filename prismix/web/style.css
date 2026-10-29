@@ -204,6 +204,9 @@ dialog legend { font-size: 12px; text-transform: uppercase; letter-spacing: .08e
 .trackhead { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
 .trackhead img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; background: var(--surface-2); }
 .th-text { flex: 1; min-width: 200px; }
+.th-text h1.renamable { cursor: text; border-radius: 6px; outline-offset: 4px; }
+.th-text h1.renamable:hover { text-decoration: underline dotted; }
+.th-text h1.renamable:focus { outline: 2px solid var(--accent, #7c9cff); text-decoration: none; }
 .th-text h1 { font-size: clamp(18px, 2.4vw, 26px); letter-spacing: -0.02em; line-height: 1.2; }
 .seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; }
 .seg button { border: 0; background: none; padding: 6px 14px; border-radius: 999px; color: var(--muted); font-size: 13px; font-weight: 600; }

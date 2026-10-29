@@ -223,13 +223,15 @@ def download(cloud: Cloud, song_id: str, progress=lambda step, done, total: None
         entries = [{"name": n, "file": f"{n}.m4a", "peaks": [int(round(float(v) * 255)) for v in pipeline.peaks(s) / scale]}
                    for n, s in samples.items()]
         duration = float(manifest.get("duration") or 0) or len(next(iter(samples.values()))[0]) / SAMPLE_RATE
-        info = {"id": song_id, "title": manifest.get("title") or song_id, "channel": manifest.get("artist") or "",
+        info = {"id": song_id, "title": library.clean_title(manifest.get("title") or song_id), "channel": manifest.get("artist") or "",
                 "duration": duration, "added": int(time.time()), "fromCloud": True}
         for rel, name in (("cover.jpg", "thumb.jpg"), ("structure.json", "structure.json"), ("lyrics.json", "lyrics.json"), ("tab.json", "tabdata.json")):
             if (src / rel).is_file():
                 (src / rel).replace(tmp / name)
         shutil.rmtree(src)
         (tmp / "info.json").write_text(json.dumps(info, ensure_ascii=False))
+        if setup := library.clean_setup(manifest.get("setup")):
+            (tmp / "setup.json").write_text(json.dumps(setup))
         (mdir / "meta.json").write_text(json.dumps({**info, "model": model, "sampleRate": SAMPLE_RATE, "stems": entries}, ensure_ascii=False))
         final = library.video_dir(song_id)
         if final.exists():  # the song is already here under another model: keep what it has, add this model
@@ -305,13 +307,33 @@ def publish(cloud: Cloud, video_id: str, model: str, progress=lambda step, done,
     progress("commit", len(plan), len(plan))
     return cloud.commit(video_id, {
         "id": video_id,
-        "title": found.get("title") or info.get("title", ""),
+        "title": library.clean_title(found.get("title") or info.get("title", "")),
         "artist": found.get("artist") or info.get("channel", ""),
         "duration": float(info.get("duration") or 0),
         "model": model,
         "stems": [s["name"] for s in meta.get("stems", [])] if len(meta.get("stems", [])) > 1 else [],
         "files": files,
+        "setup": library.read_setup(video_id),
     })
+
+
+def push_setup(video_id: str, setup: dict) -> bool:
+    """Share a changed playing setup with the cloud copy of the song, if there is one. Nothing is rendered or uploaded:
+    the committed manifest is sent again with the new setup. Quiet when offline or not signed in."""
+    cloud = current()
+    if not cloud:
+        return False
+    try:
+        manifest = cloud.manifest(video_id)
+        if not manifest:
+            return False
+        keep = ("id", "title", "artist", "duration", "model", "stems", "files")
+        cloud.commit(video_id, {**{k: manifest[k] for k in keep if k in manifest}, "setup": setup})
+        return True
+    except (CloudError, httpx.HTTPError):
+        return False
+    finally:
+        cloud.close()
 
 
 class Publisher:

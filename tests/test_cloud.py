@@ -130,6 +130,28 @@ def test_publish_uploads_then_commits(tmp_path, monkeypatch):
     assert body["stems"] == ["vocals", "drums"]
     assert {f["path"]: f["bytes"] for f in body["files"]}["stems/drums.m4a"] == len(b"drums" * 10)
     assert steps[-1] == ("commit", 4, 4)
+    assert body["setup"] == {}
+
+
+def test_setup_travels_with_the_song(tmp_path, monkeypatch):
+    import numpy as np
+    seed_song(tmp_path, monkeypatch)
+    monkeypatch.setattr(cloud, "LIBRARY_DIR", tmp_path)
+    library.write_setup(VID, {"semitones": -3, "tuning": "dropd", "junk": 1})
+    fake = FakeCloud()
+    cloud.publish(cloud_for(fake), VID, "htdemucs_ft")
+    assert fake.committed["setup"] == {"semitones": -3, "tuning": "dropd"}
+    monkeypatch.setattr(cloud, "current", lambda: cloud_for(fake))
+    assert cloud.push_setup(VID, {"semitones": 2})
+    assert fake.committed["setup"] == {"semitones": 2} and fake.committed["files"]
+    other = tmp_path / "other"
+    other.mkdir()
+    monkeypatch.setattr(library, "LIBRARY_DIR", other)
+    monkeypatch.setattr(cloud, "LIBRARY_DIR", other)
+    monkeypatch.setattr(cloud.pipeline, "decode", lambda path: np.zeros((2, 4410), dtype="float32"))
+    monkeypatch.setattr(cloud.pipeline, "peaks", lambda s: np.ones(8, dtype="float32"))
+    cloud.download(cloud_for(fake), VID)
+    assert library.read_setup(VID) == {"semitones": 2}
 
 
 def test_republish_skips_unchanged_files(tmp_path, monkeypatch):

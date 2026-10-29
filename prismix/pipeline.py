@@ -75,7 +75,7 @@ def search(query: str, limit: int = 8, offset: int = 0) -> list[dict]:
             continue
         out.append({
             "id": vid,
-            "title": e.get("title") or vid,
+            "title": library.clean_title(e.get("title") or vid),
             "channel": e.get("channel") or e.get("uploader") or "",
             "duration": e.get("duration"),
         })
@@ -112,7 +112,7 @@ def playlist(url: str, limit: int = 200) -> dict:
         if vid and library.VIDEO_ID_RE.match(vid):
             items.append({
                 "id": vid,
-                "title": e.get("title") or vid,
+                "title": library.clean_title(e.get("title") or vid),
                 "channel": e.get("channel") or e.get("uploader") or "",
                 "duration": e.get("duration"),
             })
@@ -197,7 +197,7 @@ def download(video_id: str, report: Report) -> dict:
 
     info = {
         "id": video_id,
-        "title": meta.get("title") or video_id,
+        "title": library.clean_title(meta.get("title") or video_id),
         "channel": meta.get("channel") or meta.get("uploader") or "",
         "duration": duration,
         "added": int(time.time()),
@@ -325,6 +325,24 @@ def _stem_rank(name: str) -> int:
 
 
 _ROFORMER = "bs_roformer_sw"
+
+
+def release_models() -> None:
+    """Drop the separation models from memory once the queue is idle; they reload in seconds when the next song needs them."""
+    import gc
+
+    _load_model.cache_clear()
+    _load_roformer.cache_clear()
+    gc.collect()
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        elif torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+    except Exception:  # noqa: BLE001 - freeing memory is best effort
+        pass
 
 
 @lru_cache(maxsize=1)

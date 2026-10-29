@@ -135,6 +135,17 @@ class ExportRequest(BaseModel):
     volumes: dict[str, float] = {}
 
 
+class UploadRename(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+
+
+class SongSetup(BaseModel):
+    semitones: int | None = Field(default=None, ge=-12, le=12)
+    chord_key: int | None = Field(default=None, alias="chordKey", ge=-12, le=12)
+    capo: int | None = Field(default=None, ge=0, le=11)
+    tuning: str | None = Field(default=None, max_length=40)
+
+
 class CloudLogin(BaseModel):
     link: str = Field(max_length=2000)
 
@@ -438,6 +449,25 @@ def create_app() -> FastAPI:
     def list_library():
         return library.list_library()
 
+    @app.get("/api/library/{video_id}/setup")
+    def get_setup(video_id: str):
+        try:
+            return library.read_setup(video_id)
+        except ValueError:
+            raise HTTPException(404, "Not found") from None
+
+    @app.put("/api/library/{video_id}/setup")
+    async def put_setup(video_id: str, body: SongSetup):
+        """Remember how the song is played (key, capo, tuning); songs in the Band cloud share it with everyone."""
+        try:
+            if not library.read_info(video_id):
+                raise HTTPException(404, "Not found")
+            setup = library.write_setup(video_id, body.model_dump(by_alias=True, exclude_none=True))
+        except ValueError:
+            raise HTTPException(404, "Not found") from None
+        await asyncio.to_thread(cloud.push_setup, video_id, setup)
+        return setup
+
     @app.get("/api/library/{video_id}/{model}")
     def get_track(video_id: str, model: str):
         try:
@@ -447,6 +477,17 @@ def create_app() -> FastAPI:
         if not meta:
             raise HTTPException(404, "Not processed yet")
         return meta
+
+    @app.patch("/api/library/{video_id}")
+    def rename_track(video_id: str, body: UploadRename):
+        """Rename an uploaded file; songs from YouTube/Spotify keep their own titles."""
+        try:
+            info = library.rename(video_id, body.title)
+        except ValueError:
+            raise HTTPException(404, "Not found") from None
+        if not info or not info["title"]:
+            raise HTTPException(404, "Only uploaded files can be renamed")
+        return info
 
     @app.delete("/api/library/{video_id}")
     def delete_track(video_id: str):

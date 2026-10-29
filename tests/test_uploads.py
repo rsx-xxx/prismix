@@ -98,3 +98,33 @@ def test_preview_falls_back_to_original_then_band(tmp_path, monkeypatch):
     monkeypatch.setattr(uploads, "_itunes_original", lambda t: None)
     assert uploads.make_preview(src, tmp_path / "b.jpg", info, "Song", "Cover Band") == "album"
     assert (tmp_path / "b.jpg").read_bytes() == b"band"
+
+
+def test_rename_upload_only(client, tmp_path):
+    data = tone(tmp_path / "t.mp3", "title=Hello")
+    info = client.post("/api/upload", files={"file": ("x.mp3", data)}).json()
+    r = client.patch(f"/api/library/{info['id']}", json={"title": "  My take  "})
+    assert r.status_code == 200 and r.json()["title"] == "My take"
+    assert library.read_info(info["id"])["title"] == "My take"
+    yt = tmp_path / "dQw4w9WgXcQ"
+    yt.mkdir()
+    (yt / "info.json").write_text('{"id": "dQw4w9WgXcQ", "title": "Song"}')
+    assert client.patch("/api/library/dQw4w9WgXcQ", json={"title": "Nope"}).status_code == 404
+
+
+def test_song_setup_roundtrip(client, tmp_path):
+    d = tmp_path / "dQw4w9WgXcQ"
+    d.mkdir()
+    (d / "info.json").write_text('{"id": "dQw4w9WgXcQ", "title": "Song"}')
+    assert client.get("/api/library/dQw4w9WgXcQ/setup").json() == {}
+    r = client.put("/api/library/dQw4w9WgXcQ/setup", json={"semitones": -2, "chordKey": 3, "tuning": "dropd"})
+    assert r.json() == {"semitones": -2, "chordKey": 3, "tuning": "dropd"}
+    assert client.get("/api/library/dQw4w9WgXcQ/setup").json()["semitones"] == -2
+    assert client.put("/api/library/dQw4w9WgXcQ/setup", json={"semitones": 99}).status_code == 422
+
+
+def test_clean_title_drops_karaoke_tag():
+    assert library.clean_title("Song (Караоке)") == "Song"
+    assert library.clean_title("Artist - Song [Karaoke Version]") == "Artist - Song [Karaoke Version]"
+    assert library.clean_title("Song [karaoke] live") == "Song live"
+    assert library.clean_title("(Караоке)") == "(Караоке)"

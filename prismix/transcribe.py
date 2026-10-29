@@ -46,6 +46,11 @@ def _audio(video_id: str) -> np.ndarray:
     return np.frombuffer(out.stdout, dtype=np.float32).copy()
 
 
+def unload() -> None:
+    global _loaded
+    _loaded = None
+
+
 def _load():
     global _loaded
     if _loaded is None:

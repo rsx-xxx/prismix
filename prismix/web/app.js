@@ -64,7 +64,7 @@ const STEM_ICONS = [[/vocal|voice|sing/, 'mic'], [/drum|perc/, 'drum'], [/bass/,
 const stemIcon = (name) => STEM_ICONS.find(([re]) => re.test(name.toLowerCase()))?.[1] ?? 'note';
 const player = new StemPlayer();
 window.stemPlayer = player; // debug handle
-const score = createScore({ player, api, notice: (m) => notice(m) });
+const score = createScore({ player, api, notice: (m) => notice(m), onSetup: () => saveSetup() });
 const tabView = createTab({ player, chordsIn: (j) => score.chordsIn(j) });
 document.addEventListener('tab:seek', (e) => player.seek(e.detail));
 const lyrics = createLyrics({ player, api, chords: () => score.timeline() });
@@ -489,6 +489,22 @@ function showHome(inPlaylist = false) {
 }
 
 // ── studio ──
+/** What is shared about how the song is played: audio key, chords-only shift, guitar tuning. */
+const currentSetup = () => ({ semitones: player.semitones, chordKey: player.chordKey, tuning: score.tuning.get() });
+let setupTimer;
+/** Saves the setup on this computer and, for cloud songs, for everybody; waits for the sliders to settle. */
+function saveSetup() {
+  const c = state.current;
+  if (!c) return;
+  clearTimeout(setupTimer);
+  setupTimer = setTimeout(() => {
+    if (state.current !== c) return;
+    const now = currentSetup();
+    if (JSON.stringify(now) === JSON.stringify(c.setup)) return;
+    c.setup = now;
+    api(`/api/library/${c.id}/setup`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(now) }).catch(() => { /* not shared this time */ });
+  }, 800);
+}
 const prefKey = (id) => `stems:${id}`;
 function savePrefs() {
   const c = state.current;
@@ -503,6 +519,29 @@ function savePrefs() {
 }
 function loadPrefs(id) {
   try { return JSON.parse(localStorage.getItem(prefKey(id))) || {}; } catch { return {}; }
+}
+
+/** Uploaded files can be renamed right in the title; songs from YouTube/Spotify keep their names. */
+function setTitle(id, title) {
+  const h = $('th-title');
+  h.textContent = title;
+  h.contentEditable = isUpload(id) ? 'plaintext-only' : 'false';
+  h.title = isUpload(id) ? 'Click to rename' : '';
+  h.classList.toggle('renamable', isUpload(id));
+  h.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); h.blur(); } else if (e.key === 'Escape') { h.textContent = title; h.blur(); } e.stopPropagation(); };
+  h.onblur = async () => {
+    const next = h.textContent.replace(/\s+/g, ' ').trim();
+    if (!isUpload(id) || !next || next === title) { h.textContent = title; return; }
+    try {
+      const info = await api(`/api/library/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: next }) });
+      title = info.title;
+      h.textContent = title;
+      document.title = `${title} — Stems`;
+      const entry = state.library.find((i) => i.id === id);
+      if (entry) entry.title = title;
+      if (state.current?.id === id) state.current.meta.title = title;
+    } catch (err) { h.textContent = title; notice(err.message); }
+  };
 }
 
 async function openStudio(id, model) {
@@ -537,7 +576,7 @@ async function openStudio(id, model) {
   const entry = state.library.find((i) => i.id === id);
   const available = entry?.models || [model];
   cover($('th-cover'), id);
-  $('th-title').textContent = meta.title;
+  setTitle(id, meta.title);
   $('th-sub').textContent = `${meta.channel || ''} · ${fmt(meta.duration)}${plNow() ? ` · ${plNow().name}` : ''}`;
   document.title = `${meta.title} — Stems`;
   renderModelSwitch(id, model, available);
@@ -557,7 +596,12 @@ async function openStudio(id, model) {
   state.current = { id, model, meta };
   $('nt-toggle').hidden = false;
   stickers.load();
-  applyPrefs(loadPrefs(id));
+  const setup = await api(`/api/library/${id}/setup`).catch(() => ({}));
+  if (token !== state.token) { player.dispose(); return; }
+  applyPrefs({ ...loadPrefs(id), ...(setup.semitones != null && { semitones: setup.semitones }) });
+  player.setChordKey(setup.chordKey ?? 0);
+  score.tuning.set(setup.tuning ?? 'std');
+  state.current.setup = currentSetup();
   band.publish();
   $('loading').hidden = true;
   $('mixer').classList.remove('busy');
@@ -796,7 +840,7 @@ function syncDock() {
 }
 ['state', 'tune', 'loop'].forEach((t) => player.addEventListener(t, () => { syncDock(); if (t !== 'state') savePrefs(); }));
 player.addEventListener('frame', syncFrame);
-player.addEventListener('tune', () => score.tuned());
+player.addEventListener('tune', () => { score.tuned(); saveSetup(); });
 
 // "Follow playback": appears once the playing position has scrolled out of view in lyrics, chords or tabs, or off the page.
 const followBtn = (() => {

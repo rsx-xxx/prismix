@@ -7,7 +7,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 
-from . import analysis, pipeline
+from . import align, analysis, pipeline, transcribe
 
 log = logging.getLogger(__name__)
 
@@ -185,6 +185,15 @@ class JobManager:
                 job.error = f"Unexpected error: {type(e).__name__}: {str(e).splitlines()[0][:200] if str(e) else 'no details'}"
             self._running = None
             job.version += 1
+            if not self._pending:
+                await loop.run_in_executor(None, self._release)
+
+    @staticmethod
+    def _release() -> None:
+        """Nothing left to do: give back the memory the models held."""
+        pipeline.release_models()
+        transcribe.unload()
+        align.unload()
 
     @staticmethod
     def _execute(job: Job) -> None:

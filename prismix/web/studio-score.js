@@ -1,5 +1,5 @@
 // Bars and chords for the open track: ruler, chart, fingering diagrams, capo, chart PDF.
-import { bestCapo, capoSavings, chordName, chordPaint, keyName, useFlats, simplify, voicing, voicingCount } from './theory.js';
+import { GUITAR_TUNINGS, bestCapo, capoSavings, chordName, chordPaint, keyName, shapeTuning, tuningById, tuningFromPitches, tuningSavings, useFlats, simplify, voicing, voicingCount } from './theory.js';
 import { chartPdf } from './score.js';
 import { cancelGlide, glide, offsetIn, lockstep } from './scroll.js';
 
@@ -21,7 +21,7 @@ function floorIndex(arr, x) {
   return r;
 }
 
-export function createScore({ player, api, notice }) {
+export function createScore({ player, api, notice, onSetup }) {
   /** @type {null | {id:string, model:string, meta:object, data:null|{structure:object, raw:object}, bars:number[], beats:number[]}} */
   let cur = null;
   let busy = null; // analysis job in flight
@@ -35,16 +35,20 @@ export function createScore({ player, api, notice }) {
   const remember = (k) => { try { localStorage.setItem(`stems:sc-${k}`, opts[k] ? '1' : '0'); } catch { /* ignore */ } };
 
   const shift = () => player.semitones + player.chordKey;
-  const flats = () => cur?.data && useFlats(cur.data.structure.key, shift() - capoFret());
+  let tuning = tuningById('std'); // how the guitar is tuned; shapes are read through it
+  const shape = () => shapeTuning(tuning);
+  /** Semitones the written shapes sit from the sounding chords: capo and a down-tuned guitar both lower what you fret. */
+  const shapeShift = () => shift() - capoFret() + shape().down;
+  const flats = () => cur?.data && useFlats(cur.data.structure.key, shapeShift());
   const shown = (c) => (opts.simple ? simplify(c) : c);
-  const name = (c) => chordName(shown(c), shift() - capoFret(), flats());
+  const name = (c) => chordName(shown(c), shapeShift(), flats());
   const capoFret = () => {
     if (!cur?.data || capoMode === 'off') return 0;
     return capoMode === 'auto' ? capoInfo().capo : Number(capoMode);
   };
   /** Smart capo suggestion for the current key and chord set (cached until key/simplify changes). */
   function capoInfo() {
-    cur.capo ??= bestCapo(tally().map(({ c, len }) => ({ c, w: len })), shift(), opts.simple);
+    cur.capo ??= bestCapo(tally().map(({ c, len }) => ({ c, w: len })), shift() + shape().down, opts.simple, shape().open);
     return cur.capo;
   }
   /** Tint a node with the colour of chord c (CSS reads --h, --l, --c). */
@@ -56,7 +60,7 @@ export function createScore({ player, api, notice }) {
     node.classList.add('chord');
     return node;
   };
-  const shapeKey = (c) => { const x = shown(c); return `${(x.r + shift() - capoFret() + 120) % 12}:${x.q}`; };
+  const shapeKey = (c) => { const x = shown(c); return `${tuning.id}|${(x.r + shapeShift() + 120) % 12}:${x.q}`; };
   const beatSec = (b) => {
     const beats = cur.beats;
     if (b <= 0) return beats[0] + b * (beats[1] - beats[0]);
@@ -66,20 +70,32 @@ export function createScore({ player, api, notice }) {
   };
 
   // ── lifecycle ──
+  const get = async (url) => {
+    const r = await fetch(url);
+    return r.ok ? r.json() : null;
+  };
   async function open(id, model, meta, token, stillCurrent) {
     close();
     cur = { id, model, meta, data: null, bars: [], beats: [] };
     $('score').hidden = false;
-    const get = async (url) => {
-      const r = await fetch(url);
-      return r.ok ? r.json() : null;
-    };
     const [structure, tabs] = await Promise.all([get(`/media/${id}/structure.json`), get(`/media/${id}/tabs.json`)]);
     if (!stillCurrent(token) || !cur || cur.id !== id) return;
     cur.tabs = tabs?.marks ? tabs : null;
     if (structure) setData(structure);
     renderAll();
     if (structure && !cur.tabs && !lookedUp.has(id)) autoTabs(id);
+    tabTuning(id);
+  }
+
+  /** A six-string guitar track in the song's tab tells how it is tuned; offered in the tuning picker. */
+  async function tabTuning(id) {
+    try {
+      const d = await get(`/api/tabdata/${id}`);
+      if (!cur || cur.id !== id) return;
+      const g = Object.values(d?.tracks ?? {}).find((t) => t.kind !== 'bass' && t.kind !== 'drums' && t.tuning?.length === 6 && t.tuning[0] > 36);
+      const t = g && tuningFromPitches(g.tuning);
+      if (t && t.id !== 'std') { cur.tabTuning = t; if (cur.data) renderAll(); }
+    } catch { /* no tab: nothing to suggest */ }
   }
 
   /** Online chords are looked up by themselves, once per track per session; with "Use tab chords" on they replace the detected ones. */
@@ -336,7 +352,7 @@ export function createScore({ player, api, notice }) {
     const m = cur.tabs?.marks?.[ci];
     if (!m) return;
     node.classList.add(m.ok ? 'tab-ok' : 'tab-diff');
-    if (!m.ok) node.title = opts.useTab ? `Detected ${chordName(cur.data.raw.chords[ci], shift() - capoFret(), flats())}; tab says ${m.name}` : `Tab says ${m.name}`;
+    if (!m.ok) node.title = opts.useTab ? `Detected ${chordName(cur.data.raw.chords[ci], shapeShift(), flats())}; tab says ${m.name}` : `Tab says ${m.name}`;
   }
   document.addEventListener('blocks:change', () => { if (cur?.data) refresh(); });
   document.addEventListener('lyrics:line', () => { if (cur?.data) markChord(last.chord); });
@@ -503,7 +519,7 @@ export function createScore({ player, api, notice }) {
     const row = el('div', { className: 'fing-opts' },
       toggle('easy', 'Easiest fingering', 'Pick the voicing with the fewest fingers and no stretch'),
       toggle('simple', 'Simpler chords', 'Play 7ths and 6ths as plain major/minor'));
-    row.append(chordKeyPicker(), capoPicker());
+    row.append(chordKeyPicker(), capoPicker(), tuningPicker());
     return row;
   }
 
@@ -523,7 +539,7 @@ export function createScore({ player, api, notice }) {
   function capoPicker() {
     const info = capoInfo();
     const weighted = tally().map(({ c, len }) => ({ c, w: len }));
-    const saved = info.all ?? capoSavings(weighted, shift(), opts.simple);
+    const saved = info.all ?? capoSavings(weighted, shift() + shape().down, opts.simple, shape().open);
     const sel = el('select', { ariaLabel: 'Capo' });
     const add = (value, label) => sel.append(el('option', { value, textContent: label, selected: capoMode === value }));
     add('off', 'Capo: off');
@@ -546,15 +562,53 @@ export function createScore({ player, api, notice }) {
     return box;
   }
 
+  /** Guitar tuning: presets plus whatever the tab says, with a plain-language note and a nudge when another tuning plays easier. */
+  function tuningPicker() {
+    const list = [...GUITAR_TUNINGS];
+    if (cur.tabTuning && !list.some((t) => t.id === cur.tabTuning.id)) list.push(cur.tabTuning);
+    if (!list.some((t) => t.id === tuning.id)) list.push(tuning);
+    const weighted = tally().map(({ c, len }) => ({ c, w: len }));
+    const saved = new Map(tuningSavings(weighted, shift(), opts.simple).map(({ t, saved: v }) => [t.id, v]));
+    const sel = el('select', { ariaLabel: 'Guitar tuning', title: 'How your guitar is tuned. The diagrams and chord names follow it, the sound does not change' });
+    for (const t of list) {
+      const v = saved.get(t.id);
+      const tag = t.id === cur.tabTuning?.id ? ' · from the tab' : v > 0.02 ? ` · ${Math.round(v * 100)}% easier` : '';
+      sel.append(el('option', { value: t.id, textContent: `Tuning: ${t.name}${tag}`, selected: t.id === tuning.id }));
+    }
+    sel.addEventListener('change', () => setTuning(list.find((t) => t.id === sel.value)));
+    const box = el('span', { className: 'capo-pick' }, sel);
+    const { down } = shape();
+    box.append(el('span', { className: 'muted', textContent: tuning.id === 'std' ? '' : down > 0
+      ? `${tuning.hint}. Fret the same shapes as in standard tuning, but ${down === 1 ? 'a half step' : `${down} semitones`} lower than written. Shown in ${tuning.name} shapes.`
+      : tuning.hint }));
+    const best = [...saved].filter(([id]) => id !== tuning.id).sort((a, b) => b[1] - a[1])[0];
+    const gain = best ? best[1] - (saved.get(tuning.id) ?? 0) : 0;
+    if (best && gain > 0.15 && tuning.id === 'std') {
+      const t = tuningById(best[0]);
+      const use = el('button', { type: 'button', className: 'btn small ghost', textContent: `${t.name} would be ${Math.round(gain * 100)}% easier. Use it` });
+      use.addEventListener('click', () => setTuning(t));
+      box.append(use);
+    }
+    return box;
+  }
+
+  function setTuning(t) {
+    tuning = t;
+    if (cur) cur.capo = null;
+    alts.clear();
+    renderAll();
+    onSetup?.();
+  }
+
   /** Fingering diagrams for the most-played chords; click one to try another fingering. */
   function diagrams() {
     const wrap = el('div', { className: 'diagrams' });
-    const cap = capoFret();
+    const open = shape().open, sh = shapeShift();
     for (const { c } of tally().slice(0, 10)) {
       const key = shapeKey(c);
-      const v = voicing(c, shift() - cap, { easy: opts.easy, alt: alts.get(key) || 0 });
+      const v = voicing(c, sh, { easy: opts.easy, alt: alts.get(key) || 0, open });
       if (!v) continue;
-      const n = voicingCount(c, shift() - cap);
+      const n = voicingCount(c, sh, open);
       const fig = el('figure', { title: n > 1 ? 'Click for another fingering' : '' }, diagram(v), paint(el('figcaption', { textContent: name(c) }), c));
       fig.dataset.shape = key;
       if (n > 1) {
@@ -637,10 +691,21 @@ export function createScore({ player, api, notice }) {
     clearTimeout(tuneTimer);
     tuneTimer = setTimeout(() => { if (cur) cur.capo = null; renderAll(); }, 250);
   }
+  /** Tuning id kept with the song (shared through the cloud); a tab's own tuning is offered, never forced. */
+  const tuningState = {
+    get: () => tuning.id,
+    set(id) {
+      tuning = (typeof id === 'string' && id.startsWith('custom:'))
+        ? tuningFromPitches(id.slice(7).split(',').map(Number)) ?? tuningById('std')
+        : tuningById(id);
+      if (cur) cur.capo = null;
+      if (cur?.data) renderAll();
+    },
+  };
   new ResizeObserver(() => { if (cur?.data) requestAnimationFrame(renderRuler); }).observe($('lane-col'));
 
   return {
-    open, close, retab, frame, tuned, timeline, barChords, chordsIn, refreshRuler: renderRuler,
+    tuning: tuningState, open, close, retab, frame, tuned, timeline, barChords, chordsIn, refreshRuler: renderRuler,
     // scroll-link adapter: chart rows keyed by song time
     pane: () => ({
       root: $('score'), anchor: 0.4,

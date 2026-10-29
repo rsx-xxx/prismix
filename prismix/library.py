@@ -67,8 +67,59 @@ def _read_json(path: Path) -> dict | None:
         return None
 
 
+_KARAOKE_RE = re.compile(r"\s*[(\[]\s*(?:караоке|karaoke)\s*[)\]]\s*", re.I)
+
+
+def clean_title(title: str) -> str:
+    """A song title without the "(Караоке)" tag karaoke uploads carry; never empties the title."""
+    cleaned = re.sub(r"\s{2,}", " ", _KARAOKE_RE.sub(" ", title)).strip(" -–—")
+    return cleaned or title
+
+
 def read_info(video_id: str) -> dict | None:
-    return _read_json(video_dir(video_id) / "info.json")
+    info = _read_json(video_dir(video_id) / "info.json")
+    if info and isinstance(info.get("title"), str):
+        info["title"] = clean_title(info["title"])
+    return info
+
+
+def rename(video_id: str, title: str) -> dict | None:
+    """Give an uploaded file its own title. Tags found for the old title no longer apply."""
+    info = _read_json(video_dir(video_id) / "info.json")
+    if not info or not info.get("upload"):
+        return None
+    info["title"] = title.strip()
+    (video_dir(video_id) / "info.json").write_text(json.dumps(info, ensure_ascii=False))
+    (video_dir(video_id) / "tags.json").unlink(missing_ok=True)
+    return read_info(video_id)
+
+
+SETUP_INTS = {"semitones": (-12, 12), "chordKey": (-12, 12), "capo": (0, 11)}
+
+
+def clean_setup(raw: object) -> dict:
+    """The part of a song's playing setup worth sharing: the audio key, the chords-only shift, capo and guitar tuning."""
+    out: dict = {}
+    if not isinstance(raw, dict):
+        return out
+    for key, (lo, hi) in SETUP_INTS.items():
+        v = raw.get(key)
+        if isinstance(v, int) and not isinstance(v, bool) and lo <= v <= hi:
+            out[key] = v
+    t = raw.get("tuning")
+    if isinstance(t, str) and re.fullmatch(r"[a-z0-9:,]{1,40}", t):
+        out["tuning"] = t
+    return out
+
+
+def read_setup(video_id: str) -> dict:
+    return clean_setup(_read_json(video_dir(video_id) / "setup.json"))
+
+
+def write_setup(video_id: str, setup: object) -> dict:
+    clean = clean_setup(setup)
+    (video_dir(video_id) / "setup.json").write_text(json.dumps(clean))
+    return clean
 
 
 def read_meta(video_id: str, model: str) -> dict | None:

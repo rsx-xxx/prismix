@@ -106,6 +106,40 @@ export const TUNINGS = {
 };
 export const MAX_FRET = 22;
 
+/** Guitar tunings, low -> high. Ordered for the picker: standard first, then what guitarists actually retune to. */
+export const GUITAR_TUNINGS = [
+  { id: 'std', name: 'Standard', hint: 'E A D G B E', open: [40, 45, 50, 55, 59, 64] },
+  { id: 'dropd', name: 'Drop D', hint: 'D A D G B E: only the low string goes down a whole step', open: [38, 45, 50, 55, 59, 64] },
+  { id: 'eb', name: 'Half step down', hint: 'Eb Ab Db Gb Bb Eb: every string down a half step, the shapes stay the same', open: [39, 44, 49, 54, 58, 63] },
+  { id: 'd', name: 'Whole step down', hint: 'D G C F A D: every string down a whole step, the shapes stay the same', open: [38, 43, 48, 53, 57, 62] },
+  { id: 'dropdb', name: 'Drop Db (half step down + drop)', hint: 'Db Ab Db Gb Bb Eb', open: [37, 44, 49, 54, 58, 63] },
+  { id: 'dropc', name: 'Drop C', hint: 'C G C F A D', open: [36, 43, 48, 53, 57, 62] },
+  { id: 'dadgad', name: 'DADGAD', hint: 'D A D G A D', open: [38, 45, 50, 55, 57, 62] },
+  { id: 'opend', name: 'Open D', hint: 'D A D F# A D', open: [38, 45, 50, 54, 57, 62] },
+  { id: 'openg', name: 'Open G', hint: 'D G D G B D', open: [38, 43, 50, 55, 59, 62] },
+  { id: 'opene', name: 'Open E', hint: 'E B E G# B E', open: [40, 47, 52, 56, 59, 64] },
+];
+export const tuningById = (id) => GUITAR_TUNINGS.find((t) => t.id === id) ?? GUITAR_TUNINGS[0];
+
+/** The preset (or a custom entry) for six open-string pitches read from a tab; null for anything but a six-string guitar. */
+export function tuningFromPitches(pitches) {
+  if (!Array.isArray(pitches) || pitches.length !== 6) return null;
+  const hit = GUITAR_TUNINGS.find((t) => t.open.every((m, i) => m === pitches[i]));
+  if (hit) return hit;
+  const names = pitches.map((m) => SHARP[mod12(m)]).join(' ');
+  return { id: `custom:${pitches.join(',')}`, name: names, hint: 'As written in the tab', open: [...pitches] };
+}
+
+/**
+ * How to read a tuning in chord shapes. `down` is how far the whole guitar is tuned below standard (judged by the high string),
+ * so a shape fingered in standard sounds `down` semitones lower; `open` is the tuning left once that lowering is taken out
+ * (standard for a tuned-down guitar, drop D for drop C, ...).
+ */
+export function shapeTuning(t) {
+  const down = TUNINGS.guitar[5] - t.open[5];
+  return { down, open: t.open.map((m) => m + down) };
+}
+
 /** Candidate (string, fret) pairs for a pitch, string index 0 = lowest. */
 export function positions(midi, tuning) {
   const out = [];
@@ -212,13 +246,12 @@ const SIMPLER = { 7: 'maj', maj7: 'maj', maj6: 'maj', min7: 'min', min6: 'min', 
 export const simplify = (c) => (SIMPLER[c.q] ? { ...c, q: SIMPLER[c.q] } : c);
 
 const shapeCache = new Map();
-/** All playable voicings of a chord (root pitch class + quality), best first. Each has frets, base, fingers, barre, ease. */
-export function voicings(c, semitones = 0) {
+/** All playable voicings of a chord (root pitch class + quality) on a guitar tuned to `open`, best first. Each has frets, base, fingers, barre, ease. */
+export function voicings(c, semitones = 0, open = TUNINGS.guitar) {
   const root = mod12(c.r + semitones);
-  const key = `${root}:${c.q}`;
+  const key = `${open.join(',')}|${root}:${c.q}`;
   if (shapeCache.has(key)) return shapeCache.get(key);
   const tones = new Set((CHORD_TONES[c.q] ?? CHORD_TONES.maj).map((i) => mod12(root + i)));
-  const open = TUNINGS.guitar;
   const seen = new Map();
   for (let base = 0; base <= 10; base++) {
     const hi = base + 3;
@@ -261,17 +294,17 @@ export function voicings(c, semitones = 0) {
 }
 
 /** One voicing: the best-sounding by default, the least effort with `easy`; `alt` steps through the alternatives. */
-export function voicing(c, semitones = 0, { easy = false, alt = 0 } = {}) {
-  const list = [...voicings(c, semitones)].sort((a, b) => (easy ? a.ease - b.ease : a.rank - b.rank));
+export function voicing(c, semitones = 0, { easy = false, alt = 0, open } = {}) {
+  const list = [...voicings(c, semitones, open)].sort((a, b) => (easy ? a.ease - b.ease : a.rank - b.rank));
   return list[alt % Math.max(list.length, 1)] ?? null;
 }
 
-export const voicingCount = (c, semitones = 0) => voicings(c, semitones).length;
+export const voicingCount = (c, semitones = 0, open) => voicings(c, semitones, open).length;
 
 /** Relative effort saved (0-1, negative = worse) by a capo on each fret 0-7, weighting chords by time played. */
-export function capoSavings(weighted, semitones, simple = false) {
+export function capoSavings(weighted, semitones, simple = false, open) {
   const cost = (capo) => weighted.reduce((sum, { c, w }) => {
-    const v = voicing(simple ? simplify(c) : c, semitones - capo, { easy: true });
+    const v = voicing(simple ? simplify(c) : c, semitones - capo, { easy: true, open });
     return sum + w * (v ? v.ease : 30);
   }, 0);
   const base = Math.max(cost(0), 1);
@@ -279,11 +312,27 @@ export function capoSavings(weighted, semitones, simple = false) {
 }
 
 /** The capo fret worth using, or 0. A fret must beat open shapes by a clear margin, and high frets pay a small penalty. */
-export function bestCapo(weighted, semitones, simple = false) {
-  const saved = capoSavings(weighted, semitones, simple);
+export function bestCapo(weighted, semitones, simple = false, open) {
+  const saved = capoSavings(weighted, semitones, simple, open);
   let best = { capo: 0, saved: 0, all: saved };
   for (let k = 1; k <= 7; k++) {
     if (saved[k] - 0.012 * k > 0.08 && saved[k] > best.saved + 0.04) best = { capo: k, saved: saved[k], all: saved };
   }
   return best;
+}
+
+/**
+ * Tunings worth trying for these chords at this key, each with the share of effort it saves against playing them in standard
+ * tuning (negative = harder). Tuning down is judged like a capo in reverse: the shapes move up, the sound stays.
+ */
+export function tuningSavings(weighted, semitones, simple = false) {
+  const cost = (t) => {
+    const { down, open } = shapeTuning(t);
+    return weighted.reduce((sum, { c, w }) => {
+      const v = voicing(simple ? simplify(c) : c, semitones + down, { easy: true, open });
+      return sum + w * (v ? v.ease : 30);
+    }, 0);
+  };
+  const base = Math.max(cost(GUITAR_TUNINGS[0]), 1);
+  return GUITAR_TUNINGS.map((t) => ({ t, saved: (base - cost(t)) / base }));
 }

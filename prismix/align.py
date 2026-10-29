@@ -99,6 +99,11 @@ def place(starts: np.ndarray, words: list[tuple[int, int, int]], n_lines: int, s
     return out
 
 
+def unload() -> None:
+    global _loaded
+    _loaded = None
+
+
 def _load():
     global _loaded
     if _loaded is None:
