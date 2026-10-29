@@ -1532,7 +1532,7 @@ wheels = [
 
 [[package]]
 name = "prismix"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "." }
 dependencies = [
     { name = "beartype", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or sys_platform == 'linux' or sys_platform == 'win32'" },
@@ -1565,6 +1565,7 @@ dependencies = [
 desktop = [
     { name = "pillow", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "pyinstaller", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "pyobjc-framework-usernotifications", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
     { name = "pywebview", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 dev = [
@@ -1603,6 +1604,7 @@ requires-dist = [
 desktop = [
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "pyinstaller", specifier = ">=6.10" },
+    { name = "pyobjc-framework-usernotifications", marker = "sys_platform == 'darwin'", specifier = ">=12" },
     { name = "pywebview", specifier = ">=5.3" },
 ]
 dev = [
@@ -1871,6 +1873,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/70/c6/31ac40c4d918baa36ca06d196bfec0f47f804a74684988cf424060469d98/pyobjc_framework_uniformtypeidentifiers-12.2.2.tar.gz", hash = "sha256:12f8ba77dcc949ffb9f0f48743cae326aebec8e69cb1ac55a1d1e04dca7bd59a", size = 20848, upload-time = "2026-08-11T19:45:37.634Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/79/c3/45ec69ed9fdcde5d0f229a031b610127c592d2c4674c3ff0e184d7f2741b/pyobjc_framework_uniformtypeidentifiers-12.2.2-py2.py3-none-any.whl", hash = "sha256:1dc6a538df07c410e4bfd6457adcb0b663a5e0df331905dbe135bcfd3f89ae57", size = 5045, upload-time = "2026-08-11T19:42:56.598Z" },
+]
+
+[[package]]
+name = "pyobjc-framework-usernotifications"
+version = "12.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyobjc-core", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
+    { name = "pyobjc-framework-cocoa", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/55/c96dc372855b50fc40f8ded5666ce7f07d62b508b83ea73ac19d6cdfe601/pyobjc_framework_usernotifications-12.2.2.tar.gz", hash = "sha256:ef2432463ae8c3ae75c6e434df07534bc9c79c0911e1125aaa58d9f51b32406b", size = 34160, upload-time = "2026-08-11T19:45:38.322Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cd/74/7ff980a2f23370307c94c45b17d793696774e52d20bf7da49adab8a792ad/pyobjc_framework_usernotifications-12.2.2-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:8dc86fed4c0787560875713444ae0aede029eac505a13fb8039bd19fdbb3010d", size = 10201, upload-time = "2026-08-11T19:42:58.389Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/4e/e4e13b5cff0c1491cd28562e5655b3977a2cb648c20d583d6595ef0fe405/pyobjc_framework_usernotifications-12.2.2-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:668fffa255b92776e3ce3eea435b1f30eff9e2a0dc38252c807a03cc002a33c5", size = 10210, upload-time = "2026-08-11T19:42:59.249Z" },
+    { url = "https://files.pythonhosted.org/packages/66/20/d1cbbb58c3ce011c0f66ce79beabae135ac40fc887aea61f0707a6cceb89/pyobjc_framework_usernotifications-12.2.2-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:2e56cd2e57d63b91eb7585803386fe7cab8c8f889c499b838b32f9f4ff3bd828", size = 10224, upload-time = "2026-08-11T19:43:00.16Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/b2/ebd5d7f07326f53abd3081ccb42ace6a316cd984c65cc3632c851a9c1e88/pyobjc_framework_usernotifications-12.2.2-cp313-cp313t-macosx_10_13_universal2.whl", hash = "sha256:fc685f6dc874d3bd47d28ced736e5835aa2026e0d912548c460e8f1f77c12d15", size = 10382, upload-time = "2026-08-11T19:43:00.866Z" },
 ]
 
 [[package]]

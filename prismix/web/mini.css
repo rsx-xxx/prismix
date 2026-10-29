@@ -29,3 +29,8 @@ output { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink
 .stem { display: grid; grid-template-columns: 70px 1fr auto auto; align-items: center; gap: 6px; }
 .stem span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
 .stem button { padding: 2px 7px; font-size: 11px; min-width: 0; }
+
+header{display:flex;gap:.6rem;align-items:center}
+header .who{display:flex;flex-direction:column;min-width:0}
+#cover{width:48px;height:48px;border-radius:8px;object-fit:cover;flex:none;background:#27272a}
+#cover:not([src]){display:none}

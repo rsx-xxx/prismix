@@ -458,7 +458,10 @@ function showHome(inPlaylist = false) {
   state.token++;
   video.hide(); // gives the stems back if the video's sound was on, so saved prefs are the real mix
   $('nt-toggle').hidden = true;
-  if (state.current) { savePrefs(); player.dispose(); state.current = null; }
+  if (state.current) {
+    savePrefs();
+    if (player.playing) startBackground(); else { player.dispose(); state.current = null; }
+  }
   followBtn.hide();
   score.close();
   tabView.close();
@@ -472,6 +475,32 @@ function showHome(inPlaylist = false) {
   document.title = 'Stems — split, mute, transpose';
   loadLibrary().then(() => plview.load()).catch((e) => notice(e.message));
 }
+
+// ── background playback: a song keeps playing when you leave the studio, with a mini player on the library ──
+let miniTimer = 0;
+function startBackground() {
+  state.bg = true;
+  const { id, meta } = state.current;
+  cover($('mini-cover'), id);
+  $('mini-title').textContent = meta.title;
+  $('mini-open').href = `#/v/${id}/${state.current.model}`;
+  $('mini').hidden = false;
+  paintMini();
+  miniTimer = setInterval(paintMini, 500);
+}
+function endBackground() {
+  state.bg = false;
+  clearInterval(miniTimer);
+  $('mini').hidden = true;
+}
+function paintMini() {
+  $('mini-play').innerHTML = player.playing ? ICON.pause : ICON.play;
+  $('mini-play').setAttribute('aria-label', player.playing ? 'Pause' : 'Play');
+  $('mini-time').textContent = `${fmt(player.position)} / ${fmt(player.duration)}`;
+  $('mini-bar').style.width = `${Math.min(100, (player.position / Math.max(player.duration, 1)) * 100)}%`;
+}
+$('mini-play').addEventListener('click', () => { player.toggle(); paintMini(); });
+$('mini-close').addEventListener('click', () => { player.dispose(); state.current = null; endBackground(); });
 
 // ── studio ──
 /** What is shared about how the song is played: audio key, chords-only shift, guitar tuning. */
@@ -532,7 +561,16 @@ function setTitle(id, title) {
 async function openStudio(id, model) {
   const token = ++state.token;
   video.hide(); // gives the stems back if the video's sound was on, so saved prefs are the real mix
+  if (state.bg && state.current?.id === id && state.current.model === model) {
+    // back to the song that kept playing while the library was open: the stems are still loaded, only the views need to come back
+    endBackground();
+    $('home').hidden = true;
+    $('studio').hidden = false;
+    mountStudio(id, model, state.current.meta, token);
+    return;
+  }
   if (state.current) { savePrefs(); player.dispose(); state.current = null; }
+  endBackground();
   score.close();
   tabView.close();
   lyrics.close();
@@ -589,6 +627,12 @@ async function openStudio(id, model) {
   band.publish();
   $('loading').hidden = true;
   $('mixer').classList.remove('busy');
+  mountStudio(id, model, meta, token);
+}
+
+/** The views of an opened studio; also used when coming back to a song that kept playing in the background. */
+function mountStudio(id, model, meta, token) {
+  $('nt-toggle').hidden = false;
   $('dock').hidden = false;
   syncDock();
   syncPlaylistNav();
@@ -630,11 +674,21 @@ api('/api/update').then((u) => {
   const label = { downloading: 'Downloading', installing: 'Installing', restarting: 'Restarting' };
   let busy = false;
   const fail = (why) => { busy = false; a.textContent = 'Update failed, open download'; a.href = u.download || u.url; a.target = '_blank'; a.title = why; };
+  const toast = $('update-toast');
+  const hideToast = () => { toast.hidden = true; sessionStorage.setItem(`upd-later-${u.latest}`, '1'); };
+  $('update-toast-close').addEventListener('click', hideToast);
   const show = (st) => {
     const pct = Math.round((st.percent ?? 0) * 100);
     const live = st.state in label;
-    a.textContent = st.state === 'ready' ? `Restart to update to v${u.latest}` : live ? `${label[st.state]} · ${pct}%` : `Update to v${u.latest}`;
-    a.title = st.state === 'ready' ? 'The update is downloaded. Restart Prismix to finish installing it' : 'Download and install the update, then restart Prismix';
+    const ready = st.state === 'ready';
+    a.textContent = ready ? `Restart to update to v${u.latest}` : live ? `${label[st.state]} · ${pct}%` : `Update to v${u.latest}`;
+    a.title = ready ? (st.waiting ? `Waiting until Prismix stops ${st.waiting}` : 'The update is downloaded. Restart Prismix to finish installing it') : 'Download and install the update, then restart Prismix';
+    a.classList.toggle('is-wait', ready && !!st.waiting);
+    a.setAttribute('aria-disabled', String(ready && !!st.waiting));
+    if (ready && st.waiting) a.textContent = `Restart to update · after ${st.waiting}`;
+    // Nothing is running any more: say so with a popup (once per version and session), plus the banner the host sends
+    $('update-toast-title').textContent = `Prismix ${u.latest} is ready`;
+    toast.hidden = !(ready && !st.waiting && !live && !sessionStorage.getItem(`upd-later-${u.latest}`));
     $('upd-bar').hidden = !live;
     $('upd-bar').firstElementChild.style.width = `${pct}%`;
     $('upd-msg').textContent = live || st.state === 'ready' ? st.message || '' : '';
@@ -645,21 +699,26 @@ api('/api/update').then((u) => {
     if (!st) { a.textContent = 'Restarting…'; return setTimeout(poll, 800); } // server gone: the app is swapping itself
     if (st.state === 'error') return fail(st.error);
     show(st);
-    if (st.state === 'ready' && !busy) { setTimeout(poll, 10000); return; }
+    if (st.state === 'ready' && !busy) { setTimeout(poll, 4000); return; }
     setTimeout(poll, st.state === 'idle' ? 10000 : 600);
   };
   a.addEventListener('click', async (e) => {
     if (a.target === '_blank') return; // after a failure it is a plain download link
     e.preventDefault();
+    go(a.textContent.startsWith('Restart to'));
+  });
+  async function go(ready) {
     if (busy) return;
+    if (a.classList.contains('is-wait')) { notice(`Prismix will be ready to restart after ${a.textContent.split('after ')[1]}`, 'info'); return; }
     busy = true;
-    const ready = a.textContent.startsWith('Restart to');
+    toast.hidden = true;
     a.textContent = 'Starting…';
     const r = await fetch(ready ? '/api/update/restart' : '/api/update/install', { method: 'POST' });
-    if (r.status === 409) { busy = false; a.textContent = 'Restart to update'; notice((await r.text().then((t) => { try { return JSON.parse(t).detail; } catch { return t; } })), 'info'); return; }
+    if (r.status === 409) { busy = false; notice((await r.text().then((t) => { try { return JSON.parse(t).detail; } catch { return t; } })), 'info'); poll(); return; }
     if (!r.ok) return fail(await r.text());
     poll();
-  });
+  }
+  $('update-toast-go').addEventListener('click', () => go(true));
   poll();
 }).catch(() => { /* the update notice is optional */ });
 

@@ -2,7 +2,19 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
-## Unreleased
+## 0.13.0
+
+- The menu-bar mini player shows the song cover; Now Playing, the media overlay and Android already do.
+- New look: deep zinc-950 dark theme by default (cards #18181b), with a refreshed light theme; frosted-glass top bar, controls and mini player. The theme still follows Settings → Theme.
+- The cloud badge on covers and list rows is readable on any cover in both themes.
+- The song keeps playing when you go back to the library; a mini player at the bottom shows it with play/pause, time and a way back, or stop it with ✕.
+- Chord fingerings are three blocks: now and next (also shown in the chord strip above the controls), all chords, and settings. Point at any chord (tap on a phone) to see its fingering; both can be switched off in Settings. The tuning and chord-key dropdowns are readable and fit the block.
+- Lyrics, chords and tab panes are taller and size themselves to the screen above the controls, so the line being sung is never hidden under them.
+
+- "Restart to update" really restarts the app and is a proper button; it is enabled only when nothing is processing. When an update is ready, a pop-up and a macOS banner (with the app icon and a Restart Now action) appear.
+- "Preparing songs" no longer starts over on every launch: songs that could not be completed are retried at most once a day. The pop-up is semi-transparent until hovered, opens a list of the songs being prepared (each one a link) and uses the app icon.
+- The cloud screen is headed "TigerKiss cloud" instead of "not on this computer".
+- The "Stickers" button is now "Notes". Notes gain Play and Pause symbols and a third visibility option, "Show on hover" (next to "Show on tap" and "Always show").
 
 ## 0.12.0
 

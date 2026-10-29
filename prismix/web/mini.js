@@ -45,6 +45,8 @@ function paint() {
   $('app').hidden = !on;
   if (!on) return;
   $('title').textContent = t.meta.title;
+  const cover = `/media/${h.id}/thumb.jpg`;
+  if ($('cover').getAttribute('src') !== cover) $('cover').src = cover;
   const tp = Math.round(h.tempo * 100), st = t.structure;
   $('sub').textContent = t.meta.channel || '';
   $('play').textContent = h.playing ? '❚❚' : '▶';

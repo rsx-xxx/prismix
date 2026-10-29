@@ -14,7 +14,7 @@ from pathlib import Path
 
 import httpx
 
-from . import REPO, __version__
+from . import REPO, __version__, notify
 
 log = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def check(*, force: bool = False, client: httpx.Client | None = None) -> dict:
 
 # ── installing ──
 _ALLOWED = ("https://github.com/" + REPO.removeprefix("https://github.com/") + "/releases/download/",)
-_job: dict = {"state": "idle", "progress": 0.0, "percent": 0.0, "message": "", "error": None, "ready": None}
+_job: dict = {"state": "idle", "progress": 0.0, "percent": 0.0, "message": "", "error": None, "ready": None, "offered": None}
 _staged: dict = {"path": None, "version": None}
 _lock = threading.Lock()
 BUSY_POLL = 30  # while work is running, look again this often before offering the restart
@@ -276,9 +276,17 @@ def restart(quit_app, busy=lambda: None) -> dict:
 def _apply(quit_app) -> None:
     try:
         if _staged["path"] == "brew":
-            if not _brew_upgrade():
-                raise RuntimeError("Homebrew could not update Prismix")
-            _reopen_after_exit()
+            if _brew_upgrade():
+                _reopen_after_exit()
+            else:  # brew can fail (locked, offline, app replaced by hand): install the release itself instead
+                url = check(force=True).get("download")
+                if not url or not url.startswith(_ALLOWED):
+                    raise RuntimeError("Homebrew could not update Prismix")
+                _step(0.3, "Homebrew failed, downloading the release", state="downloading", progress=0.0)
+                dest = Path(tempfile.mkdtemp(prefix="prismix-update-")) / url.rsplit("/", 1)[-1]
+                _download(url, dest)
+                _step(0.85, "Preparing the installer", state="installing", progress=1.0)
+                _hand_over(dest)
         else:
             _hand_over(Path(_staged["path"]))
         _step(0.95, "Restarting Prismix", state="restarting", progress=1.0)
@@ -290,14 +298,9 @@ def _apply(quit_app) -> None:
         _job.update(state="error", error=str(e) or e.__class__.__name__)
 
 
-def _ask_mac(version: str) -> bool:
-    """Native macOS alert with a Restart button; True when the user chose it."""
-    script = (f'display alert "Prismix {version} is ready" message "The update is downloaded. Restart Prismix to finish installing it." '
-              'buttons {"Later", "Restart Now"} default button "Restart Now" cancel button "Later"')
-    try:
-        return subprocess.run(["/usr/bin/osascript", "-e", script], capture_output=True, timeout=3600).returncode == 0
-    except (OSError, subprocess.SubprocessError):
-        return False
+def _try_restart(quit_app, busy) -> None:
+    with contextlib.suppress(RuntimeError):  # work started since the banner appeared: the page button explains why
+        restart(quit_app, busy)
 
 
 def auto(busy, quit_app, interval: float = TTL) -> None:
@@ -312,11 +315,13 @@ def auto(busy, quit_app, interval: float = TTL) -> None:
                     version = info["latest"]
                     while busy():
                         time.sleep(BUSY_POLL)
-                    if sys.platform == "darwin" and version not in declined:
-                        declined.add(version)  # ask once per version; the Settings entry stays for later
-                        if _ask_mac(version):
-                            with contextlib.suppress(RuntimeError):  # work started while the alert was open: retry from Settings
-                                restart(quit_app, busy)
+                    if version not in declined:
+                        declined.add(version)  # say so once per version; the page popup and the Settings button stay for later
+                        _job["offered"] = version
+                        notify.banner(
+                            f"Prismix {version} is ready", "Restart to finish updating. Nothing is running right now.",
+                            action="Restart Now", ident="prismix-update",
+                            on_action=lambda: _try_restart(quit_app, busy))
             except Exception:  # noqa: BLE001 - never let the updater loop die
                 log.exception("update loop failed")
             time.sleep(interval if not _staged["path"] else BUSY_POLL * 10)

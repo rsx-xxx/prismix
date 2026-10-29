@@ -70,7 +70,7 @@
       <section id="cloud-section" hidden>
         <div class="section-head">
           <img id="cloud-logo" class="band-logo" alt="" hidden>
-          <h2>In <span id="cloud-title">Band cloud</span>, not on this computer</h2>
+          <h2 id="cloud-title">Band cloud</h2>
           <span id="cloud-count" class="muted"></span>
         </div>
         <ul id="cloud-list" class="cloud-list"></ul>
@@ -108,7 +108,7 @@
         <span id="loading-text" class="muted">Loading stems…</span>
       </div>
 
-      <button class="btn ghost small" id="nt-toggle" type="button" title="Stickers: tap a word, chord or tab bar to pin a remark for the band" hidden>Stickers</button>
+      <button class="btn ghost small" id="nt-toggle" type="button" title="Notes: tap a word, chord or tab bar to pin a remark for the band" hidden>Notes</button>
       <nav id="blockbar" class="blockbar" aria-label="Blocks"></nav>
 
       <aside id="video" class="video float" hidden aria-label="Video">
@@ -185,6 +185,14 @@
   </main>
 
   <button id="follow" class="follow" type="button" data-ico="locate" title="Follow playback: scroll back to the playing position (F)" aria-label="Follow playback" hidden></button>
+
+  <aside class="mini" id="mini" hidden aria-label="Now playing">
+    <div class="mini-bar"><i id="mini-bar"></i></div>
+    <img id="mini-cover" alt="" width="40" height="40">
+    <a id="mini-open" class="mini-info" href="#/" title="Back to the player"><b id="mini-title"></b><small id="mini-time" class="muted"></small></a>
+    <button id="mini-play" class="play small" type="button" aria-label="Play"></button>
+    <button id="mini-close" class="icon-btn" type="button" aria-label="Stop and close" title="Stop">✕</button>
+  </aside>
 
   <footer class="dock" id="dock" hidden>
     <div class="sing" id="sing" hidden aria-label="Current lyric line"></div>
@@ -384,9 +392,20 @@
   </dialog>
 
   <aside id="prefetch" role="status" aria-live="polite" hidden>
-    <b id="prefetch-title">Preparing songs</b>
-    <span id="prefetch-now" class="muted"></span>
+    <button id="prefetch-head" class="pf-head" type="button" aria-expanded="false" title="Show what is being prepared">
+      <img src="/app-icon.png" alt="" width="28" height="28">
+      <span class="pf-text"><b id="prefetch-title">Preparing songs</b><span id="prefetch-now" class="muted"></span></span>
+      <span class="qchev" aria-hidden="true">▴</span>
+    </button>
     <div class="bar"><i id="prefetch-bar"></i></div>
+    <ul id="prefetch-list" class="pf-list" hidden></ul>
+    <p class="pf-note muted" hidden>Chords, lyrics and tabs are fetched once and kept on this computer. A step that finds nothing is not retried for a day.</p>
+  </aside>
+  <aside id="update-toast" class="toast" role="alertdialog" aria-label="Update ready" hidden>
+    <img src="/app-icon.png" alt="" width="40" height="40">
+    <div class="toast-text"><b id="update-toast-title">Update ready</b><span class="muted">Restart Prismix to finish installing it.</span></div>
+    <button id="update-toast-go" class="btn primary small" type="button">Restart now</button>
+    <button id="update-toast-close" class="icon-btn" type="button" aria-label="Later" title="Later">×</button>
   </aside>
   <aside id="queue" class="qdock" hidden>
     <button id="queue-head" class="qhead" type="button" aria-expanded="false" title="Show the whole queue">
@@ -401,7 +420,7 @@
     <div class="set-row"><span>Theme</span><button class="icon-btn" id="theme-btn" type="button" aria-label="Theme"></button></div>
     <div class="set-row"><span>Keyboard shortcuts</span><button class="btn small ghost" id="help-btn" type="button">Show</button></div>
     <div class="set-row"><span>Version</span><a class="ver" id="ver" href="https://github.com/rsx-xxx/prismix/releases" target="_blank" rel="noopener" title="Release notes" hidden></a></div>
-    <div class="set-row"><span>Update</span><div class="upd-box"><a class="ver upd" id="upd" href="https://github.com/rsx-xxx/prismix/releases/latest" target="_blank" rel="noopener" hidden></a><div class="bar" id="upd-bar" hidden><i></i></div><small class="muted upd-msg" id="upd-msg" hidden></small><span class="muted" id="upd-none">Up to date</span></div></div>
+    <div class="set-row"><span>Update</span><div class="upd-box"><a class="btn small primary upd" id="upd" href="https://github.com/rsx-xxx/prismix/releases/latest" target="_blank" rel="noopener" hidden></a><div class="bar" id="upd-bar" hidden><i></i></div><small class="muted upd-msg" id="upd-msg" hidden></small><span class="muted" id="upd-none">Up to date</span></div></div>
   </div>
 
   <div class="cheats" id="cheats" hidden role="dialog" aria-label="Keyboard shortcuts">

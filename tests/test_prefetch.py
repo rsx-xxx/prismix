@@ -32,3 +32,12 @@ def test_prefetch_endpoint(tmp_path, monkeypatch):
         r = c.get("/api/prefetch")
     assert r.status_code == 200
     assert r.json()["active"] is False
+
+
+def test_attempts_survive_a_restart(tmp_path, monkeypatch):
+    vid = _song(tmp_path, monkeypatch)
+    assert prefetch._attempts(vid) == {}
+    prefetch._remember(vid, "tabs")
+    assert "tabs" in prefetch._attempts(vid)
+    (library.video_dir(vid) / "prefetch.json").write_text("not json")
+    assert prefetch._attempts(vid) == {}

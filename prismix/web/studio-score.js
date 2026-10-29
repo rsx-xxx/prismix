@@ -28,7 +28,7 @@ export function createScore({ player, api, notice, onSetup }) {
   let renderToken = 0;
   let last = { bar: -2, beat: -2, chord: -2 };
   const flag = (k, dflt) => { try { const v = localStorage.getItem(`stems:sc-${k}`); return v === null ? dflt : v === '1'; } catch { return dflt; } };
-  const opts = { easy: flag('easy', false), simple: flag('simple', false), useTab: flag('useTab', true) };
+  const opts = { easy: flag('easy', false), simple: flag('simple', false), useTab: flag('useTab', true), now: flag('now', true), hover: flag('hover', true) };
   const loadCapoMode = () => { try { return localStorage.getItem('stems:sc-capoMode') || 'off'; } catch { return 'off'; } };
   let capoMode = loadCapoMode(); // 'off' | 'auto' | '1'..'7'
   const alts = new Map(); // chord shape -> which alternative fingering is showing
@@ -325,6 +325,7 @@ export function createScore({ player, api, notice, onSetup }) {
   const AHEAD = 8;
   let ahead = [];
   function renderAhead(ci) {
+    paintNow(ci);
     const box = $('ahead');
     const chords = cur?.data?.structure.chords;
     box.hidden = !chords?.length;
@@ -336,6 +337,7 @@ export function createScore({ player, api, notice, onSetup }) {
       const b = el('button', { type: 'button', className: i === ci ? 'cur' : '', title: 'Jump to this chord' },
         el('b', { textContent: name(chords[i]) }), el('small'));
       paint(b, chords[i]);
+      if (opts.now && items.length < 2) { const svg = fingerSvg(chords[i]); if (svg) b.prepend(svg); }
       b.addEventListener('click', () => player.seek(beatSec(chords[i].b)));
       items.push({ c: chords[i], node: b, small: b.lastChild });
     }
@@ -489,7 +491,7 @@ export function createScore({ player, api, notice, onSetup }) {
       grid = el('div', { className: 'chart aligned' }, ...rows);
     } else grid = el('div', { className: 'chart' }, ...cells);
     body.replaceChildren(grid);
-    $('fing').replaceChildren(fingerOpts(), diagrams());
+    $('fing').replaceChildren(fingBlock('Now and next', 'fg-now', nowNext()), fingBlock('All chords', 'fg-all', diagrams()), fingBlock('Settings', 'fg-cfg', fingerOpts(), false));
     $('fing').hidden = false;
     if (aligned) alignRows();
     markBar(last.bar);
@@ -510,6 +512,33 @@ export function createScore({ player, api, notice, onSetup }) {
     return [...t.values()].sort((p, q) => q.len - p.len);
   }
 
+  function fingBlock(title, cls, body, open = true) {
+    const d = el('details', { className: `fg-block ${cls}`, open }, el('summary', { textContent: title }), body);
+    const k = `stems:fg-${cls}`;
+    try { if (localStorage.getItem(k) != null) d.open = localStorage.getItem(k) === '1'; } catch { /* ignore */ }
+    d.addEventListener('toggle', () => { try { localStorage.setItem(k, d.open ? '1' : '0'); } catch { /* ignore */ } });
+    return d;
+  }
+
+  /** The chord being played and the one after it, big enough to read at a glance; kept current by renderAhead. */
+  function nowNext() {
+    const box = el('div', { className: 'fg-pair' });
+    nowBox = box;
+    paintNow(last.chord);
+    return box;
+  }
+  let nowBox = null;
+  function paintNow(ci) {
+    if (!nowBox || !cur?.data) return;
+    const chords = cur.data.structure.chords, first = Math.max(0, ci);
+    const picks = [];
+    for (let i = first; i < chords.length && picks.length < 2; i++) if (!picks.length || name(chords[i]) !== name(chords[picks[0]])) picks.push(i);
+    nowBox.replaceChildren(...picks.map((i, k) => {
+      const svg = fingerSvg(chords[i]);
+      return el('figure', { className: k ? 'next' : 'cur' }, svg || el('span', { className: 'muted', textContent: '–' }), paint(el('figcaption', { textContent: `${k ? 'Next: ' : ''}${name(chords[i])}` }), chords[i]));
+    }));
+  }
+
   function fingerOpts() {
     const toggle = (key, text, hint) => {
       const input = el('input', { type: 'checkbox', checked: opts[key] });
@@ -518,7 +547,9 @@ export function createScore({ player, api, notice, onSetup }) {
     };
     const row = el('div', { className: 'fing-opts' },
       toggle('easy', 'Easiest fingering', 'Pick the voicing with the fewest fingers and no stretch'),
-      toggle('simple', 'Simpler chords', 'Play 7ths and 6ths as plain major/minor'));
+      toggle('simple', 'Simpler chords', 'Play 7ths and 6ths as plain major/minor'),
+      toggle('now', 'Fingering in the chord strip', 'Show the current and next chord fingering in the strip above the controls'),
+      toggle('hover', 'Fingering on hover or tap', 'Point at a chord (or tap it on a phone) to see how to play it'));
     row.append(chordKeyPicker(), capoPicker(), tuningPicker());
     return row;
   }
@@ -601,15 +632,22 @@ export function createScore({ player, api, notice, onSetup }) {
   }
 
   /** Fingering diagrams for the most-played chords; click one to try another fingering. */
+  /** The fingering of one chord as an SVG, the same one the list shows; null when the chord has no shape. */
+  function fingerSvg(c) {
+    const v = voicing(c, shapeShift(), { easy: opts.easy, alt: alts.get(shapeKey(c)) || 0, open: shape().open });
+    return v ? diagram(v) : null;
+  }
+
+  /** Every chord of the song, most played first. */
   function diagrams() {
     const wrap = el('div', { className: 'diagrams' });
     const open = shape().open, sh = shapeShift();
-    for (const { c } of tally().slice(0, 10)) {
+    for (const { c } of tally()) {
       const key = shapeKey(c);
-      const v = voicing(c, sh, { easy: opts.easy, alt: alts.get(key) || 0, open });
-      if (!v) continue;
+      const svg = fingerSvg(c);
+      if (!svg) continue;
       const n = voicingCount(c, sh, open);
-      const fig = el('figure', { title: n > 1 ? 'Click for another fingering' : '' }, diagram(v), paint(el('figcaption', { textContent: name(c) }), c));
+      const fig = el('figure', { title: n > 1 ? 'Click for another fingering' : '' }, svg, paint(el('figcaption', { textContent: name(c) }), c));
       fig.dataset.shape = key;
       if (n > 1) {
         fig.classList.add('alt');
@@ -619,6 +657,29 @@ export function createScore({ player, api, notice, onSetup }) {
     }
     return wrap;
   }
+
+  // ── fingering on hover (mouse) or tap (touch), on any chord in the lyrics, the chart or the dock ──
+  const tip = el('div', { id: 'fg-tip', hidden: true, role: 'tooltip' });
+  document.body.append(tip);
+  const tipChord = (n) => { const ci = n?.dataset?.ci; return ci != null ? cur?.data?.structure.chords[+ci] : null; };
+  function showTip(n) {
+    const c = opts.hover && tipChord(n);
+    const svg = c && fingerSvg(c);
+    if (!svg) { tip.hidden = true; return; }
+    tip.replaceChildren(svg, paint(el('b', { textContent: name(c) }), c));
+    tip.hidden = false;
+    const r = n.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2))}px`;
+    tip.style.top = `${r.top - h - 8 < 8 ? r.bottom + 8 : r.top - h - 8}px`;
+  }
+  const CHORD_NODE = '.ly-lines .ch[data-ci], #sing .ch[data-ci], .chart .cell span[data-ci]';
+  document.addEventListener('pointerover', (e) => { if (e.pointerType === 'mouse') showTip(e.target.closest?.(CHORD_NODE)); });
+  document.addEventListener('pointerout', (e) => { if (e.pointerType === 'mouse' && e.target.closest?.(CHORD_NODE)) tip.hidden = true; });
+  document.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    const n = e.target.closest?.(CHORD_NODE);
+    if (n) showTip(n); else tip.hidden = true;
+  }, true);
 
   function diagram({ frets, base, fingers, barre }) {
     const svg = document.createElementNS(SVGNS, 'svg');

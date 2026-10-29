@@ -197,8 +197,6 @@ def create_app() -> FastAPI:
         """Why the app must not restart right now, or None."""
         if any(not j.finished for j in jobs.listing()):
             return "splitting songs"
-        if prefetcher.status().get("active"):
-            return "preparing songs"
         if any(j["state"] == "running" for j in list(app.state.publisher.jobs.values())):
             return "syncing the band cloud"
         return None
@@ -443,7 +441,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/update")
     def update_info():
-        return {**updates.check(), **updates.status()}
+        return {**updates.check(), **updates.status(), "waiting": busy()}
 
     @app.post("/api/update/install")
     def update_install(request: Request):

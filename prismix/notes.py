@@ -1,4 +1,4 @@
-"""Stickers: short remarks pinned to a moment of a song, for the whole band.
+"""Notes: short remarks pinned to a moment of a song, for the whole band.
 
 A sticker belongs to a time in the recording (`t`, seconds), not to a word, bar or tab: lyrics, chords and tab all sit on
 the same timeline, so one sticker shows up in each of them. Kept per song in `library/<id>/notes.json`; phones change
@@ -19,8 +19,8 @@ SCHEMA = 1
 MAX_NOTES = 300
 MAX_TEXT = 500
 MAX_T = 86_400.0
-ICONS = {"down", "up", "mute", "bang", "talk", "cresc", "dim", "hold", *map(str, range(1, 9))}
-SHOW = ("tap", "always")
+ICONS = {"down", "up", "mute", "bang", "talk", "cresc", "dim", "hold", "play", "pause", *map(str, range(1, 9))}
+SHOW = ("tap", "always", "hover")
 _ID_RE = re.compile(r"^[0-9a-f]{8}$")
 _lock = threading.Lock()
 

@@ -31,3 +31,7 @@ body.nt-mode .sy, body.nt-mode .cell, body.nt-mode .tbar, body.nt-mode .bar, bod
 .nt-sp { flex: 1; }
 .nt-meta { color: var(--muted, #999); font-size: .75rem; }
 #nt-toggle { align-self: flex-start; margin: .25rem 0; }
+
+/* "Show on hover": the text stays hidden until the pointer is over the note (touch screens open it by tap instead) */
+.nt-w:has(.on-hover) .nt-say.on-hover { display: none; position: absolute; z-index: 5; }
+.nt-w:has(.on-hover):hover .nt-say.on-hover { display: block; }

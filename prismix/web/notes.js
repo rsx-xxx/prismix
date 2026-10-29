@@ -1,9 +1,9 @@
-// Stickers, shared by the desktop studio and the phone. A sticker is pinned to a time in the song, so it is drawn on
+// Notes, shared by the desktop studio and the phone. A note is pinned to a time in the song, so it is drawn on
 // whatever sits at that time in the view at hand: a word in the lyrics, a bar in the chords, a spot in a tab bar.
 // The views tag their cells with times (data-t / data-e on words and chord cells, data-t0 / data-t1 on tab and phone bars).
 const S = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const SPK = '<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" fill="currentColor"/>';
-// name, colour, glyph: each sticker has its own colour, so a count or a dynamic reads at a glance
+// name, colour, glyph: each note has its own colour, so a count or a dynamic reads at a glance
 export const ICONS = {
   down: ['Quieter', '#4da3ff', S(`${SPK}<path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/>`)],
   up: ['Louder', '#ff9f43', S(`${SPK}<path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/>`)],
@@ -12,6 +12,8 @@ export const ICONS = {
   talk: ['Remark', '#2ed3b7', S('<path d="M4.5 5.5h15v10.5h-8.5l-4 3.5V16h-2.5z" fill="currentColor" fill-opacity=".25"/>')],
   cresc: ['Crescendo', '#5ad66f', S('<path d="M20 6.5L5 12l15 5.5"/>')],
   dim: ['Diminuendo', '#ff7ac6', S('<path d="M4 6.5L19 12 4 17.5"/>')],
+  play: ['Play', '#3ddc84', S('<path d="M8 5.5v13l11-6.5z" fill="currentColor"/>')],
+  pause: ['Pause', '#ffd24d', S('<path d="M8 5.5v13M16 5.5v13" stroke-width="3.4"/>')],
   hold: ['Hold', '#b57bff', S('<path d="M4 16a8 7 0 0 1 16 0"/><circle cx="12" cy="16" r="1.4" fill="currentColor"/>')],
   ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map((n) => [String(n), [`Count ${n}`, `hsl(${(n * 47 + 190) % 360} 80% 58%)`, `<b>${n}</b>`]])),
 };
@@ -19,7 +21,7 @@ const TARGETS = {
   lyrics: '.sy[data-t], .ly-brk[data-t], .ly-instr[data-t]',
   bars: '[data-t0], .cell[data-t]',
 };
-const GAP = 1.5; // a sticker this far past the last word belongs to the silence, not to the word
+const GAP = 1.5; // a note this far past the last word belongs to the silence, not to the word
 
 const el = (tag, props = {}, ...kids) => { const n = Object.assign(document.createElement(tag), props); n.append(...kids); return n; };
 const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -30,7 +32,7 @@ const num = (v) => (v == null ? NaN : Number(v));
  * @param {() => string|null} o.id      the song on screen
  * @param {(msg: object) => boolean} o.send  band socket send
  * @param {() => HTMLElement[]} o.roots  containers whose cells carry times
- * @param {HTMLElement} o.button         toggles sticker mode
+ * @param {HTMLElement} o.button         toggles note mode
  */
 export function createNotes({ id, send, roots, button }) {
   let list = [];
@@ -40,14 +42,14 @@ export function createNotes({ id, send, roots, button }) {
   let queued = 0;
   const obs = new MutationObserver(() => schedule());
 
-  const pop = el('div', { id: 'nt-pop', hidden: true, role: 'dialog', ariaLabel: 'Sticker' });
+  const pop = el('div', { id: 'nt-pop', hidden: true, role: 'dialog', ariaLabel: 'Note' });
   const grid = el('div', { className: 'nt-grid' });
   const text = el('textarea', { className: 'nt-text', maxLength: 500, rows: 3, placeholder: 'Comment (optional)' });
   const radio = (v, label) => {
     const i = el('input', { type: 'radio', name: 'nt-show', value: v });
     return el('label', {}, i, label);
   };
-  const showRow = el('div', { className: 'nt-row' }, radio('tap', ' Show on tap'), radio('always', ' Always show'));
+  const showRow = el('div', { className: 'nt-row' }, radio('tap', ' Show on tap'), radio('always', ' Always show'), radio('hover', ' Show on hover'));
   const meta = el('div', { className: 'nt-meta' });
   const del = el('button', { type: 'button', className: 'btn ghost small', textContent: 'Delete' });
   const cancel = el('button', { type: 'button', className: 'btn ghost small', textContent: 'Cancel' });
@@ -85,7 +87,7 @@ export function createNotes({ id, send, roots, button }) {
   }
   let waiting = 0;
   function close() { clearTimeout(waiting); pop.hidden = true; draft = null; }
-  /** The panel closes when the host answers; silence means a host that predates stickers. */
+  /** The panel closes when the host answers; silence means a host that predates notes. */
   function waitAnswer() {
     save.disabled = del.disabled = true;
     meta.textContent = 'Saving…';
@@ -122,14 +124,14 @@ export function createNotes({ id, send, roots, button }) {
     if (!b) { b = el('span', { className: 'nt-box' }); target.append(b); }
     return b;
   }
-  function sticker(n) {
+  function note(n) {
     const name = (ICONS[n.icon] || ICONS.talk)[0];
     const i = face(ICONS[n.icon] ? n.icon : 'talk', name);
     i.classList.add('nt');
     i.title = `${name}${n.text ? `: ${n.text}` : ''}${n.by ? ` (${n.by})` : ''}`;
     i.dataset.nid = n.id;
     const wrap = el('span', { className: 'nt-w' }, i);
-    if (n.show === 'always' && n.text) wrap.append(el('span', { className: 'nt-say', textContent: n.text }));
+    if (n.text && n.show !== 'tap') wrap.append(el('span', { className: `nt-say${n.show === 'hover' ? ' on-hover' : ''}`, textContent: n.text }));
     return wrap;
   }
   const last = (items, t, of) => { let k = -1; for (let j = 0; j < items.length && of(items[j]) <= t; j++) k = j; return k; };
@@ -141,7 +143,7 @@ export function createNotes({ id, send, roots, button }) {
       const wi = last(words, n.t + 0.05, (w) => num(w.dataset.t));
       if (wi >= 0) {
         const w = words[wi];
-        if (!(w.classList.contains('sy') && n.t > num(w.dataset.e) + GAP)) box(w, n).append(sticker(n));
+        if (!(w.classList.contains('sy') && n.t > num(w.dataset.e) + GAP)) box(w, n).append(note(n));
       }
       const bi = last(bars, n.t, (b) => num(b.dataset.t0 ?? b.dataset.t));
       if (bi < 0) continue;
@@ -150,7 +152,7 @@ export function createNotes({ id, send, roots, button }) {
       const t1 = b.dataset.t1 != null ? num(b.dataset.t1) : num(bars[bi + 1]?.dataset.t0 ?? bars[bi + 1]?.dataset.t) || t0 + 20;
       if (n.t >= t1 + 0.01 && b.dataset.t1 != null) continue;
       const wide = b.classList.contains('tbar') || b.classList.contains('tb');
-      box(b, { ...n, pct: Math.max(0, Math.min(94, ((n.t - t0) / Math.max(1e-6, t1 - t0)) * 100)) }, wide).append(sticker(n));
+      box(b, { ...n, pct: Math.max(0, Math.min(94, ((n.t - t0) / Math.max(1e-6, t1 - t0)) * 100)) }, wide).append(note(n));
     }
   }
   function paint() {
@@ -203,7 +205,7 @@ export function createNotes({ id, send, roots, button }) {
   });
 
   return {
-    /** Fetch the song's stickers; a failure (older host, offline) just means none. */
+    /** Fetch the song's notes; a failure (older host, offline) just means none. */
     async load() {
       const mine = ++token;
       const sid = id();

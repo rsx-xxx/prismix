@@ -22,7 +22,7 @@ COLLECT_ALL = [
     "bs_roformer", "ml_collections", "torchaudio", "websockets",  # bs_roformer reads data/*.json next to its code
 ]
 HIDDEN = ["uvicorn.logging", "uvicorn.loops.auto", "uvicorn.protocols.http.auto", "uvicorn.lifespan.on", "multipart",
-          "PyObjCTools.AppHelper", "AppKit", "WebKit"]
+          "PyObjCTools.AppHelper", "AppKit", "WebKit", "UserNotifications"]
 EXCLUDE = ["tkinter", "matplotlib", "IPython", "pytest", "torch.utils.tensorboard", "sklearn", "onnxruntime", "tensorflow", "pandas"]
 
 

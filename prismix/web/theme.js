@@ -9,7 +9,7 @@
     light: '<circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2.5v2.3M12 19.2v2.3M2.5 12h2.3M19.2 12h2.3M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
   };
   const read = () => { try { return localStorage.getItem(KEY); } catch { return null; } };
-  const get = () => (ORDER.includes(read()) ? read() : 'auto');
+  const get = () => (ORDER.includes(read()) ? read() : 'dark');
   const root = document.documentElement;
   const apply = (mode) => (mode === 'auto' ? root.removeAttribute('data-theme') : root.setAttribute('data-theme', mode));
   apply(get());

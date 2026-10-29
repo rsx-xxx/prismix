@@ -68,8 +68,9 @@ export function createQueue({ $, api }) {
   }
 
   const WHAT = { chords: 'chords', lyrics: 'lyrics', tabs: 'tabs' };
+  const box = $('prefetch');
+  const list = $('prefetch-list');
   async function prefetch() {
-    const box = $('prefetch');
     let st;
     try { st = await api('/api/prefetch'); } catch { return; }
     box.hidden = !st.active;
@@ -77,7 +78,35 @@ export function createQueue({ $, api }) {
     $('prefetch-title').textContent = `Preparing songs · ${st.done + 1} of ${st.total}`;
     $('prefetch-now').textContent = st.current ? `${st.current.title}: ${WHAT[st.current.step] || st.current.step}` : '';
     $('prefetch-bar').style.width = `${Math.round((st.done / Math.max(st.total, 1)) * 100)}%`;
+    const rows = [st.current, ...(st.next || [])].filter(Boolean).map((it, i) => {
+      const a = document.createElement('a');
+      a.href = `#/v/${it.id}/${it.model}`;
+      const name = document.createElement('span');
+      name.textContent = it.title;
+      const what = document.createElement('span');
+      what.className = 'muted';
+      what.textContent = i ? WHAT[it.step] || it.step : `${WHAT[it.step] || it.step}…`;
+      a.append(name, what);
+      if (!i) a.className = 'now';
+      const li = document.createElement('li');
+      li.append(a);
+      return li;
+    });
+    if (st.total > rows.length) {
+      const li = document.createElement('li');
+      li.className = 'muted';
+      li.textContent = `+${st.total - rows.length} more steps`;
+      rows.push(li);
+    }
+    list.replaceChildren(...rows);
   }
+  function setPrefetchOpen(on) {
+    box.classList.toggle('open', on);
+    list.hidden = !on;
+    box.querySelector('.pf-note').hidden = !on;
+    $('prefetch-head').setAttribute('aria-expanded', String(on));
+  }
+  $('prefetch-head').addEventListener('click', () => setPrefetchOpen(!box.classList.contains('open')));
 
   $('queue-head').addEventListener('click', () => setOpen(!dock.classList.contains('open')));
   timer = setInterval(() => { if (!document.hidden) { refresh(); prefetch(); } }, 3000);

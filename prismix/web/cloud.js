@@ -28,7 +28,7 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
     const btn = $('cloud-btn');
     btn.replaceChildren(...(state.signedIn && state.band.logo ? [el('img', { className: 'band-logo', alt: '', src: logoUrl() })] : []),
       document.createTextNode(state.signedIn ? state.band.name : 'Band cloud sign-in'));
-    $('cloud-title').textContent = state.band.name;
+    $('cloud-title').textContent = state.band.logo ? `${state.band.name} cloud` : state.band.name;
     $('cloud-logo').hidden = !state.band.logo;
     $('cloud-logo').src = logoUrl();
     const sec = $('cloud-section');
