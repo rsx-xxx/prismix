@@ -758,7 +758,8 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .tab.pat .trow { margin-bottom: 0; }
 .tab.pat .trow[hidden] { display: none; }
 .tab.pat .trow.next { opacity: .4; }
-.tab-count { position: sticky; top: 0; z-index: 2; width: max-content; margin: 0 0 4px auto; padding: 0 22px; border-radius: 18px; font-size: 64px; line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; background: var(--accent); color: var(--on-primary); }
+.tab-count { position: sticky; top: 0; z-index: 2; width: max-content; margin: 0 0 4px auto; padding: 0 22px; border-radius: 18px; font-size: 64px; line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; background: var(--accent); color: var(--on-primary); transition: background-color .25s; }
+.tab-count.counted { background: oklch(0.74 0.19 var(--cd, 145)); color: oklch(0.16 0.02 var(--cd, 145)); }
 .tab.paged .trow.next { opacity: .35; }
 .tab.paged .trow[hidden] { display: none; }
 .trow { display: flex; gap: 6px; margin-bottom: 14px; align-items: flex-end; }

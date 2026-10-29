@@ -574,7 +574,13 @@ export function createTab({ player, chordsIn = () => [] }) {
       }
     }
     const c = body.querySelector('.tab-count');
-    if (c) c.textContent = String(left + 1);
+    if (c) {
+      c.textContent = String(left + 1);
+      // green on the first bar of the pattern, sliding to red on the last; a one-bar pattern keeps the plain pill
+      if (seg.len > 1) c.style.setProperty('--cd', String(Math.round(145 - 120 * ((seg.len - 1 - left) / (seg.len - 1)))));
+      else c.style.removeProperty('--cd');
+      c.classList.toggle('counted', seg.len > 1);
+    }
   }
 
   function frame(pos) {

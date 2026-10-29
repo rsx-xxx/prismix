@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.25.0
+
+The big drum countdown now changes colour with the pattern: green on the first bar, through yellow, to red on the last one. A pattern that is only one bar long just shows a plain 1.
+
 ## 0.24.0
 
 Songs on the main page and in playlists now show a small icon for each instrument that has a tab (guitar, bass, keys, drums, other). Several parts of one instrument, like lead and rhythm guitar, show a single icon.
