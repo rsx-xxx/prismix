@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.22.0
+
+Lyrics and tabs now scroll like a teleprompter: the line or bar row being played always sits at one fixed spot with the next lines visible below it, and when the next one's time comes the text eases up so it takes that spot, instead of drifting continuously. Lyrics and tabs share the same spot and move together; the same applies to lyrics alone and tabs alone.
+
 ## 0.21.0
 
 Guitar and bass tabs now follow playback exactly: bar positions were measured wrongly under the pane's zoom, and the lyric and tab panes anchored at different screen heights. Switching Guitar, Bass or Drums jumps straight to the bar playing now. Drum patterns detect cycles of 1, 2, 3, 4, 6 or 8 bars and show a single large bars-left number with no extra wording.

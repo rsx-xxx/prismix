@@ -62,6 +62,36 @@ function lookup(points, from, to, v) {
 export const yToT = (points, y) => lookup(points, 'y', 't', y);
 export const tToY = (points, t) => lookup(points, 't', 'y', t);
 
+/** The y of the last anchor that has started by `t` (steps, never drifts between anchors); the first anchor before any; null if none. */
+export function stepY(points, t) {
+  let y = points[0]?.y ?? null;
+  for (const p of points) { if (p.t <= t) y = p.y; else break; }
+  return y;
+}
+
+const aimed = new WeakMap();
+/** Teleprompter move: the current line owns one fixed spot and the box stays put; when the next line's time comes it
+ *  eases (~0.4 s) up into that spot. A box not aimed yet (first frame, after a seek or a manual scroll) jumps. */
+export function settle(box, want) {
+  want = Math.max(0, Math.min(want, box.scrollHeight - box.clientHeight));
+  const was = aimed.get(box);
+  if (was != null && Math.abs(want - was) <= 2) return;
+  aimed.set(box, want);
+  const d = Math.abs(want - box.scrollTop);
+  if (was == null && d > 40 || d > 900 || matchMedia('(prefers-reduced-motion: reduce)').matches) { cancelGlide(box); box.scrollTop = want; return; }
+  if (d < 1) return;
+  cancelGlide(box);
+  const from = box.scrollTop, t0 = performance.now(), ms = 420;
+  const step = (now) => {
+    const p = Math.min(1, (now - t0) / ms);
+    box.scrollTop = from + (want - from) * (1 - (1 - p) ** 3);
+    if (p < 1) running.set(box, requestAnimationFrame(step)); else running.delete(box);
+  };
+  running.set(box, requestAnimationFrame(step));
+}
+/** Forget the aim (manual scroll, pane hidden) so the next settle() re-seats the box. */
+export const unaim = (box) => aimed.delete(box);
+
 /**
  * Scroll two panes together by song time: wheel one and the other lands on the same moment.
  * A pane is { root (stable ancestor), box() (the scroller), track() -> [{y, t}] in content pixels,
@@ -87,6 +117,7 @@ export function linkScroll(a, b) {
 }
 
 /** True while two side-by-side panes are driven together, so each pane's own auto-centering stays out of the way. */
+export const LEAD = 0.35; // s: same lead the lyrics use to light a line, so the move and the highlight coincide
 export const lockstep = { on: false };
 
 /**
@@ -107,15 +138,12 @@ export function linkFollow(a, b, player) {
   return function follow(pos) {
     const on = a.active() && b.active() && a.following() && b.following() && beside();
     lockstep.on = on;
-    if (!on) return;
+    if (!on) { unaim(a.box()); unaim(b.box()); return; }
     const sh = sharedAnchor([a.box(), b.box()], a.anchor);
     for (const pane of [a, b]) {
-      const box = pane.box(), y = tToY(track(pane), pos);
+      const box = pane.box(), y = stepY(track(pane), pos + LEAD);
       if (y == null) continue;
-      cancelGlide(box);
-      const want = Math.max(0, Math.min(y - anchorFor(box, sh, pane.anchor), box.scrollHeight - box.clientHeight));
-      const d = want - box.scrollTop;
-      box.scrollTop = player.playing && Math.abs(d) < 600 ? box.scrollTop + d * 0.18 : want;
+      settle(box, y - anchorFor(box, sh, pane.anchor)); // each pane's current line holds one spot; the next eases into it
     }
   };
 }

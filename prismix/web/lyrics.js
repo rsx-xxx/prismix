@@ -1,7 +1,7 @@
 // Spotify-style lyrics: the current line is lit and kept centred, click a line to jump to it.
 // Lines come from LRCLIB or Genius through the server (first open of a track only); Genius text is timed against the audio, and when nothing is published the words are recognised from the audio.
 
-import { glide, cancelGlide, offsetIn, lockstep, anchorAt, visible } from './scroll.js';
+import { glide, cancelGlide, offsetIn, lockstep, anchorAt, visible, settle, unaim } from './scroll.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -296,17 +296,16 @@ export function createLyrics({ player, api, chords = () => [] }) {
     document.dispatchEvent(new Event('lyrics:line'));
   }
 
-  /** Keep the lit line in a band around 40% of the pane; only move (eased) once it leaves the band. */
+  /** Teleprompter: the lit line always sits at the same spot (40% of the pane) with the next lines below it;
+   *  when the next line is lit the text eases up so that line takes the spot. */
   function center(i) {
     const n = cur.nodes[i];
     if (!n || lockstep.on || Date.now() < manualUntil || Date.now() < holdUntil || body.offsetParent === null) return;
-    const v = visible(body), mid = offsetIn(body, n) + n.offsetHeight / 2 - v.top;
-    if (mid > v.height * 0.3 && mid < v.height * 0.55) return;
-    glide(body, body.scrollTop + mid + v.top - anchorAt(body, 0.4));
+    settle(body, body.scrollTop + offsetIn(body, n) + n.offsetHeight / 2 - anchorAt(body, 0.4));
   }
 
-  ['wheel', 'touchmove'].forEach((t) => body.addEventListener(t, () => { manualUntil = Date.now() + PAUSE_MS; cancelGlide(body); }, { passive: true }));
-  player.addEventListener('seek', () => { manualUntil = 0; });
+  ['wheel', 'touchmove'].forEach((t) => body.addEventListener(t, () => { manualUntil = Date.now() + PAUSE_MS; cancelGlide(body); unaim(body); }, { passive: true }));
+  player.addEventListener('seek', () => { manualUntil = 0; unaim(body); });
   let wasPlaying = false;
   player.addEventListener('state', () => { if (player.playing && !wasPlaying) manualUntil = 0; wasPlaying = player.playing; });
   document.addEventListener('blocks:change', () => { if (cur) { cur.active = -2; frame(player.position); } });
@@ -344,7 +343,7 @@ export function createLyrics({ player, api, chords = () => [] }) {
       root: $('lyrics'), anchor: 0.4,
       box: () => body,
       active: () => !!cur?.data.synced && !$('lyrics').hidden && !$('lyrics').classList.contains('off') && body.offsetParent !== null,
-      hold: () => { holdUntil = Date.now() + 4000; cancelGlide(body); },
+      hold: () => { holdUntil = Date.now() + 4000; cancelGlide(body); unaim(body); },
       following: () => Date.now() >= manualUntil && Date.now() >= holdUntil,
       resume: () => {
         manualUntil = 0; holdUntil = 0;

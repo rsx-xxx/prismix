@@ -7,7 +7,7 @@ const el = (tag, props = {}, ...kids) => {
   n.append(...kids);
   return n;
 };
-import { glide, cancelGlide, offsetIn, lockstep, anchorAt, tToY } from './scroll.js';
+import { glide, cancelGlide, offsetIn, lockstep, anchorAt, stepY, settle, unaim, LEAD } from './scroll.js';
 import { SCORE_KINDS, scoreLayout, paintScore, clefColumn } from './studio-staff.js';
 const NOTES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const BAR_MIN = 11; // rem a bar needs before a row takes one more
@@ -555,11 +555,8 @@ export function createTab({ player, chordsIn = () => [] }) {
   function glideTo(pos) {
     const key = `${body.scrollHeight}/${body.clientHeight}/${cur.cells.length}`;
     if (key !== trackKey || !trackPts) { trackKey = key; trackPts = api.pane().track(); }
-    const y = tToY(trackPts, pos);
-    if (y == null) return;
-    cancelGlide(body);
-    const want = Math.max(0, Math.min(y - anchorAt(body, 0.4), body.scrollHeight - body.clientHeight)), d = want - body.scrollTop;
-    body.scrollTop = player.playing && Math.abs(d) < 600 ? body.scrollTop + d * 0.18 : want;
+    const y = stepY(trackPts, pos + LEAD);
+    if (y != null) settle(body, y - anchorAt(body, 0.4)); // the playing row holds one spot; the next slides in when its time comes
   }
 
   // Drums: a pattern that repeats stays put while a line sweeps its bars and a countdown runs; a few bars before it ends
@@ -597,10 +594,10 @@ export function createTab({ player, chordsIn = () => [] }) {
     if (cell) cell.querySelector('.cursor').style.setProperty('--x', `${Math.min(1, Math.max(0, (pos - cur.secs[j]) / Math.max(1e-6, cur.ends[j] - cur.secs[j]))) * 100}%`);
   }
 
-  const manual = () => { holdUntil = Date.now() + 4000; follow = false; cancelGlide(body); };
+  const manual = () => { holdUntil = Date.now() + 4000; follow = false; cancelGlide(body); unaim(body); };
   for (const ev of ['wheel', 'touchmove']) body.addEventListener(ev, manual, { passive: true });
   document.addEventListener('chords:change', () => { if (cur && !root.hidden) { const n = cur.now; render(); cur.now = -1; if (n >= 0) frame(cur.secs[n]); } });
-  const resume = () => { follow = true; holdUntil = 0; };
+  const resume = () => { follow = true; holdUntil = 0; unaim(body); };
   player.addEventListener('seek', resume);
   let wasPlaying = false;
   player.addEventListener('state', () => { if (player.playing && !wasPlaying) resume(); wasPlaying = player.playing; });
@@ -614,15 +611,14 @@ export function createTab({ player, chordsIn = () => [] }) {
       hold: manual,
       following: () => follow && Date.now() >= holdUntil,
       track: () => {
-        const point = ({ row, first }, i) => {
-          const last = (cur.rows[i + 1]?.first ?? cur.cells.length) - 1;
-          return { y: yIn(row), t: (cur.secs[first] + cur.ends[last]) / 2 };
+        const point = ({ row, first }) => {
+          return { y: yIn(row), t: cur.secs[first] };
         };
         const rows = cur?.rows ?? [];
-        if (!body.querySelector('.tab.aligned')) return rows.map(point);
+        if (!body.querySelector('.tab.aligned')) return rows.map((x) => point(x));
         // aligned: a row of the lyrics' own height maps to the line's start, so both panes agree on every moment
         return [...body.querySelector('.tab').children].flatMap((r) => (r.hidden ? [] : r.dataset.free || !r.dataset.t
-          ? rows.map((x, i) => [x, i]).filter(([x]) => x.row.parentElement === r).map(([x, i]) => point(x, i))
+          ? rows.map((x, i) => [x, i]).filter(([x]) => x.row.parentElement === r).map(([x]) => point(x))
           : [{ y: yIn(r), t: Number(r.dataset.t) }]));
       },
       resume: () => { resume(); const c = cur?.cells[cur.now]; if (c) centre(c, true); },
