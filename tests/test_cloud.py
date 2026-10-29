@@ -278,3 +278,15 @@ def test_download_rejects_a_corrupt_file(tmp_path, monkeypatch):
 def test_download_endpoint_validates_id(api):
     api.post("/api/cloud/login", json={"link": LINK})
     assert api.post("/api/cloud/download", json={"video_id": "../x"}).status_code in (404, 422)
+
+
+def test_download_never_touches_a_song_already_in_the_library(tmp_path, monkeypatch):
+    monkeypatch.setattr(library, "LIBRARY_DIR", tmp_path)
+    monkeypatch.setattr(cloud, "LIBRARY_DIR", tmp_path)
+    (tmp_path / VID).mkdir()
+    (tmp_path / VID / "info.json").write_text('{"title": "mine"}')
+    fake = FakeCloud()
+    _committed(fake)
+    cloud.download(cloud_for(fake), VID)
+    assert (tmp_path / VID / "info.json").read_text() == '{"title": "mine"}'
+    assert sorted(p.name for p in (tmp_path / VID).iterdir()) == ["info.json"]

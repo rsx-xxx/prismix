@@ -1,6 +1,6 @@
 // The band cloud on the desktop: sign in with an invite link, publish processed songs, and download the band's songs into the library.
-export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded }) {
-  const state = { signedIn: false, host: '', band: { name: 'Band cloud', logo: '' }, songs: [], playing: null, local: new Set() };
+export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, lookup }) {
+  const state = { signedIn: false, host: '', band: { name: 'Band cloud', logo: '' }, songs: [], playing: null, local: new Set(), syncing: false };
   const audio = $('cloud-audio');
 
   const post = (path, body) => api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
@@ -48,6 +48,10 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded })
           el('span', { className: 'muted', textContent: `${s.artist || ''} · ${fmt(s.duration)} · ${(s.bytes / 1048576).toFixed(1)} MB` })),
         play, get);
     }));
+    const { up, down } = plan();
+    const sb = $('cloud-sync');
+    sb.hidden = !state.signedIn;
+    if (!state.syncing) sb.querySelector('span').textContent = up.length || down.length ? `Sync${up.length ? ` ↑${up.length}` : ''}${down.length ? ` ↓${down.length}` : ''}` : 'In sync';
     onChange?.();
   }
 
@@ -58,13 +62,25 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded })
     state.local = next;
     if (!same) render();
   }
-  function badge(item, open) {
-    const has = state.signedIn && inCloud.has(item.id);
-    const b = el('button', { className: `pub${has ? ' on' : ''}`, type: 'button', innerHTML: ICON_CLOUD(has ? '' : 'up', has) });
-    b.title = b.ariaLabel = has ? `In ${state.band.name}` : state.signedIn ? `Upload to ${state.band.name}` : 'Sign in to a band cloud to upload';
-    b.addEventListener('click', (e) => { e.stopPropagation(); if (!has) publish(item, open, b); });
+  // The cloud button of one song, by where it lives: on this computer only → Upload (always visible);
+  // on both → a white filled cloud (shown on hover); in the cloud only (a playlist entry) → Download.
+  function mark(id) {
+    if (!state.signedIn) return null;
+    const local = lookup?.(id);
+    const has = inCloud.has(id);
+    if (!local && !has) return null;
+    const song = state.songs.find((x) => x.id === id);
+    const kind = !local ? 'get' : has ? 'on' : 'up';
+    const b = el('button', { className: `pub ${kind}`, type: 'button', innerHTML: ICON_CLOUD(kind === 'up' ? 'up' : kind === 'get' ? 'down' : '', kind === 'on') });
+    b.title = b.ariaLabel = kind === 'on' ? `In ${state.band.name}` : kind === 'up' ? `Upload to ${state.band.name}` : 'Download into your library';
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (kind === 'up') publish(local.item, local.model, b);
+      else if (kind === 'get' && song) download(song, b);
+    });
     return b;
   }
+  const badge = (item) => mark(item.id);
 
   function toggle(s) {
     if (state.playing === s.id) { stop(); render(); return; }
@@ -85,41 +101,75 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded })
   }
   audio.addEventListener('ended', () => { state.playing = null; render(); });
 
-  // ── publishing ──
+  // ── publishing and downloading: both are background jobs on the computer, polled until they settle ──
+  async function runJob(path, body, onStep, every, cancelBtn) {
+    const { job } = await post(path, body);
+    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.stopPropagation(); cancelBtn.disabled = true; post(`/api/cloud/publish/${job}/cancel`).catch(() => {}); });
+    for (;;) {
+      const j = await api(`/api/cloud/publish/${job}`);
+      onStep(j.state === 'running' && j.total ? `${j.done}/${j.total}` : '…');
+      if (j.state === 'done') return;
+      if (j.state === 'error') throw new Error(j.error);
+      await new Promise((r) => setTimeout(r, every));
+    }
+  }
+
   async function publish(item, model, button) {
     if (!state.signedIn) { openLogin(); return; }
     button.disabled = true;
-    const stop = el('button', { className: 'pub stop', type: 'button', textContent: '✕', title: 'Cancel the upload', ariaLabel: 'Cancel the upload' });
-    button.after(stop);
+    const cancel = el('button', { className: 'pub stop', type: 'button', textContent: '✕', title: 'Cancel the upload', ariaLabel: 'Cancel the upload' });
+    button.after(cancel);
     try {
-      const { job } = await post('/api/cloud/publish', { videoId: item.id, model });
-      stop.addEventListener('click', (e) => { e.stopPropagation(); stop.disabled = true; post(`/api/cloud/publish/${job}/cancel`).catch(() => {}); });
-      for (;;) {
-        const j = await api(`/api/cloud/publish/${job}`);
-        button.textContent = j.state === 'running' && j.total ? `${j.done}/${j.total}` : '…';
-        if (j.state === 'done') break;
-        if (j.state === 'error') { if (j.error !== 'Cancelled') notice(j.error); break; }
-        await new Promise((r) => setTimeout(r, 700));
-      }
+      await runJob('/api/cloud/publish', { videoId: item.id, model }, (t) => { button.textContent = t; }, 700, cancel);
       await refresh();
-    } catch (e) { notice(e.message); } finally { stop.remove(); onChange?.(); }
+    } catch (e) { if (e.message !== 'Cancelled') notice(e.message); } finally { cancel.remove(); onChange?.(); }
   }
 
-  // ── downloading ──
   async function download(s, button) {
     button.disabled = true;
     try {
-      const { job } = await post('/api/cloud/download', { videoId: s.id });
-      for (;;) {
-        const j = await api(`/api/cloud/publish/${job}`);
-        button.textContent = j.state === 'running' && j.total ? `${j.done}/${j.total}` : '…';
-        if (j.state === 'done') break;
-        if (j.state === 'error') throw new Error(j.error);
-        await new Promise((r) => setTimeout(r, 500));
-      }
+      await runJob('/api/cloud/download', { videoId: s.id }, (t) => { button.textContent = t; }, 500);
       await onDownloaded?.();
     } catch (e) { notice(e.message); button.disabled = false; render(); }
   }
+
+  // ── sync everything: upload what the cloud lacks, download what this computer lacks (never a song already in the library) ──
+  function plan() {
+    const up = [...state.local].filter((id) => !inCloud.has(id));
+    const down = state.songs.filter((s) => !state.local.has(s.id));
+    return { up, down };
+  }
+
+  async function syncAll() {
+    if (state.syncing || !state.signedIn) return;
+    const { up, down } = plan();
+    const total = up.length + down.length;
+    if (!total) { notice(`Everything is in sync with ${state.band.name}`); return; }
+    state.syncing = true;
+    const btn = $('cloud-sync');
+    btn.disabled = true;
+    let n = 0, failed = 0;
+    const step = () => { btn.querySelector('span').textContent = `Syncing ${Math.min(++n, total)}/${total}…`; };
+    try {
+      for (const id of up) {
+        step();
+        const l = lookup?.(id);
+        if (!l) continue;
+        try { await runJob('/api/cloud/publish', { videoId: id, model: l.model }, () => {}, 700); } catch (e) { failed++; if (e.message !== 'Cancelled') notice(`${l.item.title}: ${e.message}`); }
+      }
+      for (const s of down) {
+        step();
+        if (state.local.has(s.id)) continue;
+        try { await runJob('/api/cloud/download', { videoId: s.id }, () => {}, 500); } catch (e) { failed++; notice(`${s.title || s.id}: ${e.message}`); }
+      }
+    } finally {
+      state.syncing = false;
+      btn.disabled = false;
+      await onDownloaded?.();
+      notice(failed ? `Synced with ${failed} problem${failed > 1 ? 's' : ''}` : `Synced with ${state.band.name}`);
+    }
+  }
+  $('cloud-sync').addEventListener('click', syncAll);
 
   // ── sign-in ──
   function openLogin() {
@@ -149,5 +199,5 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded })
     await refresh();
   });
 
-  return { refresh, publish, badge, setLocal, get signedIn() { return state.signedIn; } };
+  return { refresh, publish, badge, mark, setLocal, get signedIn() { return state.signedIn; } };
 }

@@ -13,7 +13,7 @@ const SONG = 'application/x-prismix-song';
 const itemOf = (s) => ({ id: s.id, title: s.title, channel: s.channel, duration: s.duration });
 const art = (id) => (/^u-[0-9a-f]{9}$/.test(id) ? `/media/${id}/thumb.jpg` : `https://i.ytimg.com/vi/${id}/mqdefault.jpg`);
 
-export function createPlaylistView({ api, library, open, notice, quality }) {
+export function createPlaylistView({ api, library, open, notice, quality, cloudMark }) {
   let lists = [];
   let timer = null;
   let current = null; // id of the playlist page that is showing
@@ -94,7 +94,7 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
         addEventListener('pointermove', probe);
         addEventListener('pointerup', stop);
       });
-      row.append(grip, go, rm);
+      row.append(grip, go, ...[cloudMark?.(it.id)].filter(Boolean), rm);
       return row;
     }));
     poll();
@@ -280,5 +280,7 @@ export function createPlaylistView({ api, library, open, notice, quality }) {
     return pl;
   }
 
-  return { refresh: () => { clearTimeout(timer); poll(); }, load, show, stop, pick, save, importUrl, find, all: () => lists, lib };
+  const rerender = () => { if (current && !$('plpage').hidden) show(current); };
+
+  return { rerender, refresh: () => { clearTimeout(timer); poll(); }, load, show, stop, pick, save, importUrl, find, all: () => lists, lib };
 }

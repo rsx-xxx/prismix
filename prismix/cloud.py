@@ -195,7 +195,7 @@ def download(cloud: Cloud, song_id: str, progress=lambda step, done, total: None
     if not manifest:
         raise CloudError("That song is not in the cloud", 404)
     model = manifest.get("model") if manifest.get("model") in MODELS else DEFAULT_MODEL
-    if library.read_meta(song_id, model):
+    if library.video_dir(song_id).exists():  # already in the library under any model: never overwritten or merged
         return {"id": song_id, "model": model}
     files = {f["path"]: f for f in manifest.get("files", []) if valid_path(f.get("path", "")) and isinstance(f.get("sha256"), str)}
     names = [n for n in manifest.get("stems", []) if PART_RE.match(n)]

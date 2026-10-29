@@ -98,6 +98,7 @@ const plPicker = createPlaylists({
 const plview = createPlaylistView({
   api, library: () => state.library, notice: (m) => notice(m), quality: () => $('quality').value,
   open: (id, plId) => openFrom(id, plId),
+  cloudMark: (id) => cloud.mark(id),
 });
 function openFrom(id, plId) {
   const it = state.library.find((i) => i.id === id);
@@ -428,13 +429,30 @@ function renderLibrary() {
     add.addEventListener('click', async (e) => { e.stopPropagation(); await plview.load(); plview.pick(it); });
     const pub = cloud.badge(it, open);
     card.append(add, del, pub);
-    card.draggable = true;
-    card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('application/x-prismix-song', it.id); e.dataTransfer.effectAllowed = 'copy'; });
+    dragSong(card, it.id);
     const go = () => { state.plist = null; location.hash = `#/v/${it.id}/${open}`; };
     card.addEventListener('click', go);
     card.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
     return card;
   }));
+}
+
+// The whole card is the drag handle: the cover image must not start its own (picture-only) drag, and the ghost is the card itself.
+function dragSong(card, id) {
+  card.draggable = true;
+  card.querySelectorAll('img').forEach((i) => { i.draggable = false; });
+  card.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('application/x-prismix-song', id);
+    e.dataTransfer.effectAllowed = 'copy';
+    const r = card.getBoundingClientRect();
+    const ghost = card.cloneNode(true);
+    ghost.classList.add('drag-ghost');
+    ghost.style.width = `${r.width}px`;
+    document.body.append(ghost);
+    e.dataTransfer.setDragImage(ghost, e.clientX - r.left, e.clientY - r.top);
+    requestAnimationFrame(() => { ghost.remove(); card.classList.add('lifted'); document.body.classList.add('song-drag'); });
+  });
+  card.addEventListener('dragend', () => { card.classList.remove('lifted'); document.body.classList.remove('song-drag'); });
 }
 
 const modelLabel = (id) => state.models.find((m) => m.id === id)?.label || id;
@@ -1157,7 +1175,10 @@ const stickers = createNotes({
 });
 const band = createBand({ player, current: () => state.current, onNotes: (m) => stickers.onMessage(m), $ });
 createJoin({ $ });
-const cloud = createCloud({ $, el, api, notice, fmt, onChange: renderLibrary, onDownloaded: async () => { await loadLibrary(); await cloud.refresh(); } });
+const cloud = createCloud({
+  $, el, api, notice, fmt, onChange: () => { renderLibrary(); plview.rerender(); },
+  lookup: (id) => { const item = state.library.find((i) => i.id === id); return item && { item, model: item.models.includes(state.defaultModel) ? state.defaultModel : item.models[0] }; },
+  onDownloaded: async () => { await loadLibrary(); await cloud.refresh(); } });
 cloud.refresh();
 const queue = createQueue({ $, api });
 // Media keys, Now Playing and the Windows media overlay drive the studio player.

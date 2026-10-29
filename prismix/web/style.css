@@ -882,19 +882,33 @@ dialog[open]::backdrop { opacity: 1; }
 .tab-sel { max-width: 280px; height: 30px; padding: 0 28px 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background-color: transparent; color: var(--text); font-size: 13px; }
 .set-row select { height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background-color: transparent; color: var(--text); font-size: 13px; }
 
-/* Band cloud */
-.card .pub {
-  position: absolute; left: 44px; top: 8px; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 14px; border: 0; background: #000a; color: #fff;
-  opacity: 0; transition: opacity .15s; font-size: 14px; display: grid; place-items: center;
+/* Band cloud: not uploaded → an Upload button that is always there; in the cloud → a white cloud that shows on hover */
+.card .pub, .pp-row .pub {
+  min-width: 28px; height: 28px; padding: 0 6px; border-radius: 14px; border: 0; background: #000a; color: #fff;
+  font-size: 12px; display: grid; place-items: center; cursor: pointer; transition: opacity .15s, background .15s;
+  backdrop-filter: blur(6px);
 }
-.card:hover .pub, .card .pub:focus-visible, .card .pub:disabled { opacity: 1; }
-.card .pub:hover { background: var(--accent); }
-@media (hover: none) { .card .pub { opacity: 1; } }
+.card .pub { position: absolute; left: 44px; top: 8px; }
+.pp-row .pub { flex: none; background: transparent; }
+.card .pub.on, .pp-row .pub.on { opacity: 0; cursor: default; }
+.card:hover .pub.on, .pp-row:hover .pub.on, .pub.on:focus-visible { opacity: .9; }
+.pub.up:hover, .pub.get:hover, .pub:disabled { background: var(--accent); }
+.pp-row .pub.up, .pp-row .pub.get { color: var(--muted); }
+.pp-row .pub.up:hover, .pp-row .pub.get:hover { color: #fff; }
+@media (hover: none) { .card .pub.on, .pp-row .pub.on { opacity: .9; } }
+.sync-btn { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+
+/* Dragging a song: the whole card lifts off and follows the pointer; playlists light up as places to land */
+.drag-ghost { position: fixed; left: -9999px; top: -9999px; transform: rotate(-3deg) scale(.96); box-shadow: 0 24px 60px -12px #000, 0 0 0 1px var(--accent); pointer-events: none; }
+.drag-ghost .add, .drag-ghost .del, .drag-ghost .pub { display: none; }
+.card.lifted { opacity: .35; transform: scale(.97); }
+body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: land 1.2s ease-in-out infinite; }
+@keyframes land { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); } }
+@media (prefers-reduced-motion: reduce) { body.song-drag .plcard { animation: none; } }
 #cloud-section { margin-top: 24px; }
 #cloud-section .section-head { display: flex; align-items: center; gap: 10px; }
 .band-logo { height: 22px; width: auto; vertical-align: middle; margin-right: 6px; }
 #cloud-logo { height: 36px; margin: 0; }
-.card .pub.on { color: var(--accent); opacity: 1; }
 .cloud-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .cloud-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .cloud-cover { width: 64px; height: 36px; object-fit: cover; border-radius: 6px; background: var(--surface-2); flex: none; }

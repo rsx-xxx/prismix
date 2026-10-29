@@ -4,6 +4,12 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.5.0
+
+- Dragging a song into a playlist moves the whole card (it lifts off as a tilted ghost, and playlists pulse as drop targets), not just the cover.
+- Cloud markers: a song not in the cloud has an always-visible Upload button; one that is shows a white cloud on hover. Playlist rows carry the same markers, with Download for songs that are only in the cloud.
+- "Sync" button above the library uploads what the cloud lacks and downloads what this computer lacks; a song already in the library is never downloaded or overwritten.
+
 ## 0.4.0
 
 - The in-app update goes through Homebrew when brew installed Prismix (`brew update`, then upgrade of the prismix cask only), so brew's records stay correct; it retries once if another brew holds the lock and falls back to the release download if brew fails. Other installs update from the GitHub release as before.
