@@ -2,6 +2,11 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.17.0
+
+- Drums show one page of eight bars at a time with a "bars left" countdown and the next page dimmed below; a Scroll/Pages button switches back to the scrolling chart.
+- The macOS app now publishes Now Playing (Control Center, media keys, lock screen) and obeys play, pause, skip and seeking from it.
+
 ## 0.16.0
 
 - Lyrics: every recognised word is checked against English and Russian dictionaries (misspellings repaired, invented lines dropped), and when nothing is found by title the recognised words are matched against lyrics already in the library and a web search, so covers and odd uploads get the real, timed text.

@@ -753,6 +753,9 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .seg-btns button[aria-pressed=true] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .tab-body { --row: 1.2rem; position: relative; height: var(--pane-h); overflow-y: auto; overscroll-behavior: contain; padding: 24px 4px; mask-image: linear-gradient(transparent, #000 10%, #000 90%, transparent); }
 .tabview #tab-credit a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.tab-count { position: sticky; top: 0; z-index: 2; width: max-content; margin: 0 0 8px auto; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--accent); color: var(--on-primary); }
+.tab.paged .trow.next { opacity: .35; }
+.tab.paged .trow[hidden] { display: none; }
 .trow { display: flex; gap: 6px; margin-bottom: 14px; align-items: flex-end; }
 .trow .strs { flex: 0 0 1.1rem; }
 .trow .tbar { min-width: 0; }

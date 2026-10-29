@@ -136,7 +136,11 @@ def main() -> None:
 
         webview.settings["ALLOW_DOWNLOADS"] = True
         global _window
-        _window = webview.create_window(TITLE, url, width=1280, height=840, min_size=(900, 600))
+        from .nowplaying import NowPlaying
+
+        api = NowPlaying()
+        _window = webview.create_window(TITLE, url, width=1280, height=840, min_size=(900, 600), js_api=api)
+        api.window = _window
         webview.start(_window_ready, url)
     except Exception:
         logging.getLogger(__name__).exception("native window unavailable, opening the browser")

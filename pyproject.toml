@@ -1,6 +1,6 @@
 [project]
 name = "prismix"
-version = "0.16.0"
+version = "0.17.0"
 description = "Practice any song with your band: split it into stems, see chords and synced lyrics, change tempo and key, and follow along on phones."
 readme = "README.md"
 license = { text = "MIT" }
@@ -29,6 +29,7 @@ dependencies = [
     "segno>=1.6",
     "zeroconf>=0.132",
     "wordfreq>=3.1.1",
+    "pyobjc-framework-mediaplayer>=12 ; sys_platform == 'darwin'",
 ]
 
 [dependency-groups]

@@ -4,6 +4,7 @@
 // notification instead (a foreground service keeps it and the audio alive with the screen off).
 
 const droid = window.Android;
+const native = () => window.pywebview?.api?.now_playing ? window.pywebview.api : null; // the macOS desktop shell
 
 /** One second of 16-bit audio whose only signal is a 1-LSB, 50 Hz square wave (about -90 dB, inaudible). Firefox/Zen and WebKit
  *  give media controls only to audio that actually produces samples, so exact silence would never reach Now Playing. */
@@ -34,6 +35,7 @@ export function createMedia(ctl) {
     else if (op === 'pause') ctl.pause();
     else if (op === 'seek') ctl.seek(arg);
     else if (op === 'step') ctl.step(arg);
+    else if (op === 'toggle') (sent?.playing ? ctl.pause() : ctl.play());
   };
   window.__media = (op, arg) => act(op, +arg || 0); // called by the Android shell
 
@@ -85,6 +87,7 @@ export function createMedia(ctl) {
       if (ok === false) sent = null; // the shell could not start its service: try again on the next tick
       return;
     }
+    native()?.now_playing(m.title, m.artist || '', m.playing, m.pos, m.dur, m.rate || 1);
     if (!ms) return;
     if (fresh) {
       ms.metadata = new MediaMetadata({
@@ -104,6 +107,7 @@ export function createMedia(ctl) {
     sent = null;
     hold(false);
     if (droid?.mediaStop) droid.mediaStop();
+    native()?.now_playing_stop();
     if (ms) { ms.metadata = null; ms.playbackState = 'none'; }
   }
 
