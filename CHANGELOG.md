@@ -4,6 +4,13 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.12.0
+
+- The Android app names the band cloud after the band and shows its logo ("TigerKiss cloud"), in the player header and on the cloud screens; unknown clouds stay "Band cloud".
+- While the band cloud is open, the app now watches the Wi-Fi for a Prismix computer. When one appears it offers to join it with a card over the player, or, if the app is in the background, a notification with a Connect button. "Not now" is remembered until the app is closed.
+- Stems you have muted (or that a solo silences) no longer use CPU while tempo or key is changed, so the phone lags less with many stems; they start again, in sync, when un-muted.
+- The Drums role now really opens the tab view by default (songs without a tab still open on lyrics).
+
 ## 0.11.0
 
 - Smoother playback on phones and laptops. At normal tempo and key the stems now play directly, with no time-stretch processing (the heavy part that made phones lag); the stretch engine and its memory are only used while tempo or key is changed.

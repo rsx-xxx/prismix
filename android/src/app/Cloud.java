@@ -28,6 +28,12 @@ final class Cloud {
         final String origin, token;
         Credential(String origin, String token) { this.origin = origin; this.token = token; }
         String host() { return URI.create(origin).getHost(); }
+        /** The band's name for a cloud we know ("TigerKiss"), else null. Keyed by address, like BANDS on the server. */
+        String band() { return "band.deltaclans.win".equals(host()) ? "TigerKiss" : null; }
+        /** How the cloud is titled everywhere: "TigerKiss cloud", or "Band cloud" for one we do not know. */
+        String title() { return band() == null ? "Band cloud" : band() + " cloud"; }
+        /** The logo file shipped with the page, or "". */
+        String logo() { return band() == null ? "" : "tigerkiss.png"; }
         /** The page that turns the token into the session cookie and redirects to the player. */
         String joinUrl() { return origin + "/join?t=" + token; }
     }

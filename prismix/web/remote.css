@@ -81,6 +81,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px;
 /* app shell */
 main { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; height: 100dvh; max-width: 52rem; margin: 0 auto; }
 .top { display: flex; align-items: center; gap: .4rem; padding: max(.6rem, env(safe-area-inset-top)) .6rem .2rem 1.1rem; }
+.logo { height: 1.8rem; width: auto; margin-left: -.5rem; border-radius: .4rem; flex: none; }
+.logo[hidden] { display: none; }
 .who { flex: 1; min-width: 0; display: grid; }
 .who b { font-size: 1.05rem; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .who span { color: var(--ink-2); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

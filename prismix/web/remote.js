@@ -1036,11 +1036,21 @@ if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname) && !OFFLINE) {
   }).catch(() => { /* a plain browser tab on this computer */ });
 }
 
+/** The cloud's own name and logo: the app answers /remote/hello for it, so "TigerKiss cloud" rather than a generic title. */
+async function paintBand() {
+  try {
+    const h = await (await rawFetch('/remote/hello')).json();
+    cloudName = h.name;
+    $('title').textContent = cloudName;
+    setLink('ok', cloudName);
+    if (h.logo) { $('logo').src = `/${h.logo}`; $('logo').hidden = false; }
+  } catch { /* the generic name stays */ }
+}
+
 async function showHostName() {
   $('host-name').textContent = location.hostname;
   try {
     const h = await (await rawFetch('/remote/hello')).json();
-    if (CLOUD) cloudName = h.name;
     $('host-name').textContent = joined ? h.name : `${h.name} · ${location.hostname}`;
   } catch { /* the address alone will do */ }
 }
@@ -1202,6 +1212,7 @@ function offlineStart() {
   $('title').textContent = CLOUD ? cloudName : 'Offline songs';
   $('sub').textContent = CLOUD ? "Your band's library" : 'Saved on this phone';
   setLink(CLOUD ? 'ok' : 'bad', CLOUD ? cloudName : 'Offline');
+  if (CLOUD) paintBand();
   S.mode = 'solo';
   chrome();
   render();
@@ -1394,7 +1405,7 @@ $('join').onsubmit = (e) => {
   store.pin = $('j-pin').value.trim();
   if (changed || store.chords == null) {
     store.chords = withChordsRole.has(pickedRole);
-    store.view = pickedRole === 'drums' || pickedRole === 'other' ? 'chords' : 'lyrics';
+    store.view = pickedRole === 'drums' ? 'tab' : pickedRole === 'other' ? 'chords' : 'lyrics'; // a song without a tab falls back to lyrics in chrome()
   }
   save();
   S.view = store.view || 'lyrics';

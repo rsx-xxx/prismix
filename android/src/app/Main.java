@@ -1,12 +1,19 @@
 package app.prismix.band;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Icon;
 import android.graphics.drawable.RippleDrawable;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -37,6 +44,7 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -54,8 +62,10 @@ import java.net.URL;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -78,6 +88,8 @@ public class Main extends Activity {
     private static final String BG = "#121110";
     static final int PORT = 8443;
     private static final String SERVICE = "_prismix._tcp.";
+    private static final String JOIN = "joinHost";
+    private static final String HOSTS_CHANNEL = "hosts";
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Map<String, Host> found = new LinkedHashMap<>(); // address -> host
@@ -99,6 +111,12 @@ public class Main extends Activity {
     private boolean cloudFresh; // history of the sign-in redirect is dropped once the player has loaded
     private NsdManager nsd;
     private NsdManager.DiscoveryListener nsdListener;
+    private FrameLayout root;
+    private Nearby nearby; // looks for a LAN host while the cloud player is on screen
+    private Host pending; // a host the cloud player has not yet been offered to switch to
+    private final Set<String> declined = new HashSet<>(); // hosts the user said "not now" to, until the app is closed
+    private View suggestion;
+    private boolean resumed;
     private ExecutorService pool;
     private static Main current;
 
@@ -120,6 +138,7 @@ public class Main extends Activity {
         bars(BG, false);
         prefs = getSharedPreferences("band", MODE_PRIVATE);
         importEmbeddedInvite();
+        nearby = new Nearby(this, this::onNearby);
 
         web = new WebView(this);
         web.setBackgroundColor(Color.parseColor(BG));
@@ -143,7 +162,7 @@ public class Main extends Activity {
         scroll.setBackgroundColor(Color.parseColor(BG));
         scroll.addView(panel, new FrameLayout.LayoutParams(-1, -2));
 
-        FrameLayout root = new FrameLayout(this);
+        root = new FrameLayout(this);
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
         root.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
@@ -178,6 +197,11 @@ public class Main extends Activity {
             final boolean gone = h == null;
             ui.post(() -> { if (gone && g == gen && a.equals(host) && web.getVisibility() == View.VISIBLE) discover(); });
         }, "recheck").start();
+    }
+
+    /** A new Wi-Fi network: look again for a host, if the cloud player is what is showing. */
+    private void rewatch() {
+        if (cloudMode && web.getVisibility() == View.VISIBLE) nearby.watch();
     }
 
     private void netUp() {
@@ -219,6 +243,13 @@ public class Main extends Activity {
 
     /** A scanned QR / link carries the host; otherwise discover. */
     private void open(Intent i) {
+        String join = i == null ? null : i.getStringExtra(JOIN);
+        if (join != null) { // the "Connect" button of the host notification
+            i.removeExtra(JOIN);
+            clearSuggestion();
+            go(join);
+            return;
+        }
         Uri d = i == null ? null : i.getData();
         String h = d == null ? null : d.getHost();
         if (h == null) { discover(); return; }
@@ -237,7 +268,25 @@ public class Main extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        resumed = true;
+        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(HOST_NOTE);
+        if (cloudMode && web.getVisibility() == View.VISIBLE) {
+            nearby.watch(); // the network may have changed while we were away
+            if (pending != null) suggest(pending);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        resumed = false;
+        super.onPause();
+    }
+
+    @Override
     protected void onDestroy() {
+        nearby.stop();
         stopSearch();
         if (cm != null && wifiCallback != null) {
             try { cm.unregisterNetworkCallback(wifiCallback); cm.bindProcessToNetwork(null); } catch (RuntimeException e) { /* gone */ }
@@ -276,7 +325,7 @@ public class Main extends Activity {
     }
 
     /** A Prismix computer on the network: stable id, the name its owner gave it, current address. */
-    private static class Host {
+    static class Host {
         final String addr, id, name, domain;
         Host(String addr, String id, String name, String domain) { this.addr = addr; this.id = id; this.name = name; this.domain = domain; }
     }
@@ -354,6 +403,7 @@ public class Main extends Activity {
             try { m.cm.bindProcessToNetwork(n); } catch (RuntimeException e) { /* keep the default route */ }
             m.ui.post(m::netUp);
             m.ui.post(m::recheck);
+            m.ui.post(m::rewatch);
         }
 
         @Override
@@ -498,7 +548,7 @@ public class Main extends Activity {
     }
 
     /** First private IPv4 prefix ("192.168.1.") of this device, preferring Wi-Fi. */
-    private static String subnet() {
+    static String subnet() {
         String best = null;
         try {
             for (NetworkInterface n : Collections.list(NetworkInterface.getNetworkInterfaces())) {
@@ -544,7 +594,7 @@ public class Main extends Activity {
     }
 
     /** The host answering at this address, else null. Only used to discover, never to send data. */
-    private static Host hello(String addr) {
+    static Host hello(String addr) {
         HttpsURLConnection c = null;
         try {
             c = (HttpsURLConnection) new URL("https://" + addr + ":" + PORT + "/remote/hello").openConnection();
@@ -598,6 +648,8 @@ public class Main extends Activity {
 
     private void screen(String title, String sub) {
         cloudMode = false;
+        nearby.stop();
+        clearSuggestion();
         panel.removeAllViews();
         web.setVisibility(View.GONE);
         scroll.setVisibility(View.VISIBLE);
@@ -637,6 +689,8 @@ public class Main extends Activity {
 
     private void goOffline() {
         cloudMode = false;
+        nearby.stop();
+        clearSuggestion();
         stopSearch();
         ++gen;
         host = "";
@@ -650,7 +704,8 @@ public class Main extends Activity {
     // ── Band cloud ──
 
     private void cloudButton() {
-        Button b = button("Band cloud", false);
+        Cloud.Credential have = Cloud.load(prefs);
+        Button b = button(have == null ? "Band cloud" : have.title(), false);
         b.setOnClickListener(v -> showCloud(null));
         panel.addView(b);
     }
@@ -663,10 +718,11 @@ public class Main extends Activity {
         host = "";
         listing = false;
         final Cloud.Credential have = Cloud.load(prefs);
-        screen("Band cloud", have == null ? "Paste the invite link you were sent." : "Signed in to " + have.host());
+        screen(have == null ? "Band cloud" : have.title(), have == null ? "Paste the invite link you were sent." : "Signed in to " + have.host());
+        if (have != null) addLogo(have);
         final TextView err = text(problem == null ? "" : problem, 14, Color.parseColor("#ff6b5b"), 8);
         if (have != null) {
-            Button open = button("Open band cloud", true);
+            Button open = button("Open " + have.title(), true);
             open.setOnClickListener(v -> openCloud(have));
             panel.addView(open);
             Button out = button("Sign out", false);
@@ -687,6 +743,98 @@ public class Main extends Activity {
         Button lan = button("LAN connections", false);
         lan.setOnClickListener(v -> discover());
         panel.addView(lan);
+    }
+
+    /** The band's logo, from the page's own files, under the app name. */
+    private void addLogo(Cloud.Credential c) {
+        if (c.logo().isEmpty()) return;
+        try (InputStream in = getAssets().open("web/" + c.logo())) {
+            Bitmap bmp = BitmapFactory.decodeStream(in);
+            if (bmp == null) return;
+            ImageView img = new ImageView(this);
+            img.setImageBitmap(bmp);
+            img.setAdjustViewBounds(true);
+            img.setContentDescription(c.title());
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(84));
+            lp.bottomMargin = dp(10);
+            panel.addView(img, Math.min(1, panel.getChildCount()), lp);
+        } catch (java.io.IOException | RuntimeException e) { /* no logo: the name alone */ }
+    }
+
+    // ── a LAN host turned up while in the cloud ──
+
+    private static final int HOST_NOTE = 7;
+
+    private void onNearby(Host h) {
+        if (!cloudMode || web.getVisibility() != View.VISIBLE || declined.contains(h.id) || h.addr.equals(host)) return;
+        pending = h;
+        if (resumed) suggest(h); else notifyHost(h);
+    }
+
+    /** A card over the player: join the host, or stay in the cloud. */
+    private void suggest(final Host h) {
+        if (suggestion != null) root.removeView(suggestion);
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(20), dp(18), dp(20), dp(14));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#1d1b19"));
+        bg.setStroke(dp(1), Color.parseColor("#3a3632"));
+        bg.setCornerRadius(dp(22));
+        card.setBackground(bg);
+        card.setElevation(dp(12));
+        card.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        TextView t = text(h.name + " is on this Wi-Fi", 17, Color.WHITE, 4);
+        t.setGravity(Gravity.START);
+        TextView sub = text("Join it to play live with the band, in sync with the computer.", 14, Color.parseColor("#9b948b"), 12);
+        sub.setGravity(Gravity.START);
+        card.addView(t);
+        card.addView(sub);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        Button no = button("Not now", false);
+        Button yes = button("Connect", true);
+        for (Button b : new Button[] { no, yes }) {
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(48), 1);
+            lp.topMargin = 0;
+            lp.leftMargin = b == yes ? dp(10) : 0;
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+        card.addView(row);
+        no.setOnClickListener(v -> { declined.add(h.id); clearSuggestion(); });
+        yes.setOnClickListener(v -> { clearSuggestion(); go(h.addr); });
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
+        lp.setMargins(dp(12), 0, dp(12), dp(16));
+        root.addView(card, lp);
+        card.setTranslationY(dp(220));
+        card.animate().translationY(0).setDuration(240).start();
+        suggestion = card;
+    }
+
+    private void clearSuggestion() {
+        pending = null;
+        if (suggestion != null) { root.removeView(suggestion); suggestion = null; }
+        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(HOST_NOTE);
+    }
+
+    /** With the app in the background the offer is a notification whose button joins the host. */
+    private void notifyHost(Host h) {
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (!nm.areNotificationsEnabled()) return;
+        if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(new NotificationChannel(HOSTS_CHANNEL, "Hosts on your network", NotificationManager.IMPORTANCE_DEFAULT));
+        Intent join = new Intent(this, Main.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(JOIN, h.addr);
+        PendingIntent pi = PendingIntent.getActivity(this, HOST_NOTE, join, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Notification.Builder n = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, HOSTS_CHANNEL) : new Notification.Builder(this);
+        n.setSmallIcon(android.R.drawable.ic_menu_share)
+                .setContentTitle(h.name + " is on this Wi-Fi")
+                .setContentText("Join it to play live with the band.")
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .setCategory(Notification.CATEGORY_RECOMMENDATION)
+                .addAction(new Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_menu_share), "Connect", pi).build());
+        if (Build.VERSION.SDK_INT >= 26) n.setTimeoutAfter(15 * 60 * 1000L);
+        nm.notify(HOST_NOTE, n.build());
     }
 
     private EditText field(String hint) {
@@ -733,7 +881,8 @@ public class Main extends Activity {
     private void openCloud(final Cloud.Credential c) {
         stopSearch();
         final int g = ++gen;
-        screen("Opening band cloud…", c.host());
+        screen("Opening " + c.title() + "…", c.host());
+        addLogo(c);
         panel.addView(spinner());
         cloudMode = true;
         cloudFresh = false;
@@ -902,6 +1051,7 @@ public class Main extends Activity {
         connecting = false;
         scroll.setVisibility(View.GONE);
         web.setVisibility(View.VISIBLE);
+        if (cloudMode) nearby.watch();
     }
 
     @Override

@@ -104,6 +104,33 @@ export class StemPlayer extends EventTarget {
 
   _each(fn) { this.stems.forEach((s) => s.node && fn(s.node, s)); }
 
+  /** Run the stretch node of every stem that can be heard; muted ones stay idle, since each running node costs real DSP. */
+  _scheduleStretch(params) {
+    this._each((n, s) => {
+      s.live = this.isAudible(s);
+      if (s.live) n.schedule(params); else n.stop();
+    });
+  }
+
+  _idleStretch(when) { this._each((n, s) => { n.stop(when); s.live = false; }); }
+
+  /** A stem became audible or silent while the stretch engine is running: start or park its node to match. */
+  _syncStretch() {
+    if (!this.playing || this._engine !== 'stretch') return;
+    const now = this.ctx.currentTime;
+    const t = now + this._latency;
+    this._each((n, s) => {
+      const audible = this.isAudible(s);
+      if (audible && !s.live) {
+        n.schedule({ ...this._params(), output: t, input: this._positionAt(t), active: true });
+        s.live = true;
+      } else if (!audible && s.live) {
+        n.stop(now + 0.06); // after the gain has faded out
+        s.live = false;
+      }
+    });
+  }
+
   _params() {
     return {
       rate: this.tempo,
@@ -185,9 +212,9 @@ export class StemPlayer extends EventTarget {
       this._rate = this.tempo;
       this._engine = 'stretch';
       const params = { ...this._params(), output: t, input: pos, active: true };
-      this._each((n) => n.schedule(params));
+      this._scheduleStretch(params);
     } else {
-      this._each((n) => n.stop(t));
+      this._idleStretch(t);
       this._stopDirect(t);
       this._rate = 1;
       this._engine = 'direct';
@@ -222,7 +249,7 @@ export class StemPlayer extends EventTarget {
     this._rate = stretch ? this.tempo : 1;
     if (stretch) {
       const params = { ...this._params(), output: t, input: pos, active: true };
-      this._each((n) => n.schedule(params));
+      this._scheduleStretch(params);
     } else this._startDirect(t, pos);
     this._emit('state');
   }
@@ -233,7 +260,7 @@ export class StemPlayer extends EventTarget {
     const now = this.ctx.currentTime;
     this.duck.gain.setTargetAtTime(0, now, 0.012);
     this._stopDirect(now + 0.06);
-    this._each((n) => n.stop(now + 0.06));
+    this._idleStretch(now + 0.06);
     this.playing = false;
     this._engine = null;
     this._anchor = { pos, t: now };
@@ -259,7 +286,7 @@ export class StemPlayer extends EventTarget {
     this._anchor = { pos, t };
     if (this._engine === 'stretch') {
       const params = { ...this._params(), output: t, input: pos, active: true };
-      this._each((n) => n.schedule(params));
+      this._scheduleStretch(params);
     } else {
       this._stopDirect(t);
       this._startDirect(t, pos);
@@ -288,6 +315,7 @@ export class StemPlayer extends EventTarget {
       const audible = anySolo ? s.solo : !s.muted;
       s.gain.gain.setTargetAtTime(audible ? s.volume : 0, t, 0.015);
     }
+    this._syncStretch();
     this._emit('mix');
   }
 
