@@ -22,6 +22,7 @@ TTL = 6 * 3600  # GitHub allows 60 unauthenticated calls an hour; one every few 
 RETRY = 15 * 60  # after a failed check (offline, rate limited) try again sooner
 
 # The release asset that installs on this OS; the phone app is not offered here.
+CASK = "prismix"
 _ASSET = {"win32": "Prismix-Setup.exe", "darwin": "Prismix.dmg"}
 
 _cache: dict = {"at": 0.0, "ttl": TTL, "data": None}
@@ -131,8 +132,55 @@ open "$2"
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+_BREW = ("/opt/homebrew/bin/brew", "/usr/local/bin/brew")
+
+
+def _brew() -> str | None:
+    return next((b for b in _BREW if os.access(b, os.X_OK)), None)
+
+
+def brew_managed() -> bool:
+    """True when Homebrew installed this copy: its cask record exists, so brew's bookkeeping must be what updates it."""
+    brew = _brew()
+    return bool(brew and sys.platform == "darwin" and any((Path(brew).parents[1] / "Caskroom" / CASK).glob("*")))
+
+
+def _brew_upgrade() -> bool:
+    """`brew update` then upgrade this one cask (never other packages). One retry when another brew holds the lock."""
+    env = {**os.environ, "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", "HOMEBREW_NO_ENV_HINTS": "1", "HOMEBREW_NO_INSTALL_CLEANUP": "1"}
+    for attempt in (1, 2):
+        out = ""
+        for cmd in (["update"], ["upgrade", "--cask", CASK, "--greedy"]):
+            r = subprocess.run([_brew(), *cmd], env=env, capture_output=True, text=True, timeout=900)
+            out = r.stdout + r.stderr
+            if r.returncode != 0:
+                break
+        else:
+            return True
+        log.warning("brew attempt %d failed: %s", attempt, out[-400:])
+        if attempt == 1 and "lock" in out.lower():
+            time.sleep(8)
+            continue
+        return False
+    return False
+
+
+def _reopen_after_exit() -> None:
+    subprocess.Popen(["/bin/bash", "-c", f"while kill -0 {os.getpid()} 2>/dev/null; do sleep 0.3; done; open {_bundle()!s}"],
+                     start_new_session=True, close_fds=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def _run(url: str, quit_app) -> None:
     try:
+        if brew_managed():
+            _job.update(state="installing", progress=1.0, error=None)
+            if _brew_upgrade():
+                _job.update(state="restarting", progress=1.0)
+                _reopen_after_exit()
+                time.sleep(1.5)
+                quit_app()
+                return
+            log.warning("brew could not update Prismix; installing from the release instead")
         _job.update(state="downloading", progress=0.0, error=None)
         d = Path(tempfile.mkdtemp(prefix="prismix-update-"))
         dest = d / url.rsplit("/", 1)[-1]
@@ -148,7 +196,7 @@ def _run(url: str, quit_app) -> None:
 
 
 def install(quit_app) -> dict:
-    """Download the newest installer from the project's own releases and replace the running app with it."""
+    """Update the running app: through Homebrew when brew installed it, else from the project's own releases."""
     if not installable():
         raise RuntimeError("Updating in place works in the installed app only")
     if _job["state"] in ("downloading", "installing", "restarting"):

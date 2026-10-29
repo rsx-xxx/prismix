@@ -30,7 +30,7 @@ All installers are on the [latest release](https://github.com/rsx-xxx/prismix/re
 ```bash
 brew tap rsx-xxx/prismix
 brew install --cask prismix                 # install
-brew update && brew upgrade --cask prismix --greedy   # update (the app also updates itself from the toolbar)
+brew update && brew upgrade --cask prismix --greedy   # update (the app also updates itself from the toolbar, through brew when brew installed it)
 ```
 
 Already installed Prismix by hand? Link that copy to brew with `brew install --cask --force prismix`, which replaces it with the brew-managed app. Your library is kept. Run `brew update` before every upgrade: brew does not refresh third-party taps on its own, so it can say "latest version is already installed" while a newer release exists. `--greedy` is needed because the app updates itself.

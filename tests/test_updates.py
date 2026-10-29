@@ -66,3 +66,43 @@ def test_install_only_takes_assets_from_own_releases(monkeypatch):
     monkeypatch.setattr(updates, "check", lambda force=False: {"available": True, "download": "https://evil.example/Prismix.dmg"})
     with pytest.raises(RuntimeError):
         updates.install(lambda: None)
+
+
+def test_brew_managed_needs_a_cask_record(tmp_path, monkeypatch):
+    brew = tmp_path / "bin" / "brew"
+    brew.parent.mkdir()
+    brew.write_text("#!/bin/sh\n")
+    brew.chmod(0o755)
+    monkeypatch.setattr(updates, "_BREW", (str(brew),))
+    monkeypatch.setattr(updates.sys, "platform", "darwin")
+    assert not updates.brew_managed()
+    (tmp_path / "Caskroom" / "prismix" / "0.3.0").mkdir(parents=True)
+    assert updates.brew_managed()
+
+
+def test_brew_upgrade_touches_only_this_cask_and_retries_on_lock(monkeypatch):
+    calls = []
+
+    class R:
+        def __init__(self, code, err=""):
+            self.returncode, self.stdout, self.stderr = code, "", err
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd[1:])
+        locked = len(calls) == 1
+        return R(1, "Error: Cannot lock for download!") if locked else R(0)
+
+    monkeypatch.setattr(updates, "_BREW", ("/bin/sh",))
+    monkeypatch.setattr(updates.subprocess, "run", fake_run)
+    monkeypatch.setattr(updates.time, "sleep", lambda s: None)
+    assert updates._brew_upgrade()
+    assert calls == [["update"], ["update"], ["upgrade", "--cask", "prismix", "--greedy"]]
+
+
+def test_brew_upgrade_gives_up_on_other_errors(monkeypatch):
+    class R:
+        returncode, stdout, stderr = 1, "", "Error: no such cask"
+
+    monkeypatch.setattr(updates, "_BREW", ("/bin/sh",))
+    monkeypatch.setattr(updates.subprocess, "run", lambda cmd, **kw: R())
+    assert not updates._brew_upgrade()

@@ -4,6 +4,10 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.4.0
+
+- The in-app update goes through Homebrew when brew installed Prismix (`brew update`, then upgrade of the prismix cask only), so brew's records stay correct; it retries once if another brew holds the lock and falls back to the release download if brew fails. Other installs update from the GitHub release as before.
+
 ## 0.3.0
 
 - Cloud and library are one list: every song shows a cloud badge (outlined with an arrow = not uploaded yet, click to upload; filled = in the cloud). Songs only in the cloud sit in their own section; Download turns one into a normal library song with stems, lyrics and tab, no reprocessing.
