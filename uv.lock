@@ -1562,7 +1562,7 @@ wheels = [
 
 [[package]]
 name = "prismix"
-version = "0.27.1"
+version = "0.28.0"
 source = { editable = "." }
 dependencies = [
     { name = "beartype", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or sys_platform == 'linux' or sys_platform == 'win32'" },

@@ -397,6 +397,24 @@ def merge_bars(bars: list[dict], offset: int) -> list[dict]:
     return out
 
 
+def split_bars(bars: list[dict]) -> list[dict]:
+    """One tab bar becomes two: the tab counts the beat half as fast as the recording's bar tracker."""
+    out = []
+    for bar in bars:
+        half = round(bar["len"] / 2, 4)
+        halves = ({"len": half, "n": []}, {"len": half, "n": []})
+        for pos, dur, *tail in bar["n"]:
+            k = 1 if pos >= 0.5 - 1e-6 else 0
+            at = round((pos - 0.5 * k) * 2, 4)
+            halves[k]["n"].append([at, round(min(dur * 2, 1 - at), 4), *tail])
+        if bar.get("mark"):
+            halves[0]["mark"] = bar["mark"]
+        if bar.get("auto"):
+            halves[0]["auto"] = halves[1]["auto"] = bar["auto"]
+        out.extend(halves)
+    return out
+
+
 def _tab_chroma(parts: dict[str, dict]) -> list[list[float]]:
     n = max(len(p["bars"]) for p in parts.values())
     tab = []
@@ -412,35 +430,39 @@ def _tab_chroma(parts: dict[str, dict]) -> list[list[float]]:
 def fit(parts: dict[str, dict], structure: dict) -> dict | None:
     """Pick the transposition and bar mapping that fit best; None when the tab is not this recording.
 
-    A tab written at double (or half) the tracked tempo has bars half as long as the recording's: the same music
-    counted differently. Pairs of its bars are then merged, in place, so every part lines up bar for bar.
+    A tab written at double the tracked tempo has bars half as long as the recording's, at half the tempo twice as
+    long: the same music counted differently. Pairs of its bars are then merged (or every bar split in two), in place,
+    so every part lines up bar for bar.
     """
     lead = _lead_parts(parts)
     rec = _bar_chroma(structure)
     if len(rec) < 4 or not lead:
         return None
-    variants: list[tuple[int | None, dict[str, dict]]] = [(None, lead)]
-    for off in (0, 1):
-        variants.append((off, {k: {**p, "bars": merge_bars(p["bars"], off)} for k, p in lead.items()}))
+    ways = [(None, lambda b: b), ("merged", lambda b: merge_bars(b, 0)), ("merged1", lambda b: merge_bars(b, 1)),
+            ("split", split_bars)]
     best = None
-    for off, vp in variants:
+    for way, regroup in ways:
+        vp = lead if way is None else {k: {**p, "bars": regroup(p["bars"])} for k, p in lead.items()}
+        tab = _tab_chroma(vp)
         for t in range(12):
-            sim, cover, pair = align(_tab_chroma(vp), rec, t)
-            score = sim * cover * (1.0 if off is None else 0.95)  # the plain reading wins a close call
+            sim, cover, pair = align(tab, rec, t)
+            used = [j for j in pair if j is not None]
+            dense = len(used) / (max(used) - min(used) + 1) if used else 0.0  # a reading that skips recording bars is a stretched one
+            score = sim * cover * dense * (1.0 if way is None else 0.95)  # the plain reading wins a close call
             if best is None or score > best[0]:
-                best = (score, sim, cover, pair, t, off)
-    _, sim, cover, pair, t, off = best
+                best = (score, sim, cover, pair, t, way, regroup)
+    _, sim, cover, pair, t, way, regroup = best
     if sim < MIN_SCORE + (0.05 if t else 0) or cover < MIN_COVERAGE:
         log.info("tab rejected: similarity %.2f, coverage %.2f, transpose %d", sim, cover, t)
         return None
-    if off is not None:
-        log.info("tab bars are half as long as the recording's: merged in pairs (offset %d)", off)
+    if way is not None:
+        log.info("tab bars differ in length from the recording's: regrouped (%s)", way)
         for p in parts.values():
-            p["bars"] = merge_bars(p["bars"], off)
+            p["bars"] = regroup(p["bars"])
     # the tab is written in another key than the audio at hand (a karaoke cut, a lowered cover): follow the audio
     fitted = {"similarity": round(sim, 3), "coverage": round(cover, 3), "map": pair, "shift": -t if t <= 6 else 12 - t}
-    if off is not None:
-        fitted["merged"] = off
+    if way is not None:
+        fitted["regrouped"] = way
     return fitted
 
 

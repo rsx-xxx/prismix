@@ -234,7 +234,7 @@ def test_fit_merges_a_tab_counted_at_double_tempo():
     half = [r for r in roots for _ in range(2)]
     parts = {"guitar": _tab(half)}
     got = tabdata.fit(parts, _structure(roots))
-    assert got and got["merged"] == 0 and got["map"] == list(range(8))
+    assert got and got["regrouped"] == "merged" and got["map"] == list(range(8))
     bars = parts["guitar"]["bars"]
     assert len(bars) == 8 and bars[0]["len"] == 2.0
     assert [n[0] for n in bars[0]["n"]] == [0.0, 0.25, 0.5, 0.75]
@@ -245,3 +245,14 @@ def test_merge_bars_keeps_a_lone_pickup_and_tail():
     bar = {"len": 1.0, "n": [[0.0, 0.5, [[5, 0]]]]}
     out = tabdata.merge_bars([bar] * 5, 1)
     assert [b["len"] for b in out] == [1.0, 2.0, 2.0]
+
+
+def test_fit_splits_a_tab_counted_at_half_tempo():
+    roots = [0, 5, 7, 0, 5, 7, 0, 5]
+    rec_roots = [r for r in roots for _ in range(2)]  # each tab bar covers two recording bars
+    bars = [{"len": 1.0, "n": [[p, 0.25, [[5, (r - 40) % 12]]] for p in (0.0, 0.25, 0.5, 0.75)]} for r in roots]
+    parts = {"guitar": {"bars": bars, "tuning": TUNING}}
+    got = tabdata.fit(parts, _structure(rec_roots))
+    assert got and got["regrouped"] == "split" and got["map"] == list(range(16))
+    bars = parts["guitar"]["bars"]
+    assert len(bars) == 16 and bars[0]["len"] == 0.5 and bars[0]["n"][0][:2] == [0.0, 0.5] and len(bars[0]["n"]) == 2

@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.28.0
+
+The player's three-dots menu now starts with a small stem mixer: mute, solo and volume for every stem, in step with the big mixer above. Songsterr tabs counted at half the app's tempo (bars twice as long as the recording's) are now recognised as well, next to the double-tempo ones from 0.27.1, and the layout that explains the recording's bars best is chosen. Saved stem volumes now also show on the big mixer's sliders when a song is opened.
+
 ## 0.27.1
 
 Songsterr tabs written at double the tempo the app measures (133 BPM against 66.7, so every tab bar is half a recording bar) are no longer rejected. Their bars are merged in pairs so they line up with the recording bar for bar, and the tab then plays and follows like any other. Songs that were already checked and recorded as having no tab need a new tab search to pick this up.

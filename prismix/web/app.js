@@ -828,7 +828,7 @@ function renderMixer(meta) {
     mute.dataset.kind = 'mute';
     const solo = el('button', { type: 'button', className: 'tog', textContent: 'S', title: 'Solo' });
     solo.dataset.kind = 'solo';
-    const vol = el('input', { type: 'range', min: 0, max: 150, value: 100, ariaLabel: `${s.name} volume` });
+    const vol = el('input', { type: 'range', className: 'vol', min: 0, max: 150, value: 100, ariaLabel: `${s.name} volume` });
     const row = el('div', { className: 'stem' },
       el('div', { className: 'name' }, s.name, i < 6 ? el('kbd', { textContent: String(i + 1) }) : ''),
       el('div', { className: 'btns' }, mute, solo), vol);
@@ -847,6 +847,29 @@ function renderMixer(meta) {
     lanes.insertBefore(lane, $('shade'));
     requestAnimationFrame(() => { drawPeaks(base, s.peaks); drawPeaks(lit, s.peaks); });
   });
+  renderMiniStems(meta);
+}
+
+/** The mixer again in small, inside the player's three-dots menu: reachable while the big one is scrolled away. */
+function renderMiniStems(meta) {
+  const box = $('mini-stems');
+  box.hidden = !meta.stems.length;
+  box.replaceChildren(...meta.stems.map((s) => {
+    const btn = (kind, text, title, on) => {
+      const b = el('button', { type: 'button', className: 'tog', textContent: text, title });
+      b.dataset.kind = kind;
+      b.addEventListener('click', () => on(player._stem(s.name)));
+      return b;
+    };
+    const vol = el('input', { type: 'range', className: 'vol', min: 0, max: 150, value: Math.round(player._stem(s.name).volume * 100), ariaLabel: `${s.name} volume` });
+    vol.addEventListener('input', () => { setPct(vol); player.setVolume(s.name, vol.value / 100); });
+    setPct(vol);
+    const row = el('div', { className: 'mini-stem' }, el('span', { className: 'name', textContent: s.name }),
+      btn('mute', 'M', 'Mute', (st) => player.setMuted(s.name, !st.muted)),
+      btn('solo', 'S', 'Solo', (st) => player.setSolo(s.name, !st.solo)), vol);
+    row.dataset.stem = s.name;
+    return row;
+  }));
 }
 
 function setPct(range) {
@@ -899,8 +922,7 @@ function applyPrefs(p) {
   player.setMaster(Number($('master').value) / 100);
   $('master-out').textContent = `${$('master').value}%`;
   player.stems.forEach((s) => {
-    const v = document.querySelector(`.stem[data-stem="${s.name}"] .vol`);
-    if (v) { v.value = Math.round(s.volume * 100); setPct(v); }
+    for (const v of document.querySelectorAll(`[data-stem="${s.name}"] .vol`)) { v.value = Math.round(s.volume * 100); setPct(v); }
   });
 }
 
@@ -909,6 +931,11 @@ function syncMixer() {
   const names = player.stems.map((s) => s.name);
   for (const s of player.stems) {
     const audible = player.isAudible(s);
+    for (const mini of document.querySelectorAll(`.mini-stem[data-stem="${s.name}"]`)) {
+      mini.classList.toggle('silent', !audible);
+      mini.querySelector('[data-kind=mute]').setAttribute('aria-pressed', String(s.muted));
+      mini.querySelector('[data-kind=solo]').setAttribute('aria-pressed', String(s.solo));
+    }
     const row = document.querySelector(`.stem[data-stem="${s.name}"]`);
     const lane = document.querySelector(`.lane[data-stem="${s.name}"]`);
     row?.classList.toggle('silent', !audible);

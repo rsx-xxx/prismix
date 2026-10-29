@@ -350,6 +350,13 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
   position: absolute; right: 0; bottom: 44px; width: 290px; padding: 16px; display: grid; gap: 14px; background: var(--surface);
   border: 1px solid var(--line-strong); border-radius: 14px; box-shadow: 0 20px 50px -10px #000a;
 }
+.mini-stems { display: grid; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.mini-stem { --c: oklch(0.78 0.12 255); display: grid; grid-template-columns: 62px auto auto 1fr; align-items: center; gap: 6px; font-size: 13px; }
+.mini-stem .name { display: flex; align-items: center; gap: 6px; font-weight: 600; text-transform: capitalize; min-width: 0; }
+.mini-stem .name::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.mini-stem.silent .name { color: var(--muted); } .mini-stem.silent .name::before { opacity: .25; }
+.mini-stem .tog { min-width: 26px; width: 26px; height: 26px; padding: 0; font-size: 11px; }
+.mini-stem .vol { min-width: 0; margin-left: 4px; }
 .slider-row { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
 .slider-row output { float: right; }
 .switch { display: flex; gap: 10px; align-items: center; font-size: 13px; }
