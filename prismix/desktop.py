@@ -5,6 +5,7 @@ Falls back to the default browser when no native webview is available. Closing t
 from __future__ import annotations
 
 import logging
+import re
 import socket
 import sys
 import threading
@@ -58,6 +59,22 @@ def selftest() -> None:
     print("selftest ok; js runtime:", list(js_runtime()))
 
 
+def song_hash(link: str) -> str | None:
+    """prismix://song/<id>?m=<model>&t=<sec> becomes the page's own route, or None for any other link."""
+    from urllib.parse import parse_qs, urlsplit
+
+    u = urlsplit(link)
+    if u.scheme != "prismix" or u.netloc != "song":
+        return None
+    vid = u.path.strip("/")
+    q = parse_qs(u.query)
+    model = q.get("m", ["htdemucs_ft"])[0]
+    if not re.fullmatch(r"[\w-]{11}", vid) or not re.fullmatch(r"\w+", model):
+        return None
+    at = q.get("t", [""])[0]
+    return f"#/v/{vid}/{model}" + (f"?t={at}" if re.fullmatch(r"\d+(\.\d+)?", at) else "")
+
+
 def open_link(link: str) -> None:
     """A clicked prismix://join link: sign in to the cloud, then reload the page. Held until the window exists."""
     import json
@@ -67,6 +84,10 @@ def open_link(link: str) -> None:
         return
     from . import cloud
 
+    song = song_hash(link)
+    if song:
+        _window.evaluate_js(f"location.hash = {json.dumps(song)}")
+        return
     try:
         cloud.accept_link(link)
         _window.evaluate_js("location.reload()")

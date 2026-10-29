@@ -486,9 +486,20 @@ async function route() {
   if (pm) { showHome(true); await plview.show(pm[1]); return; }
   plview.stop();
   $('home').classList.remove('inpl');
-  const m = location.hash.match(/^#\/v\/([\w-]{11})\/(\w+)$/);
+  const m = location.hash.match(/^#\/v\/([\w-]{11})\/(\w+)(?:\?t=(\d+(?:\.\d+)?))?$/);
   if (!m) { showHome(); return; }
+  const at = m[3] == null ? null : Number(m[3]);
+  if (at != null) history.replaceState(null, '', `#/v/${m[1]}/${m[2]}`); // the moment is spent once the song is open
+  if (at != null && !state.library.some((i) => i.id === m[1])) await fetchShared(m[1]);
   await openStudio(m[1], m[2]);
+  if (at != null && state.current?.id === m[1]) player.seek(Math.min(at, player.duration || at));
+}
+
+/** A shared song this computer lacks comes from the band cloud first; if it is not there the open fails with the usual notice. */
+async function fetchShared(id) {
+  $('loading').hidden = false;
+  $('loading-text').textContent = 'Downloading the shared song from the cloud…';
+  try { await cloud.fetchSong(id); } catch (e) { notice(e.message); }
 }
 
 function showHome(inPlaylist = false) {
@@ -1208,6 +1219,16 @@ function syncExport() {
 }
 document.querySelectorAll('input[name=scope]').forEach((r) => r.addEventListener('change', syncExport));
 $('export-btn').addEventListener('click', openExport);
+
+// ── sharing: a prismix:// link to this song, optionally to the moment being played ──
+$('share-btn').addEventListener('click', async () => {
+  if (!state.current) return;
+  const { id, model } = state.current;
+  const at = $('share-at').checked ? `&t=${Math.floor(player.position)}` : '';
+  const link = `prismix://song/${id}?m=${model}${at}`;
+  try { await navigator.clipboard.writeText(link); notice(`Link copied${at ? ` (at ${fmt(player.position)})` : ''}`, 'ok'); }
+  catch { prompt('Copy this link', link); }
+});
 $('ex-cancel').addEventListener('click', () => $('export').close());
 
 $('export-form').addEventListener('submit', async (e) => {

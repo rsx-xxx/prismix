@@ -226,5 +226,14 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
     await refresh();
   });
 
-  return { refresh, publish, badge, mark, setLocal, get signedIn() { return state.signedIn; } };
+  /** Pulls one song from the band cloud into the library; false when it is not signed in or the song is not there. */
+  async function fetchSong(id) {
+    if (!state.signedIn) await refresh();
+    if (!state.signedIn || !state.songs.some((s) => s.id === id)) return false;
+    await runJob('/api/cloud/download', { videoId: id }, () => {}, 500);
+    await onDownloaded?.();
+    return true;
+  }
+
+  return { refresh, publish, badge, mark, setLocal, fetchSong, get signedIn() { return state.signedIn; } };
 }

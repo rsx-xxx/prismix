@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.27.0
+
+New Share button in the player copies a `prismix://song/…` link to the song, and "at this moment" makes it open at the current position, so the lyrics, chords and tabs land in the same place. Opening the link in the desktop app goes straight to that song and, if it isn't in the library, downloads it from the band cloud first. Android doesn't open these links yet.
+
 ## 0.26.1
 
 Settings works again on the desktop layout: it opens beside the left rail, bottom-aligned with the Settings button, and the player bar no longer covers that button. The empty space above the first lyric line and the first chord bar is gone. In the chord panel the current and next fingerings are white cards with the chord name above the diagram, in the chord's colour.
