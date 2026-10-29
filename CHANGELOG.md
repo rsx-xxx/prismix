@@ -4,6 +4,13 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.9.0
+
+- Updating shows overall progress in Settings: a percentage, a progress bar and a short live note (download size and speed, refreshing Homebrew, installing, restarting).
+- The queue shows the song's real name instead of a YouTube id while it waits.
+- Dropdowns and text fields share one modern look everywhere, including the chord key, capo and tuning pickers that were unstyled.
+- Tapping ⌘ alone opens the shortcut sheet; combos such as ⌘⇧S, even ones the system handles itself, no longer trigger it.
+
 ## 0.8.0
 
 - macOS menu-bar mini player: an icon in the menu bar opens a popover with play/pause, seek, per-stem volume, mute and solo, master volume, tempo and key switchers, and the current BPM and key. It drives the song playing in the main window.

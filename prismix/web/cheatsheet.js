@@ -34,6 +34,10 @@ export const GROUPS = [
   ]],
 ];
 
+/** Another modifier is down besides the one that opens the sheet. */
+const otherMods = (e) => e.shiftKey || e.altKey || (MAC ? e.ctrlKey : e.metaKey);
+const LONE_MS = 500; // a tap, not a hold: a shortcut the OS handles itself (⌘⇧S) never shows its other keys to the page
+
 const kbd = (t) => Object.assign(document.createElement('kbd'), { textContent: t });
 
 function render(grid) {
@@ -61,21 +65,27 @@ export function initCheatsheet(root, blocked = () => false) {
   const grid = root.querySelector('#cheats-grid');
   render(grid);
   let lone = false; // the modifier went down with nothing else pressed since
+  let since = 0; // when it went down
   const open = () => { root.hidden = false; };
   const close = () => { root.hidden = true; };
   const toggle = () => (root.hidden ? open() : close());
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === MOD) { if (!e.repeat) lone = true; return; }
+    if (e.key === MOD) {
+      if (!e.repeat) { lone = !otherMods(e); since = performance.now(); }
+      return;
+    }
     lone = false;
     if (e.key === 'Escape' && !root.hidden) { close(); e.stopPropagation(); }
   }, true);
   window.addEventListener('keyup', (e) => {
     if (e.key !== MOD || !lone) return;
     lone = false;
+    if (otherMods(e) || performance.now() - since > LONE_MS) return;
     if (!blocked()) toggle();
   });
   window.addEventListener('blur', () => { lone = false; });
+  document.addEventListener('visibilitychange', () => { lone = false; });
   window.addEventListener('pointerdown', (e) => { lone = false; if (!root.hidden && !root.contains(e.target) && !e.target.closest('#help-btn')) close(); }, true);
   root.querySelector('#cheats-close').addEventListener('click', close);
   return { toggle, isOpen: () => !root.hidden };

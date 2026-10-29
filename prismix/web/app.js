@@ -625,8 +625,14 @@ api('/api/update').then((u) => {
   let busy = false;
   const fail = (why) => { busy = false; a.textContent = 'Update failed, open download'; a.href = u.download || u.url; a.target = '_blank'; a.title = why; };
   const show = (st) => {
-    a.textContent = st.state === 'ready' ? `Restart to update to v${u.latest}` : st.state === 'downloading' && st.progress ? `Downloading ${Math.round(st.progress * 100)}%` : `${label[st.state] || `Update to v${u.latest}`}${label[st.state] ? '…' : ''}`;
+    const pct = Math.round((st.percent ?? 0) * 100);
+    const live = st.state in label;
+    a.textContent = st.state === 'ready' ? `Restart to update to v${u.latest}` : live ? `${label[st.state]} · ${pct}%` : `Update to v${u.latest}`;
     a.title = st.state === 'ready' ? 'The update is downloaded. Restart Prismix to finish installing it' : 'Download and install the update, then restart Prismix';
+    $('upd-bar').hidden = !live;
+    $('upd-bar').firstElementChild.style.width = `${pct}%`;
+    $('upd-msg').textContent = live || st.state === 'ready' ? st.message || '' : '';
+    $('upd-msg').hidden = !$('upd-msg').textContent;
   };
   const poll = async () => {
     const st = await api('/api/update').catch(() => null);
@@ -641,7 +647,7 @@ api('/api/update').then((u) => {
     e.preventDefault();
     if (busy) return;
     busy = true;
-    const ready = a.textContent.startsWith('Restart');
+    const ready = a.textContent.startsWith('Restart to');
     a.textContent = 'Starting…';
     const r = await fetch(ready ? '/api/update/restart' : '/api/update/install', { method: 'POST' });
     if (r.status === 409) { busy = false; a.textContent = 'Restart to update'; notice((await r.text().then((t) => { try { return JSON.parse(t).detail; } catch { return t; } }))); return; }

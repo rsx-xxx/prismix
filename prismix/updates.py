@@ -78,7 +78,7 @@ def check(*, force: bool = False, client: httpx.Client | None = None) -> dict:
 
 # ── installing ──
 _ALLOWED = ("https://github.com/" + REPO.removeprefix("https://github.com/") + "/releases/download/",)
-_job: dict = {"state": "idle", "progress": 0.0, "error": None, "ready": None}
+_job: dict = {"state": "idle", "progress": 0.0, "percent": 0.0, "message": "", "error": None, "ready": None}
 _staged: dict = {"path": None, "version": None}
 _lock = threading.Lock()
 BUSY_POLL = 30  # while work is running, look again this often before offering the restart
@@ -93,16 +93,29 @@ def status() -> dict:
     return {**_job, "installable": installable()}
 
 
+def _step(percent: float, message: str, **state) -> None:
+    """Overall progress (0-1) and a short note on what is happening, for the settings panel."""
+    _job.update(percent=round(percent, 3), message=message, **state)
+
+
 def _download(url: str, dest: Path) -> None:
+    """Fetch the installer; counts for the first 80% of the whole update."""
     with httpx.stream("GET", url, follow_redirects=True, timeout=30, headers={"User-Agent": "prismix"}) as r:
         r.raise_for_status()
         total = int(r.headers.get("content-length") or 0)
         done = 0
+        began = last = time.monotonic()
         with dest.open("wb") as f:
             for chunk in r.iter_bytes(1 << 16):
                 f.write(chunk)
                 done += len(chunk)
                 _job["progress"] = done / total if total else 0.0
+                now = time.monotonic()
+                if now - last >= 0.25:
+                    last = now
+                    rate = done / max(now - began, 0.001) / 1e6
+                    size = f"{done / 1e6:.0f} of {total / 1e6:.0f} MB" if total else f"{done / 1e6:.0f} MB"
+                    _step(0.8 * _job["progress"], f"Downloading {size} · {rate:.1f} MB/s")
 
 
 def _bundle() -> Path:
@@ -155,6 +168,7 @@ def _brew_upgrade() -> bool:
     for attempt in (1, 2):
         out = ""
         for cmd in (["update"], ["upgrade", "--cask", CASK, "--greedy"]):
+            _step(0.3 if cmd[0] == "update" else 0.65, "Refreshing Homebrew" if cmd[0] == "update" else "Upgrading Prismix with Homebrew")
             r = subprocess.run([_brew(), *cmd], env=env, capture_output=True, text=True, timeout=900)
             out = r.stdout + r.stderr
             if r.returncode != 0:
@@ -177,21 +191,21 @@ def _reopen_after_exit() -> None:
 def _run(url: str, quit_app) -> None:
     try:
         if brew_managed():
-            _job.update(state="installing", progress=1.0, error=None)
+            _step(0.1, "Starting Homebrew", state="installing", progress=1.0, error=None)
             if _brew_upgrade():
-                _job.update(state="restarting", progress=1.0)
+                _step(0.95, "Restarting Prismix", state="restarting", progress=1.0)
                 _reopen_after_exit()
                 time.sleep(1.5)
                 quit_app()
                 return
             log.warning("brew could not update Prismix; installing from the release instead")
-        _job.update(state="downloading", progress=0.0, error=None)
+        _step(0.02, "Connecting to GitHub", state="downloading", progress=0.0, error=None)
         d = Path(tempfile.mkdtemp(prefix="prismix-update-"))
         dest = d / url.rsplit("/", 1)[-1]
         _download(url, dest)
-        _job["state"] = "installing"
+        _step(0.85, "Preparing the installer", state="installing")
         _hand_over(dest)
-        _job.update(state="restarting", progress=1.0)
+        _step(0.95, "Restarting Prismix", state="restarting", progress=1.0)
         time.sleep(1.5)  # let the page see "restarting" before the window goes away
         quit_app()
     except Exception as e:  # noqa: BLE001 - shown to the user; the manual download link still works
@@ -219,7 +233,7 @@ def install(quit_app, busy=lambda: None) -> dict:
     if not info.get("available") or not url or not url.startswith(_ALLOWED):
         raise RuntimeError("No newer release to install")
     threading.Thread(target=_run, args=(url, quit_app), daemon=True).start()
-    _job.update(state="downloading", progress=0.0, error=None)
+    _step(0.0, "Starting", state="downloading", progress=0.0, error=None)
     return status()
 
 
@@ -237,15 +251,15 @@ def stage(info: dict) -> bool:
             if brew_managed():  # brew fetches and swaps in one step, nothing to pre-download
                 _staged.update(path="brew", version=info["latest"])
             else:
-                _job.update(state="downloading", progress=0.0, error=None)
+                _step(0.0, "Starting", state="downloading", progress=0.0, error=None)
                 dest = Path(tempfile.mkdtemp(prefix="prismix-update-")) / url.rsplit("/", 1)[-1]
                 _download(url, dest)
                 _staged.update(path=str(dest), version=info["latest"])
-            _job.update(state="ready", progress=1.0, ready=info["latest"])
+            _step(0.8, "Downloaded, ready to restart", state="ready", progress=1.0, ready=info["latest"])
             return True
         except Exception as e:  # noqa: BLE001 - the manual install button still works
             log.warning("background update download failed: %s", e)
-            _job.update(state="idle", progress=0.0, error=None)
+            _step(0.0, "", state="idle", progress=0.0, error=None)
             return False
 
 
@@ -255,7 +269,7 @@ def restart(quit_app, busy=lambda: None) -> dict:
         raise RuntimeError("No update is ready yet")
     _guard(busy)
     threading.Thread(target=_apply, args=(quit_app,), daemon=True).start()
-    _job.update(state="installing", progress=1.0, error=None)
+    _step(0.85, "Installing the update", state="installing", progress=1.0, error=None)
     return status()
 
 
@@ -267,7 +281,7 @@ def _apply(quit_app) -> None:
             _reopen_after_exit()
         else:
             _hand_over(Path(_staged["path"]))
-        _job.update(state="restarting", progress=1.0)
+        _step(0.95, "Restarting Prismix", state="restarting", progress=1.0)
         time.sleep(1.5)
         quit_app()
     except Exception as e:  # noqa: BLE001

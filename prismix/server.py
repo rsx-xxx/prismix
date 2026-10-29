@@ -5,10 +5,12 @@ import json
 import logging
 import os
 import re
+import threading
 from contextlib import asynccontextmanager
 from typing import Literal
 from urllib.parse import quote, urlparse
 
+import httpx
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
@@ -211,6 +213,7 @@ def create_app() -> FastAPI:
         await prefetcher.stop()
         await jobs.stop()
 
+    _titles: dict[str, str | None] = {}
     app = FastAPI(title="Prismix", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.state.band = band = Band()
     app.state.upstream = None  # the host this desktop has joined, if any
@@ -835,6 +838,21 @@ def create_app() -> FastAPI:
             "Cache-Control": "no-store",
         }, background=BackgroundTask(res.cleanup))
 
+    def _video_title(video_id: str) -> str | None:
+        """Name of a queued song that has not been downloaded yet; looked up once in the background."""
+        if video_id not in _titles:
+            _titles[video_id] = None
+            threading.Thread(target=_fetch_title, args=(video_id,), daemon=True).start()
+        return _titles[video_id]
+
+    def _fetch_title(video_id: str) -> None:
+        try:
+            r = httpx.get("https://www.youtube.com/oembed", params={"url": f"https://www.youtube.com/watch?v={video_id}", "format": "json"}, timeout=8)
+            r.raise_for_status()
+            _titles[video_id] = library.clean_title(r.json()["title"])
+        except (httpx.HTTPError, ValueError, KeyError):
+            _titles[video_id] = ""  # offline or removed video: stop asking
+
     @app.get("/api/jobs")
     def jobs_list():
         titles = {i["id"]: i.get("title") for pl in playlists.list_all() for i in pl["items"]}
@@ -844,7 +862,8 @@ def create_app() -> FastAPI:
                 meta = library.read_meta(j.video_id, j.model)
             except ValueError:
                 meta = None
-            out.append({**j.snapshot(), "title": (meta or {}).get("title") or titles.get(j.video_id) or j.video_id})
+            title = (meta or {}).get("title") or titles.get(j.video_id) or (library.read_info(j.video_id) or {}).get("title") or _video_title(j.video_id)
+            out.append({**j.snapshot(), "title": title or ("Unknown song" if title == "" else "Loading title…")})
         return out
 
     @app.get("/api/prefetch")
