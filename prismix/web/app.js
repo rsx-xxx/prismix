@@ -717,8 +717,18 @@ api('/api/version').then((v) => {
   a.hidden = false;
 }).catch(() => { /* the version label is optional */ });
 
-api('/api/update').then((u) => {
-  if (!u.available) return;
+let updateWired = false;
+
+/** Asks the server whether a newer release exists (`force` skips its cache) and shows it; wires the install controls once. */
+async function checkUpdates(force = false) {
+  const u = force ? await fetch('/api/update/check', { method: 'POST' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.statusText)))) : await api('/api/update');
+  if (!u.available || updateWired) return u;
+  updateWired = true;
+  wireUpdate(u);
+  return u;
+}
+
+function wireUpdate(u) {
   const a = $('upd');
   a.hidden = false;
   $('upd-none').hidden = true;
@@ -782,7 +792,29 @@ api('/api/update').then((u) => {
   }
   $('update-toast-go').addEventListener('click', () => go(true));
   poll();
-}).catch(() => { /* the update notice is optional */ });
+}
+
+// Look at launch, again whenever the window comes back after a while (the laptop slept, the app sat in the background), and on demand.
+const UPDATE_EVERY = 30 * 60 * 1000;
+let updateCheckedAt = Date.now();
+checkUpdates().catch(() => { /* the update notice is optional */ });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || updateWired || Date.now() - updateCheckedAt < UPDATE_EVERY) return;
+  updateCheckedAt = Date.now();
+  checkUpdates().catch(() => {});
+});
+$('upd-check').addEventListener('click', async () => {
+  const b = $('upd-check');
+  b.disabled = true;
+  b.textContent = 'Checking…';
+  try {
+    const u = await checkUpdates(true);
+    updateCheckedAt = Date.now();
+    notice(u.available ? `Prismix ${u.latest} is available` : `Prismix ${u.current ?? ''} is the latest version`.replace('  ', ' '), 'info');
+  } catch { notice('Could not reach GitHub to check for updates', 'error'); }
+  b.disabled = false;
+  b.textContent = 'Check for updates';
+});
 
 function renderModelSwitch(id, current, available) {
   const box = $('th-models');
@@ -1248,14 +1280,16 @@ document.querySelectorAll('input[name=scope]').forEach((r) => r.addEventListener
 $('export-btn').addEventListener('click', openExport);
 
 // ── sharing: a prismix:// link to this song, optionally to the moment being played ──
-$('share-btn').addEventListener('click', async () => {
+async function shareLink(atMoment) {
   if (!state.current) return;
   const { id, model } = state.current;
-  const at = $('share-at').checked ? `&t=${Math.floor(player.position)}` : '';
+  const at = atMoment ? `&t=${Math.floor(player.position)}` : '';
   const link = `prismix://song/${id}?m=${model}${at}`;
   try { await navigator.clipboard.writeText(link); notice(`Link copied${at ? ` (at ${fmt(player.position)})` : ''}`, 'ok'); }
   catch { prompt('Copy this link', link); }
-});
+}
+$('share-btn').addEventListener('click', () => shareLink(false));
+$('share-at-btn').addEventListener('click', () => shareLink(true));
 $('ex-cancel').addEventListener('click', () => $('export').close());
 
 $('export-form').addEventListener('submit', async (e) => {

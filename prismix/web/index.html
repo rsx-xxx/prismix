@@ -123,7 +123,8 @@
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Share
         </button>
-        <label class="muted" title="Open the link at the current moment"><input type="checkbox" id="share-at"> at this moment</label>
+        <button class="btn" id="share-at-btn" type="button" title="Copy a prismix:// link that opens this song at the current moment">At this moment</button>
+        
       </div>
 
       <div id="loading" class="loading" hidden>
@@ -454,7 +455,7 @@
     <div class="set-row"><span>Theme</span><button class="icon-btn" id="theme-btn" type="button" aria-label="Theme"></button></div>
     <div class="set-row"><span>Keyboard shortcuts</span><button class="btn small ghost" id="help-btn" type="button">Show</button></div>
     <div class="set-row"><span>Version</span><a class="ver" id="ver" href="https://github.com/rsx-xxx/prismix/releases" target="_blank" rel="noopener" title="Release notes" hidden></a></div>
-    <div class="set-row"><span>Update</span><div class="upd-box"><a class="btn small primary upd" id="upd" href="https://github.com/rsx-xxx/prismix/releases/latest" target="_blank" rel="noopener" hidden></a><div class="bar" id="upd-bar" hidden><i></i></div><small class="muted upd-msg" id="upd-msg" hidden></small><span class="muted" id="upd-none">Up to date</span></div></div>
+    <div class="set-row"><span>Update</span><div class="upd-box"><a class="btn small primary upd" id="upd" href="https://github.com/rsx-xxx/prismix/releases/latest" target="_blank" rel="noopener" hidden></a><div class="bar" id="upd-bar" hidden><i></i></div><small class="muted upd-msg" id="upd-msg" hidden></small><span class="muted" id="upd-none">Up to date</span><button class="btn small ghost" id="upd-check" type="button">Check for updates</button></div></div>
   </div>
 
   <div class="cheats" id="cheats" hidden role="dialog" aria-label="Keyboard shortcuts">

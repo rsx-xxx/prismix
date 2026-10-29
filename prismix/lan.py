@@ -236,10 +236,11 @@ def start(app, port: int = HTTPS_PORT) -> uvicorn.Server | None:
         return None
 
     def serve(on: int, host: str = "0.0.0.0") -> uvicorn.Server:
+        # lifespan off: the main server owns the job queue; a second startup on this thread's loop broke the shared asyncio events
         # a vanished phone is noticed within ~20 s instead of the TCP timeout
         server = uvicorn.Server(uvicorn.Config(
             app, host=host, port=on, ssl_certfile=str(crt), ssl_keyfile=str(key),
-            log_level="warning", log_config=None, ws_ping_interval=10, ws_ping_timeout=10))
+            log_level="warning", log_config=None, lifespan="off", ws_ping_interval=10, ws_ping_timeout=10))
         threading.Thread(target=server.run, daemon=True).start()
         return server
 

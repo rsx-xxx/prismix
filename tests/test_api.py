@@ -105,3 +105,12 @@ def test_queue_listing_endpoint(tmp_path, monkeypatch):
         r = c.get("/api/jobs")
         assert r.status_code == 200 and r.json() == []
         assert c.post("/api/jobs/nope/promote").status_code == 404
+
+
+def test_update_check_forces_a_fresh_look(monkeypatch):
+    from prismix import updates
+
+    seen = []
+    monkeypatch.setattr(updates, "check", lambda force=False, client=None: seen.append(force) or {"available": False, "latest": "0.0.1", "url": "", "download": None})
+    r = TestClient(server.create_app()).post("/api/update/check")
+    assert r.status_code == 200 and seen == [True] and r.json()["available"] is False

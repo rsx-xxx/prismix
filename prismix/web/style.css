@@ -967,10 +967,10 @@ dialog[open]::backdrop { opacity: 1; }
 .card .pub.on, .pp-row .pub.on { opacity: 0; cursor: default; }
 .card:hover .pub.on, .pp-row:hover .pub.on, .pub.on:focus-visible { opacity: 1; }
 .pub.up:hover, .pub.get:hover, .pub:disabled { background: var(--accent); color: #fff; }
-.card .pub.on { color: var(--accent); }
+.card .pub.on { color: var(--text); }
 .pp-row .pub.up, .pp-row .pub.get { color: var(--muted); }
 .pp-row .pub.up:hover, .pp-row .pub.get:hover { color: #fff; }
-.pp-row .pub.on { color: var(--accent); }
+.pp-row .pub.on { color: var(--text); }
 @media (hover: none) { .card .pub.on, .pp-row .pub.on { opacity: 1; } }
 .sync-btn { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
 
@@ -1163,10 +1163,3 @@ body:has(#tabview:not([hidden], .off, .out)) #ahead { display: none !important; 
 .instr i { display: inline-grid; place-items: center; line-height: 0; }
 .card .badges .instr { margin-left: auto; }
 .pp-go .instr { flex: none; margin-left: 12px; }
-
-/* Magnet: scrolling down from the stems, the lyrics/chords/tabs row settles so it fills the screen above the dock.
-   Proximity only: it pulls when close and lets go of a deliberate scroll, so it never fights the reader. */
-@media (prefers-reduced-motion: no-preference) {
-  html:has(#studio:not([hidden])) { scroll-snap-type: y proximity; }
-  #panes { scroll-snap-align: start; scroll-snap-stop: normal; scroll-margin-top: 8px; }
-}

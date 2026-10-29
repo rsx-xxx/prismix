@@ -471,6 +471,11 @@ def create_app() -> FastAPI:
     def update_info():
         return {**updates.check(), **updates.status(), "waiting": busy()}
 
+    @app.post("/api/update/check")
+    def update_check(request: Request):
+        own_window(request)
+        return {**updates.check(force=True), **updates.status(), "waiting": busy(), "current": __version__}
+
     @app.post("/api/update/install")
     def update_install(request: Request):
         own_window(request)
