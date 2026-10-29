@@ -4,10 +4,11 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
-## 0.2.0
+## 0.3.0
 
-- The band cloud is now called TigerKiss everywhere in the app, so a musician can later belong to several bands.
-- Android: a TigerKiss invite link (band.deltaclans.win/join) opens the app and signs in, instead of the browser page. Needs the cloud site to publish its app-link file for the no-prompt handoff.
+- Cloud and library are one list: every song shows a cloud badge (outlined with an arrow = not uploaded yet, click to upload; filled = in the cloud). Songs only in the cloud sit in their own section; Download turns one into a normal library song with stems, lyrics and tab, no reprocessing.
+- A cloud that has a registered band (TigerKiss) shows the band's name and logo in the app; other clouds stay "Band cloud".
+- Android: a band cloud invite link opens the app and signs in, instead of the browser chooser (needs the cloud site to publish its app-link file).
 
 ## 0.1.0
 

@@ -1,4 +1,4 @@
-"""TigerKiss client: sign in with an invite link, publish processed songs, read the committed library.
+"""Band cloud client: sign in with an invite link, publish processed songs, read the committed library.
 
 The cloud is a private store. Every invite link lets its holder play and publish; removing a song stays with the
 cloud's admin. Songs stay invisible until their commit. This module holds the credential in the user data folder,
@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import threading
 import time
 import uuid
@@ -18,8 +19,8 @@ from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
-from . import analysis, export, library, tabdata, tagging
-from .config import DATA_DIR, MODELS
+from . import analysis, export, library, pipeline, tabdata, tagging
+from .config import DATA_DIR, DEFAULT_MODEL, LIBRARY_DIR, MODELS, SAMPLE_RATE
 
 CRED_FILE = DATA_DIR / "band_cloud.json"
 PART_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$")
@@ -52,6 +53,14 @@ def parse_credential(text: str) -> tuple[str, str]:
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,128}", token):
         raise CloudError("That link does not look right")
     return f"{base_parts.scheme}://{base_parts.netloc}", token
+
+
+# What each known cloud is called and how it looks. The cloud itself only has an address, so this is keyed by it.
+BANDS = {"band.deltaclans.win": {"name": "TigerKiss", "logo": "tigerkiss.png"}}
+
+
+def band_for(host: str) -> dict:
+    return BANDS.get(host, {"name": "Band cloud", "logo": ""})
 
 
 def valid_path(rel: str) -> bool:
@@ -157,6 +166,85 @@ def current() -> Cloud | None:
     return Cloud(*cred) if cred else None
 
 
+# ── downloading: a cloud song becomes an ordinary library song ──
+
+def _fetch(cloud: Cloud, song_id: str, entry: dict, dest) -> None:
+    """Streams one cloud file to disk and checks it against the manifest's hash."""
+    digest = hashlib.sha256()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with cloud.http.stream("GET", f"/files/{song_id}/{entry['path']}") as r:
+            if r.status_code == 401:
+                raise CloudError("The cloud refused this link", 401)
+            if r.status_code != 200:
+                raise CloudError(f"Download of {entry['path']} failed ({r.status_code})", 502)
+            with open(dest, "wb") as f:
+                for chunk in r.iter_bytes(1 << 16):
+                    digest.update(chunk)
+                    f.write(chunk)
+    except httpx.HTTPError:
+        raise CloudError("The cloud is not answering", 502) from None
+    if digest.hexdigest() != entry["sha256"]:
+        raise CloudError(f"{entry['path']} arrived damaged, try again", 502)
+
+
+def download(cloud: Cloud, song_id: str, progress=lambda step, done, total: None) -> dict:
+    """Fetch a committed song and lay it out like a locally processed one, so it opens in the full studio.
+    The phone-sized AAC stems stand in for the lossless ones; nothing needs processing on this computer."""
+    manifest = cloud.manifest(song_id)
+    if not manifest:
+        raise CloudError("That song is not in the cloud", 404)
+    model = manifest.get("model") if manifest.get("model") in MODELS else DEFAULT_MODEL
+    if library.read_meta(song_id, model):
+        return {"id": song_id, "model": model}
+    files = {f["path"]: f for f in manifest.get("files", []) if valid_path(f.get("path", "")) and isinstance(f.get("sha256"), str)}
+    names = [n for n in manifest.get("stems", []) if PART_RE.match(n)]
+    # A single-stem song has only its mix, which is then the one stem.
+    parts = [(n, f"stems/{n}.m4a") for n in names] or [("mix", "mix.m4a")]
+    if any(rel not in files for _, rel in parts):
+        raise CloudError("The cloud copy of this song is incomplete", 502)
+
+    tmp = LIBRARY_DIR / f"{song_id}.partial"  # not a video id, so the library list never shows it
+    shutil.rmtree(tmp, ignore_errors=True)
+    try:
+        wanted = [rel for _, rel in parts] + [r for r in ("cover.jpg", "structure.json", "lyrics.json", "tab.json") if r in files]
+        for i, rel in enumerate(wanted):
+            progress(rel, i, len(wanted))
+            _fetch(cloud, song_id, files[rel], tmp / "files" / rel)
+        progress("finish", len(wanted), len(wanted))
+        src = tmp / "files"
+        mdir = tmp / model
+        mdir.mkdir(parents=True)
+        samples = {}
+        for name, rel in parts:
+            (src / rel).replace(mdir / f"{name}.m4a")
+            samples[name] = pipeline.decode(mdir / f"{name}.m4a")
+        scale = max(float(abs(s).max()) for s in samples.values()) or 1.0
+        entries = [{"name": n, "file": f"{n}.m4a", "peaks": [int(round(float(v) * 255)) for v in pipeline.peaks(s) / scale]}
+                   for n, s in samples.items()]
+        duration = float(manifest.get("duration") or 0) or len(next(iter(samples.values()))[0]) / SAMPLE_RATE
+        info = {"id": song_id, "title": manifest.get("title") or song_id, "channel": manifest.get("artist") or "",
+                "duration": duration, "added": int(time.time()), "fromCloud": True}
+        for rel, name in (("cover.jpg", "thumb.jpg"), ("structure.json", "structure.json"), ("lyrics.json", "lyrics.json"), ("tab.json", "tabdata.json")):
+            if (src / rel).is_file():
+                (src / rel).replace(tmp / name)
+        shutil.rmtree(src)
+        (tmp / "info.json").write_text(json.dumps(info, ensure_ascii=False))
+        (mdir / "meta.json").write_text(json.dumps({**info, "model": model, "sampleRate": SAMPLE_RATE, "stems": entries}, ensure_ascii=False))
+        final = library.video_dir(song_id)
+        if final.exists():  # the song is already here under another model: keep what it has, add this model
+            for item in tmp.iterdir():
+                if not (final / item.name).exists():
+                    item.replace(final / item.name)
+            shutil.rmtree(tmp, ignore_errors=True)
+        else:
+            tmp.rename(final)
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+    return {"id": song_id, "model": model}
+
+
 # ── publishing ──
 
 def sha256(data: bytes) -> str:
@@ -233,14 +321,14 @@ class Publisher:
         self.jobs: dict[str, dict] = {}
         self.lock = threading.Lock()
 
-    def start(self, cloud: Cloud, video_id: str, model: str) -> str:
+    def start(self, cloud: Cloud, video_id: str, model: str = "", kind: str = "publish") -> str:
         with self.lock:
             for jid, j in self.jobs.items():
-                if j["videoId"] == video_id and j["state"] == "running":
+                if j["videoId"] == video_id and j["kind"] == kind and j["state"] == "running":
                     return jid
             self.jobs = {k: v for k, v in self.jobs.items() if v["state"] == "running" or time.time() - v["at"] < 600}
             jid = uuid.uuid4().hex[:12]
-            job = self.jobs[jid] = {"id": jid, "videoId": video_id, "model": model, "state": "running", "step": "", "done": 0, "total": 0, "at": time.time(),
+            job = self.jobs[jid] = {"id": jid, "kind": kind, "videoId": video_id, "model": model, "state": "running", "step": "", "done": 0, "total": 0, "at": time.time(),
                                     "stop": threading.Event()}
         threading.Thread(target=self._run, args=(job, cloud), daemon=True).start()
         return jid
@@ -252,7 +340,10 @@ class Publisher:
             job.update(step=step, done=done, total=total)
 
         try:
-            job["result"] = publish(cloud, job["videoId"], job["model"], progress)
+            if job["kind"] == "download":
+                job["result"] = download(cloud, job["videoId"], progress)
+            else:
+                job["result"] = publish(cloud, job["videoId"], job["model"], progress)
             job["state"] = "done"
         except (CloudError, export.ExportError, ValueError) as e:
             job.update(state="error", error=str(e))

@@ -18,7 +18,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The player's own page, answered from the TigerKiss. The page asks the host API it always asks (library, lyrics, tab,
+ * The player's own page, answered from the band cloud. The page asks the host API it always asks (library, lyrics, tab,
  * stems); here each path is translated to the cloud's song files and fetched with the member token.
  */
 final class CloudApi {
@@ -30,12 +30,17 @@ final class CloudApi {
 
     private CloudApi() { }
 
+    /** The band this cloud belongs to, by host; a cloud nobody registered is just the band cloud. */
+    private static String bandName(Cloud.Credential c) {
+        return c != null && "band.deltaclans.win".equals(c.host()) ? "TigerKiss" : "Band cloud";
+    }
+
     static WebResourceResponse serve(Context ctx, Cloud.Credential c, String path) {
         if (path == null || path.isEmpty()) path = "/";
         if (path.contains("..") || path.contains("//") || path.contains("\\")) return status(404);
         try {
             if (path.equals("/") || path.equals("/remote")) return Offline.asset(ctx, "remote.html", "no-cache");
-            if (path.equals("/remote/hello")) return json("{\"app\":\"prismix\",\"name\":\"TigerKiss\",\"offline\":true,\"pin\":false}");
+            if (path.equals("/remote/hello")) return json("{\"app\":\"prismix\",\"name\":\"" + bandName(c) + "\",\"offline\":true,\"pin\":false}");
             if (c == null) return status(401);
             if (path.equals("/api/playlists")) return json("[]");
             if (path.equals("/api/library")) return json(library(c));

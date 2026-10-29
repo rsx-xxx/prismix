@@ -144,6 +144,10 @@ class CloudPublish(BaseModel):
     model: str
 
 
+class CloudDownload(BaseModel):
+    video_id: str = Field(alias="videoId")
+
+
 class OriginalRequest(BaseModel):
     video_id: str = Field(alias="videoId")
     kind: Literal["audio", "video"]
@@ -156,7 +160,7 @@ class MediaFiles(StaticFiles):
 
     async def get_response(self, path, scope):
         resp = await super().get_response(path, scope)
-        if path.endswith(".flac"):
+        if path.endswith((".flac", ".m4a")):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         else:
             resp.headers["Cache-Control"] = "no-cache"
@@ -298,21 +302,22 @@ def create_app() -> FastAPI:
             await old.http.aclose()
         return {"connected": False}
 
-    # ── TigerKiss: the cloud credential lives on this computer, so only its own window may use these ──
+    # ── Band cloud: the cloud credential lives on this computer, so only its own window may use these ──
     app.state.publisher = cloud.Publisher()
 
     def cloud_for(request: Request) -> cloud.Cloud:
         own_window(request)
         cl = cloud.current()
         if not cl:
-            raise HTTPException(401, "Sign in to TigerKiss first")
+            raise HTTPException(401, "Sign in to the band cloud first")
         return cl
 
     @app.get("/api/cloud")
     def cloud_status(request: Request):
         own_window(request)
         cred = cloud.load_credential()
-        return {"signedIn": bool(cred), "host": urlparse(cred[0]).netloc if cred else ""}
+        host = urlparse(cred[0]).netloc if cred else ""
+        return {"signedIn": bool(cred), "host": host, "band": cloud.band_for(host)}
 
     @app.post("/api/cloud/login")
     def cloud_login(body: CloudLogin, request: Request):
@@ -327,7 +332,7 @@ def create_app() -> FastAPI:
     def cloud_logout(request: Request):
         own_window(request)
         cloud.clear_credential()
-        return {"signedIn": False, "host": ""}
+        return {"signedIn": False, "host": "", "band": cloud.band_for("")}
 
     @app.get("/api/cloud/index")
     def cloud_index(request: Request):
@@ -366,6 +371,14 @@ def create_app() -> FastAPI:
             cl.close()
             raise HTTPException(404, "That song is not processed yet")
         return {"job": app.state.publisher.start(cl, req.video_id, req.model)}
+
+    @app.post("/api/cloud/download")
+    def cloud_download(req: CloudDownload, request: Request):
+        cl = cloud_for(request)
+        if not library.VIDEO_ID_RE.match(req.video_id):
+            cl.close()
+            raise HTTPException(404, "Not found")
+        return {"job": app.state.publisher.start(cl, req.video_id, kind="download")}
 
     @app.get("/api/cloud/publish/{job_id}")
     def cloud_publish_status(job_id: str, request: Request):

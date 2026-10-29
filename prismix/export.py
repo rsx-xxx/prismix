@@ -25,7 +25,7 @@ FORMATS: dict[str, tuple[str, str, list[str]]] = {
     "flac": ("flac", "audio/flac", ["-c:a", "flac", "-compression_level", "8"]),
     "mp3": ("mp3", "audio/mpeg", ["-c:a", "libmp3lame", "-q:a", "0"]),
     "m4a": ("m4a", "audio/mp4", ["-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart"]),
-    "m4a128": ("m4a", "audio/mp4", ["-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart"]),  # TigerKiss
+    "m4a128": ("m4a", "audio/mp4", ["-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart"]),  # band cloud
     "ogg": ("ogg", "audio/ogg", ["-c:a", "libvorbis", "-q:a", "7"]),
     "opus": ("opus", "audio/ogg", ["-c:a", "libopus", "-b:a", "160k"]),
 }

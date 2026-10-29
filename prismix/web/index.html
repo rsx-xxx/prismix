@@ -28,7 +28,7 @@
     <input id="up-file" type="file" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.wma,.aif,.aiff,.mkv,.m4b" hidden>
     <button class="btn ghost" id="pl-btn" type="button" data-ico="list" title="Pick from YouTube or Spotify playlists">Playlists</button>
     <button class="btn ghost" id="queue-btn" type="button" title="Songs being prepared" hidden>Queue</button>
-    <button class="btn ghost" id="cloud-btn" type="button" title="Publish songs to your private TigerKiss cloud and play them from anywhere">TigerKiss sign-in</button>
+    <button class="btn ghost" id="cloud-btn" type="button" title="Your band's cloud: songs shared between everyone's devices, processed once">Band cloud sign-in</button>
     <button class="btn ghost" id="band-btn" type="button" title="Play with phones or another Prismix computer on this Wi-Fi">Band</button>
     <button class="icon-btn" id="settings-btn" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
   </header>
@@ -69,12 +69,11 @@
       <div id="library" class="grid"></div>
       <section id="cloud-section" hidden>
         <div class="section-head">
-          <h2>TigerKiss</h2>
+          <img id="cloud-logo" class="band-logo" alt="" hidden>
+          <h2>In <span id="cloud-title">Band cloud</span>, not on this computer</h2>
           <span id="cloud-count" class="muted"></span>
-          <span id="cloud-host" class="muted"></span>
         </div>
         <ul id="cloud-list" class="cloud-list"></ul>
-        <p id="cloud-empty" class="muted" hidden>Nothing published yet. Use ↑ on a processed song in your library.</p>
         <div id="cloud-player" class="cloud-player" hidden>
           <span id="cloud-now"></span>
           <audio id="cloud-audio" controls preload="none"></audio>
@@ -338,7 +337,7 @@
   </dialog>
 
   <dialog id="cloud-dialog">
-    <div class="pl-head"><h3>TigerKiss</h3><button class="icon-btn" id="cloud-close" type="button" aria-label="Close">×</button></div>
+    <div class="pl-head"><h3>Band cloud</h3><button class="icon-btn" id="cloud-close" type="button" aria-label="Close">×</button></div>
     <form id="cloud-form" class="band-pane">
       <p class="muted">Paste the invite link. Everyone with the link can play and publish songs.</p>
       <label class="band-row">Invite link <input id="cloud-link" type="password" maxlength="2000" placeholder="https://…/join?t=…" spellcheck="false" autocomplete="off"></label>

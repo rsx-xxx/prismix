@@ -198,12 +198,12 @@ def api(tmp_path, monkeypatch):
 
 
 def test_login_flow_and_proxy(api):
-    assert api.get("/api/cloud").json() == {"signedIn": False, "host": ""}
+    assert api.get("/api/cloud").json() == {"signedIn": False, "host": "", "band": cloud.band_for("")}
     assert api.get("/api/cloud/index").status_code == 401
     assert api.post("/api/cloud/login", json={"link": "short"}).status_code == 400
     assert api.post("/api/cloud/login", json={"link": f"https://band.test/join?t={'B' * 43}"}).status_code == 401
     r = api.post("/api/cloud/login", json={"link": LINK})
-    assert r.json() == {"signedIn": True, "host": "band.test"}
+    assert r.json() == {"signedIn": True, "host": "band.test", "band": cloud.band_for("band.test")}
     assert TOKEN not in json.dumps(api.get("/api/cloud").json())
     assert api.get("/api/cloud/index").json()["songs"][0]["id"] == VID
     r = api.get(f"/api/cloud/files/{VID}/mix.m4a", headers={"range": "bytes=2-5"})
@@ -232,3 +232,49 @@ def test_cloud_api_is_for_this_computer_only(api, monkeypatch):
     monkeypatch.setattr(band, "is_loopback", lambda h: False)
     for method, path in [("get", "/api/cloud"), ("get", "/api/cloud/index"), ("post", "/api/cloud/logout")]:
         assert getattr(api, method)(path).status_code == 403
+
+
+# ── sync: cloud songs become ordinary library songs ──
+
+def _committed(fake, stems=("vocals", "drums")):
+    files = [{"path": f"stems/{n}.m4a", "sha256": hashlib.sha256(b"x" + n.encode()).hexdigest(), "size": 1 + len(n)} for n in stems]
+    for n in stems:
+        fake.files[f"stems/{n}.m4a"] = b"x" + n.encode()
+    fake.committed = {"id": VID, "title": "T", "artist": "A", "stems": list(stems), "files": files}
+
+
+def test_band_for_registry():
+    assert cloud.band_for("band.deltaclans.win")["name"] == "TigerKiss"
+    assert cloud.band_for("elsewhere.example") == {"name": "Band cloud", "logo": ""}
+
+
+def test_download_builds_a_local_song(tmp_path, monkeypatch):
+    import numpy as np
+    monkeypatch.setattr(library, "LIBRARY_DIR", tmp_path)
+    monkeypatch.setattr(cloud, "LIBRARY_DIR", tmp_path)
+    monkeypatch.setattr(cloud.pipeline, "decode", lambda path: np.zeros((2, 4410), dtype="float32"))
+    monkeypatch.setattr(cloud.pipeline, "peaks", lambda s: np.ones(8, dtype="float32"))
+    fake = FakeCloud()
+    _committed(fake)
+    out = cloud.download(cloud_for(fake), VID)
+    meta = library.read_meta(VID, out["model"])
+    assert [s["name"] for s in meta["stems"]] == ["vocals", "drums"]
+    assert (tmp_path / VID / "info.json").is_file()
+    assert not list(tmp_path.glob("*.partial"))
+    assert cloud.download(cloud_for(fake), VID) == out  # already local: nothing refetched
+
+
+def test_download_rejects_a_corrupt_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(library, "LIBRARY_DIR", tmp_path)
+    monkeypatch.setattr(cloud, "LIBRARY_DIR", tmp_path)
+    fake = FakeCloud()
+    _committed(fake)
+    fake.files["stems/vocals.m4a"] = b"tampered"
+    with pytest.raises(cloud.CloudError):
+        cloud.download(cloud_for(fake), VID)
+    assert not list(tmp_path.iterdir())
+
+
+def test_download_endpoint_validates_id(api):
+    api.post("/api/cloud/login", json={"link": LINK})
+    assert api.post("/api/cloud/download", json={"video_id": "../x"}).status_code in (404, 422)

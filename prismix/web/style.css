@@ -680,7 +680,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .pp-go { display: flex; flex: 1; min-width: 0; align-items: center; gap: 12px; text-align: left; padding: 6px; border: 0; background: none; color: inherit; cursor: pointer; }
 .pp-go img { width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; flex: none; }
 .pp-n { width: 22px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
-#home.inpl > .section-head, #home.inpl > #library, #home.inpl > #empty, #home.inpl > #pl-sec { display: none; }
+#home.inpl > .section-head, #home.inpl > #library, #home.inpl > #cloud-section, #home.inpl > #empty, #home.inpl > #pl-sec { display: none; }
 .card .add {
   position: absolute; left: 8px; top: 8px; width: 28px; height: 28px; border-radius: 50%; border: 0;
   background: #000a; color: #fff; font-size: 18px; line-height: 1; cursor: pointer; opacity: 0;
@@ -882,7 +882,7 @@ dialog[open]::backdrop { opacity: 1; }
 .tab-sel { max-width: 280px; height: 30px; padding: 0 28px 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background-color: transparent; color: var(--text); font-size: 13px; }
 .set-row select { height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background-color: transparent; color: var(--text); font-size: 13px; }
 
-/* TigerKiss */
+/* Band cloud */
 .card .pub {
   position: absolute; left: 44px; top: 8px; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 14px; border: 0; background: #000a; color: #fff;
   opacity: 0; transition: opacity .15s; font-size: 14px; display: grid; place-items: center;
@@ -890,7 +890,11 @@ dialog[open]::backdrop { opacity: 1; }
 .card:hover .pub, .card .pub:focus-visible, .card .pub:disabled { opacity: 1; }
 .card .pub:hover { background: var(--accent); }
 @media (hover: none) { .card .pub { opacity: 1; } }
-#cloud-section { margin-top: 8px; }
+#cloud-section { margin-top: 24px; }
+#cloud-section .section-head { display: flex; align-items: center; gap: 10px; }
+.band-logo { height: 22px; width: auto; vertical-align: middle; margin-right: 6px; }
+#cloud-logo { height: 36px; margin: 0; }
+.card .pub.on { color: var(--accent); opacity: 1; }
 .cloud-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .cloud-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .cloud-cover { width: 64px; height: 36px; object-fit: cover; border-radius: 6px; background: var(--surface-2); flex: none; }

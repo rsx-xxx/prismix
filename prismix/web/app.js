@@ -401,6 +401,7 @@ function trackJob(job) {
 // ── library ──
 async function loadLibrary() {
   state.library = await api('/api/library');
+  cloud.setLocal(state.library.map((i) => i.id));
   renderLibrary();
 }
 
@@ -425,8 +426,7 @@ function renderLibrary() {
     });
     const add = el('button', { className: 'add', type: 'button', textContent: '+', title: 'Add to playlist', ariaLabel: 'Add to playlist' });
     add.addEventListener('click', async (e) => { e.stopPropagation(); await plview.load(); plview.pick(it); });
-    const pub = el('button', { className: 'pub', type: 'button', textContent: '↑', title: 'Publish to TigerKiss', ariaLabel: 'Publish to TigerKiss' });
-    pub.addEventListener('click', (e) => { e.stopPropagation(); cloud.publish(it, open, pub); });
+    const pub = cloud.badge(it, open);
     card.append(add, del, pub);
     card.draggable = true;
     card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('application/x-prismix-song', it.id); e.dataTransfer.effectAllowed = 'copy'; });
@@ -1157,7 +1157,7 @@ const stickers = createNotes({
 });
 const band = createBand({ player, current: () => state.current, onNotes: (m) => stickers.onMessage(m), $ });
 createJoin({ $ });
-const cloud = createCloud({ $, el, api, notice, fmt });
+const cloud = createCloud({ $, el, api, notice, fmt, onChange: renderLibrary, onDownloaded: async () => { await loadLibrary(); await cloud.refresh(); } });
 cloud.refresh();
 const queue = createQueue({ $, api });
 // Media keys, Now Playing and the Windows media overlay drive the studio player.
