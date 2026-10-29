@@ -4,6 +4,10 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.9.2
+
+- The Follow button no longer lingers on the main page after leaving a song, and it now appears while a song is paused when you scroll the lyrics or chords away. Its icon is centered in the button.
+
 ## 0.9.1
 
 - Notices that are not errors ("Added to …", "Moved to …", sync done) are no longer red: successes are green, hints are neutral, and both fade after a few seconds. Red stays for errors.

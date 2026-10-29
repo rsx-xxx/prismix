@@ -567,6 +567,8 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .tog[data-ico]::before, .chip[data-ico]::before { width: 1em; height: 1em; margin-right: .35em; vertical-align: -.15em; }
 .stem .name[data-ico]::before { width: 18px; height: 18px; margin: 0; border-radius: 0; background: var(--c); box-shadow: none; filter: drop-shadow(0 0 6px var(--c)); }
 .stem.silent .name[data-ico]::before { filter: none; }
+/* an icon with no text beside it sits in the middle of its button */
+[data-ico]:empty::before { margin: 0; vertical-align: 0; }
 [data-ico=mic] { --ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%229%22 y=%223%22 width=%226%22 height=%2211%22 rx=%223%22/%3E%3Cpath d=%22M5 11a7 7 0 0 0 14 0M12 18v3%22/%3E%3C/svg%3E"); }
 [data-ico=drum] { --ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cellipse cx=%2212%22 cy=%229%22 rx=%228%22 ry=%223%22/%3E%3Cpath d=%22M4 9v6c0 1.7 3.6 3 8 3s8-1.3 8-3V9M9 3 7 1M15 3l2-2%22/%3E%3C/svg%3E"); }
 [data-ico=wave] { --ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M2 12h3l2-6 4 12 3-9 2 3h6%22/%3E%3C/svg%3E"); }
@@ -784,6 +786,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .follow { position: fixed; left: 50%; bottom: calc(var(--dock-h) + 14px); transform: translateX(-50%); z-index: 46; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 0; background: var(--primary); color: var(--on-primary); cursor: pointer; box-shadow: 0 4px 16px rgb(0 0 0 / .3); }
 .follow[hidden] { display: none; }
 .follow:hover { filter: brightness(1.08); }
+.follow::before { width: 20px; height: 20px; }
 [data-ico=locate] { --ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%223%22/%3E%3Cpath d=%22M12 2v4M12 18v4M2 12h4M18 12h4%22/%3E%3C/svg%3E"); }
 .pl-n { width: 22px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; flex: none; }
 .pp-grip { display: grid; align-content: center; gap: 4px; width: 28px; height: 40px; padding: 0 7px; flex: none; cursor: grab; touch-action: none; border-radius: 8px; user-select: none; }

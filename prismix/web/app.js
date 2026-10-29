@@ -459,6 +459,7 @@ function showHome(inPlaylist = false) {
   video.hide(); // gives the stems back if the video's sound was on, so saved prefs are the real mix
   $('nt-toggle').hidden = true;
   if (state.current) { savePrefs(); player.dispose(); state.current = null; }
+  followBtn.hide();
   score.close();
   tabView.close();
   lyrics.close();
@@ -843,6 +844,7 @@ const followBtn = (() => {
   const panes = () => [lyrics.pane(), sidePane()].filter((p) => p.active());
   let next = 0;
   const away = () => {
+    if (!$('panes').offsetParent) return false; // the song view is not on screen
     const r = $('panes').getBoundingClientRect();
     return panes().some((p) => p.away()) || (!!panes().length && r.bottom < 80);
   };
@@ -852,13 +854,18 @@ const followBtn = (() => {
     if (r.bottom < 120 || r.top > bottom - 120) $('panes').scrollIntoView({ block: 'center', behavior: 'smooth' });
     btn.hidden = true;
   };
+  const check = () => { btn.hidden = !(!!state.current && away()); };
+  let queued = 0;
   btn.addEventListener('click', go);
+  // Frames only come while playing; scrolling a pane or the page by hand also moves the position in or out of view, paused or not.
+  window.addEventListener('scroll', () => { if (!queued) queued = requestAnimationFrame(() => { queued = 0; check(); }); }, true);
   return {
     go,
+    hide: () => { btn.hidden = true; },
     frame() {
       if (performance.now() < next) return;
       next = performance.now() + 250;
-      btn.hidden = !(away() && !!state.current);
+      check();
     },
   };
 })();
