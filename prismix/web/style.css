@@ -1076,3 +1076,55 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
 .tarow .trow { margin-bottom: 0; }
 .tarow .trow + .trow { margin-top: 14px; }
 .tab.aligned .trow:last-child { margin-bottom: 0; }
+
+/* ── desktop shell: left sidebar for navigation, top bar keeps search ── */
+.sidebar, .view-btn { display: none; }
+.view-btn { margin-left: auto; }
+.shelf { display: flex; gap: 16px; overflow-x: auto; padding: 4px 2px 14px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.tile { flex: none; width: 152px; display: grid; gap: 2px; color: var(--text); text-decoration: none; scroll-snap-align: start; transition: transform .18s; }
+.tile:hover { transform: translateY(-3px); }
+.tile img { width: 152px; height: 152px; object-fit: cover; border-radius: 14px; background: var(--surface-2); box-shadow: 0 10px 28px -16px #000; margin-bottom: 8px; }
+.tile b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile small { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (min-width: 900px) {
+  :root { --side-w: 216px; }
+  .view-btn { display: inline-grid; }
+  body:not(:has(#studio:not([hidden]))) { padding-left: var(--side-w); }
+  body:not(:has(#studio:not([hidden]))) .sidebar {
+    position: fixed; z-index: 30; inset: 0 auto 0 0; width: var(--side-w); display: flex; flex-direction: column; gap: 2px;
+    padding: 18px 12px 16px; background: var(--glass); backdrop-filter: blur(28px) saturate(1.5); -webkit-backdrop-filter: blur(28px) saturate(1.5);
+    border-right: 1px solid var(--line);
+  }
+  .sidebar .brand { padding: 4px 10px 18px; font-size: 17px; }
+  .sidebar > :not(.brand) {
+    display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 12px; border: 0; border-radius: 12px; background: none;
+    color: var(--muted); font: inherit; font-size: 14px; font-weight: 550; text-decoration: none; cursor: pointer; text-align: left;
+    transition: background .15s, color .15s;
+  }
+  .sidebar > :not(.brand):hover { background: var(--surface-2); color: var(--text); }
+  .sidebar [aria-current] { background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent); }
+  .sidebar .push { margin-top: auto; }
+  body:not(:has(#studio:not([hidden]))) .topbar { padding-left: 24px; }
+  body:not(:has(#studio:not([hidden]))) .topbar .brand,
+  body:not(:has(#studio:not([hidden]))) .topbar #up-btn, body:not(:has(#studio:not([hidden]))) .topbar #pl-btn,
+  body:not(:has(#studio:not([hidden]))) .topbar #cloud-btn, body:not(:has(#studio:not([hidden]))) .topbar #band-btn,
+  body:not(:has(#studio:not([hidden]))) .topbar #settings-btn { display: none; }
+  body:not(:has(#studio:not([hidden]))) main { width: min(1180px, 100% - 56px); }
+}
+
+/* list mode: one dense row per song */
+.grid.list { grid-template-columns: 1fr; gap: 4px; }
+.grid.list .card { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 6px 12px 6px 6px; border-radius: 12px; background: transparent; border-color: transparent; }
+.grid.list .card:hover { transform: none; background: var(--surface); border-color: var(--line); box-shadow: none; }
+.grid.list .card .cover { width: 56px; height: 56px; aspect-ratio: 1; border-radius: 8px; }
+.grid.list .card .meta { padding: 0; min-width: 0; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: center; gap: 16px; }
+.grid.list .card .title { -webkit-line-clamp: 1; }
+.grid.list .card .badges { margin: 0; }
+.grid.list .card .dur { position: static; grid-column: 3; grid-row: 1; background: none; color: var(--muted); padding: 0; margin-right: 112px; }
+.grid.list .card .add, .grid.list .card .del, .grid.list .card .pub { top: 50%; transform: translateY(-50%); }
+.grid.list .card .add { left: auto; right: 82px; }
+.grid.list .card .pub { left: auto; right: 46px; }
+.grid.list .card .del { left: auto; right: 12px; }
+@media (max-width: 760px) { .grid.list .card .meta { grid-template-columns: minmax(0, 1fr); gap: 2px; } .grid.list .card .badges { display: none; } }
+.section-head .sync-btn { margin-left: 0; }

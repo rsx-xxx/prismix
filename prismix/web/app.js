@@ -392,7 +392,41 @@ async function loadLibrary() {
   renderLibrary();
 }
 
+// Library as cards or as a compact table of rows; the choice and the recently opened songs persist.
+const RECENT = 'prismix:recent';
+const store = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const keep = (k, v) => { try { localStorage.setItem(k, v); } catch { /* storage blocked: lasts this session only */ } };
+const recentIds = () => { try { return JSON.parse(store(RECENT)) || []; } catch { return []; } };
+const noteRecent = (id) => keep(RECENT, JSON.stringify([id, ...recentIds().filter((x) => x !== id)].slice(0, 12)));
+const VIEW_ICON = {
+  grid: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  list: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13" y="4" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="4" y="13" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13" y="13" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+};
+function paintView() {
+  const list = store('prismix:lib-view') === 'list';
+  $('library').classList.toggle('list', list);
+  $('lib-view').innerHTML = VIEW_ICON[list ? 'list' : 'grid'];
+  $('lib-view').title = list ? 'Show as cards' : 'Show as a list';
+}
+$('lib-view').addEventListener('click', () => { keep('prismix:lib-view', store('prismix:lib-view') === 'list' ? 'grid' : 'list'); paintView(); });
+paintView();
+
+function renderRecent() {
+  const items = recentIds().map((id) => state.library.find((i) => i.id === id)).filter(Boolean);
+  $('recent-sec').hidden = items.length === 0;
+  $('recent').replaceChildren(...items.map((it) => {
+    const open = it.models.includes(state.defaultModel) ? state.defaultModel : it.models[0];
+    const a = el('a', { className: 'tile', href: `#/v/${it.id}/${open}`, title: it.title },
+      cover(el('img', { alt: '', loading: 'lazy', draggable: false }), it.id),
+      el('b', { textContent: it.title }),
+      el('small', { className: 'muted', textContent: it.channel }));
+    a.addEventListener('click', () => { state.plist = null; });
+    return a;
+  }));
+}
+
 function renderLibrary() {
+  renderRecent();
   const lib = $('library');
   $('empty').hidden = state.library.length > 0;
   $('lib-count').textContent = state.library.length ? `${state.library.length} track${state.library.length > 1 ? 's' : ''}` : '';
@@ -574,6 +608,7 @@ function setTitle(id, title) {
 
 async function openStudio(id, model) {
   const token = ++state.token;
+  noteRecent(id);
   video.hide(); // gives the stems back if the video's sound was on, so saved prefs are the real mix
   if (state.bg && state.current?.id === id && state.current.model === model) {
     // back to the song that kept playing while the library was open: the stems are still loaded, only the views need to come back
@@ -1295,10 +1330,12 @@ const stickers = createNotes({
 });
 const band = createBand({ player, current: () => state.current, onNotes: (m) => stickers.onMessage(m), $ });
 createOutput({ player, band, $ });
-$('botnav').addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-go]');
-  if (b) $(b.dataset.go).click();
-});
+for (const nav of [$('botnav'), $('sidebar')]) {
+  nav.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-go]');
+    if (b) $(b.dataset.go).click();
+  });
+}
 
 createJoin({ $ });
 const cloud = createCloud({

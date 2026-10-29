@@ -2,6 +2,11 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.18.0
+
+- Desktop gets a left sidebar (Library, Upload, Playlists, Band cloud, Band, Settings) with the search bar left on top; phones keep the bottom bar.
+- The library can switch between cards and a compact list, and a Recently opened shelf sits above it.
+
 ## 0.17.0
 
 - Drums show one page of eight bars at a time with a "bars left" countdown and the next page dimmed below; a Scroll/Pages button switches back to the scrolling chart.
