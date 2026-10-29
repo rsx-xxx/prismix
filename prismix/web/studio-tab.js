@@ -21,7 +21,7 @@ function segmentsOf(bars) {
   const out = [];
   for (let i = 0; i < sig.length;) {
     let best = { p: 1, len: 1 };
-    for (const p of [1, 2, 4]) {
+    for (const p of [1, 2, 3, 4, 6, 8]) {
       if (i + 2 * p > sig.length) continue;
       let len = p;
       while (i + len < sig.length && sig[i + len] === sig[i + len - p]) len++;
@@ -315,6 +315,8 @@ export function createTab({ player, chordsIn = () => [] }) {
     if (SCORE_KINDS.has(cur.tab.tracks[k].kind)) editing = false;
     try { localStorage.setItem(PART_KEY, k); localStorage.setItem(`${PART_KEY}:${cur.tab.tracks[k].kind}`, k); } catch { /* ignore */ }
     render();
+    resume();
+    frame(player.position); // land on what is playing right now
   }
 
   function paintTools() {
@@ -541,8 +543,10 @@ export function createTab({ player, chordsIn = () => [] }) {
   }, true);
   addEventListener('beforeunload', flush);
 
+  // Content-space y of a row's middle, measured from rects: offsetTop ignores the zoom the pane's children carry.
+  const yIn = (n) => offsetIn(body, n) + body.scrollTop + n.getBoundingClientRect().height / 2;
   const centre = (cell, soft) => {
-    const r = cell.parentElement, want = r.offsetTop - anchorAt(body, 0.4) + r.offsetHeight / 2;
+    const r = cell.parentElement, want = yIn(r) - anchorAt(body, 0.4);
     soft ? glide(body, want) : body.scrollTo({ top: want });
   };
 
@@ -573,7 +577,7 @@ export function createTab({ player, chordsIn = () => [] }) {
       }
     }
     const c = body.querySelector('.tab-count');
-    if (c) c.textContent = (left > 0 ? `${left} bar${left === 1 ? '' : 's'} left` : 'last bar') + (nextOn ? ' · next pattern below' : '');
+    if (c) c.textContent = String(left + 1);
   }
 
   function frame(pos) {
@@ -612,14 +616,14 @@ export function createTab({ player, chordsIn = () => [] }) {
       track: () => {
         const point = ({ row, first }, i) => {
           const last = (cur.rows[i + 1]?.first ?? cur.cells.length) - 1;
-          return { y: row.offsetTop + row.offsetHeight / 2, t: (cur.secs[first] + cur.ends[last]) / 2 };
+          return { y: yIn(row), t: (cur.secs[first] + cur.ends[last]) / 2 };
         };
         const rows = cur?.rows ?? [];
         if (!body.querySelector('.tab.aligned')) return rows.map(point);
         // aligned: a row of the lyrics' own height maps to the line's start, so both panes agree on every moment
         return [...body.querySelector('.tab').children].flatMap((r) => (r.hidden ? [] : r.dataset.free || !r.dataset.t
           ? rows.map((x, i) => [x, i]).filter(([x]) => x.row.parentElement === r).map(([x, i]) => point(x, i))
-          : [{ y: r.offsetTop + r.offsetHeight / 2, t: Number(r.dataset.t) }]));
+          : [{ y: yIn(r), t: Number(r.dataset.t) }]));
       },
       resume: () => { resume(); const c = cur?.cells[cur.now]; if (c) centre(c, true); },
       away: () => {

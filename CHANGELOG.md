@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.21.0
+
+Guitar and bass tabs now follow playback exactly: bar positions were measured wrongly under the pane's zoom, and the lyric and tab panes anchored at different screen heights. Switching Guitar, Bass or Drums jumps straight to the bar playing now. Drum patterns detect cycles of 1, 2, 3, 4, 6 or 8 bars and show a single large bars-left number with no extra wording.
+
 ## 0.20.0
 
 - Drum tabs show each repeated pattern once with a sweeping line and a bars-left countdown; a few bars before it changes the next pattern appears dimmed below and replaces it on time. Nothing scrolls. The Scroll button brings the full chart back.

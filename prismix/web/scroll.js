@@ -38,6 +38,14 @@ export function anchorAt(box, frac) {
   return v.top + v.height * frac;
 }
 
+/** One screen height for two side-by-side panes: the follow anchor over the part of both that is on screen. */
+export function sharedAnchor(boxes, frac) {
+  const spans = boxes.map((b) => { const r = b.getBoundingClientRect(), v = visible(b); return [r.top + v.top, r.top + v.top + v.height]; });
+  const top = Math.max(...spans.map((x) => x[0])), bottom = Math.min(...spans.map((x) => x[1]));
+  return bottom - top < 120 ? null : top + (bottom - top) * frac;
+}
+const anchorFor = (box, shared, frac) => (shared == null ? anchorAt(box, frac) : shared - box.getBoundingClientRect().top);
+
 /** Where `node` sits inside the scrolled `box`, independent of offsetParent. */
 export const offsetIn = (box, node) => node.getBoundingClientRect().top - box.getBoundingClientRect().top;
 
@@ -66,13 +74,13 @@ export function linkScroll(a, b) {
   const drive = (from, to) => from.root.addEventListener('scroll', (e) => {
     if (driver !== from || Date.now() > until || e.target !== from.box() || !from.active() || !to.active()) return;
     until = Date.now() + 800;
-    const src = from.box(), dst = to.box();
-    const t = yToT(from.track(), src.scrollTop + anchorAt(src, from.anchor));
+    const src = from.box(), dst = to.box(), sh = sharedAnchor([src, dst], from.anchor);
+    const t = yToT(from.track(), src.scrollTop + anchorFor(src, sh, from.anchor));
     const y = t == null ? null : tToY(to.track(), t);
     if (y == null) return;
     to.hold();
     cancelGlide(dst);
-    dst.scrollTop = y - anchorAt(dst, to.anchor);
+    dst.scrollTop = y - anchorFor(dst, sh, to.anchor);
   }, { passive: true, capture: true });
   drive(a, b);
   drive(b, a);
@@ -88,7 +96,7 @@ export const lockstep = { on: false };
 export function linkFollow(a, b, player) {
   const cache = new Map();
   const track = (pane) => {
-    const box = pane.box(), key = `${box.scrollHeight}/${box.clientHeight}`;
+    const box = pane.box(), key = `${box.scrollHeight}/${box.clientHeight}/${box.firstElementChild?.className}/${box.firstElementChild?.childElementCount}`;
     const hit = cache.get(pane);
     if (hit?.key === key) return hit.points;
     const points = pane.track();
@@ -100,11 +108,12 @@ export function linkFollow(a, b, player) {
     const on = a.active() && b.active() && a.following() && b.following() && beside();
     lockstep.on = on;
     if (!on) return;
+    const sh = sharedAnchor([a.box(), b.box()], a.anchor);
     for (const pane of [a, b]) {
       const box = pane.box(), y = tToY(track(pane), pos);
       if (y == null) continue;
       cancelGlide(box);
-      const want = Math.max(0, Math.min(y - anchorAt(box, pane.anchor), box.scrollHeight - box.clientHeight));
+      const want = Math.max(0, Math.min(y - anchorFor(box, sh, pane.anchor), box.scrollHeight - box.clientHeight));
       const d = want - box.scrollTop;
       box.scrollTop = player.playing && Math.abs(d) < 600 ? box.scrollTop + d * 0.18 : want;
     }
