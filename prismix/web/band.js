@@ -35,6 +35,7 @@ export function createBand({ player, current, open, onNotes, $ }) {
       semitones: player.semitones,
       chordKey: player.chordKey,
       cents: player.cents,
+      master: Number($('master').value) / 100,
       loop: q ? { a: q.a, b: q.b } : null,
       muted: player.stems.filter((s) => s.muted).map((s) => s.name),
       solo: player.stems.filter((s) => s.solo).map((s) => s.name),
@@ -55,6 +56,7 @@ export function createBand({ player, current, open, onNotes, $ }) {
     loop: (v) => (v ? player.setLoop(+v.a, +v.b) : player.setLoop(null, null)),
     mute: (v) => player._stem(v?.name) && player.setMuted(v.name, !!v.on),
     solo: (v) => player._stem(v?.name) && player.setSolo(v.name, !!v.on),
+    master: (v) => { const m = Math.min(1, Math.max(0, +v)); $('master').value = String(Math.round(m * 100)); $('master').dispatchEvent(new Event('input')); },
     volume: (v) => player._stem(v?.name) && player.setVolume(v.name, +v.v),
     load: (v) => { if (/^[\w-]{1,64}$/.test(v?.id) && /^[\w.-]{1,64}$/.test(v?.model)) location.hash = `#/v/${v.id}/${v.model}`; },
   };

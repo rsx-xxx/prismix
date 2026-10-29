@@ -4,6 +4,12 @@ Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the Gi
 
 ## Unreleased
 
+## 0.8.0
+
+- macOS menu-bar mini player: an icon in the menu bar opens a popover with play/pause, seek, per-stem volume, mute and solo, master volume, tempo and key switchers, and the current BPM and key. It drives the song playing in the main window.
+- The phone app shows the song's BPM (at the current tempo) in the player bar.
+- Fixed per-stem volume sliders on a phone in Follow mode: the host ignored those commands.
+
 ## 0.7.0
 
 - Updates install themselves: the app downloads a new release in the background and, once nothing is running, shows a native macOS alert with a Restart Now button (Settings offers the same on every platform). It never restarts by itself, and refuses while songs are being split or prepared or the Band cloud is syncing.

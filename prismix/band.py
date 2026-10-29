@@ -22,7 +22,7 @@ from . import library, notes
 log = logging.getLogger(__name__)
 
 ROLES = ("singer", "guitar", "bass", "drums", "keys", "other")
-CMD_OPS = {"play", "pause", "seek", "tempo", "pitch", "cents", "chordkey", "loop", "mute", "solo", "load"}
+CMD_OPS = {"play", "pause", "seek", "tempo", "pitch", "cents", "chordkey", "loop", "mute", "solo", "volume", "master", "load"}
 SHARED_OPS = {"tempo", "pitch", "cents", "chordkey", "load"}
 MAX_MSG = 16_384
 SEND_TIMEOUT = 3.0  # a phone that stops reading must not stall the fan-out to everyone else

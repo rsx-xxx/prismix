@@ -21,7 +21,8 @@ COLLECT_ALL = [
     "lazy_loader", "webview", "uvicorn", "certifi", "zeroconf", "segno",
     "bs_roformer", "ml_collections", "torchaudio", "websockets",  # bs_roformer reads data/*.json next to its code
 ]
-HIDDEN = ["uvicorn.logging", "uvicorn.loops.auto", "uvicorn.protocols.http.auto", "uvicorn.lifespan.on", "multipart"]
+HIDDEN = ["uvicorn.logging", "uvicorn.loops.auto", "uvicorn.protocols.http.auto", "uvicorn.lifespan.on", "multipart",
+          "PyObjCTools.AppHelper", "AppKit", "WebKit"]
 EXCLUDE = ["tkinter", "matplotlib", "IPython", "pytest", "torch.utils.tensorboard", "sklearn", "onnxruntime", "tensorflow", "pandas"]
 
 

@@ -103,7 +103,11 @@ def _watch_links() -> None:
         logging.getLogger(__name__).exception("link handler unavailable")
 
 
-def _window_ready() -> None:
+def _window_ready(url: str = "") -> None:
+    if url:
+        from . import menubar
+
+        menubar.install(url)
     while _pending:
         open_link(_pending.pop(0))
 
@@ -133,7 +137,7 @@ def main() -> None:
         webview.settings["ALLOW_DOWNLOADS"] = True
         global _window
         _window = webview.create_window(TITLE, url, width=1280, height=840, min_size=(900, 600))
-        webview.start(_window_ready)
+        webview.start(_window_ready, url)
     except Exception:
         logging.getLogger(__name__).exception("native window unavailable, opening the browser")
         from .browser import open_url

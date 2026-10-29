@@ -719,6 +719,7 @@ function update() {
     last.tune = tuneKey;
     $('tune-v').textContent = `${tp}% · ${sm > 0 ? '+' : ''}${sm}`;
     $('tune-v').classList.toggle('changed', tp !== 100 || sm !== 0);
+    $('tune-l').textContent = bpm ? `${bpm} BPM · Key` : 'Tempo · Key';
     $('t-out').textContent = bpm ? `${tp}% · ${bpm} BPM` : `${tp}%`; $('t-range').value = String(tp); $('t-range').style.setProperty('--fill', `${tp - 50}%`);
     $('c-out').textContent = ck ? `${ck > 0 ? '+' : ''}${ck}${st0?.key ? ` · ${keyName(st0.key, sm + ck)}` : ''}` : 'with the audio'; $('c-range').value = String(ck);
     $('k-out').textContent = `${sm > 0 ? '+' : ''}${sm}${kn ? ` · ${kn}` : ''}`; $('k-range').value = String(sm); $('k-range').style.setProperty('--fill', `${((sm + 12) / 24) * 100}%`);

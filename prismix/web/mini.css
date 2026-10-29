@@ -1,0 +1,31 @@
+/* Menu-bar mini player: compact, follows the system theme. */
+:root { color-scheme: light dark; --bg: light-dark(#f6f3ec, #1c1a18); --ink: light-dark(#1b1915, #f3f0e9); --ink-2: light-dark(#6c675c, #a39e92); --line: light-dark(#e0dacb, #2f2c28); --surface: light-dark(#ece7dc, #272421); --accent: light-dark(oklch(.6 .19 38), oklch(.76 .16 55)); }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 13px/1.35 system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; user-select: none; }
+[hidden] { display: none !important; }
+main, .off { padding: 14px; display: grid; gap: 12px; }
+.off { color: var(--ink-2); text-align: center; padding-top: 40px; }
+header { display: grid; gap: 2px; }
+header b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header span, small, time { color: var(--ink-2); }
+small { font-size: 10px; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; }
+button { font: inherit; color: inherit; background: var(--surface); border: 0; border-radius: 8px; padding: 4px 10px; cursor: pointer; min-width: 30px; }
+button:hover { filter: brightness(1.08); }
+button[aria-pressed=true] { background: var(--accent); color: #fff; }
+input[type=range] { accent-color: var(--accent); width: 100%; margin: 0; }
+.row { display: flex; align-items: center; gap: 8px; }
+.seek time { font-variant-numeric: tabular-nums; font-size: 11px; }
+.xport { justify-content: center; gap: 14px; }
+#play { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 16px; }
+.tune { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.knob { display: grid; gap: 4px; background: var(--surface); border-radius: 10px; padding: 8px 10px; }
+.knob div { display: flex; justify-content: space-between; align-items: center; }
+.knob b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.knob button { background: var(--bg); padding: 2px 8px; }
+.knob span { color: var(--ink-2); font-size: 11px; min-height: 1em; }
+.vol { display: grid; grid-template-columns: 56px 1fr 38px; align-items: center; gap: 8px; }
+output { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+#stems { display: grid; gap: 6px; max-height: 190px; overflow: auto; }
+.stem { display: grid; grid-template-columns: 70px 1fr auto auto; align-items: center; gap: 6px; }
+.stem span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
+.stem button { padding: 2px 7px; font-size: 11px; min-width: 0; }

@@ -430,6 +430,10 @@ def create_app() -> FastAPI:
     def remote():
         return FileResponse(WEB_DIR / "remote.html", headers={"Cache-Control": "no-cache"})
 
+    @app.get("/mini")
+    def mini():
+        return FileResponse(WEB_DIR / "mini.html", headers={"Cache-Control": "no-cache"})
+
     @app.get("/api/version")
     def app_version():
         return {"version": __version__, "url": f"{REPO}/releases/tag/v{__version__}"}
