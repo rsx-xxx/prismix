@@ -226,3 +226,22 @@ def test_chroma_accepts_flagged_notes():
     bar = {"len": 1, "n": [[0, 0.25, [[0, 3, "h"], [1, 0]]]]}
     v = tabdata._chroma(bar, [40, 45])
     assert v[(40 + 3) % 12] > 0 and v[45 % 12] > 0
+
+
+def test_fit_merges_a_tab_counted_at_double_tempo():
+    roots = [0, 5, 7, 0, 5, 7, 0, 5]
+    # the tab writes every recording bar as two bars: the same chord twice
+    half = [r for r in roots for _ in range(2)]
+    parts = {"guitar": _tab(half)}
+    got = tabdata.fit(parts, _structure(roots))
+    assert got and got["merged"] == 0 and got["map"] == list(range(8))
+    bars = parts["guitar"]["bars"]
+    assert len(bars) == 8 and bars[0]["len"] == 2.0
+    assert [n[0] for n in bars[0]["n"]] == [0.0, 0.25, 0.5, 0.75]
+    assert [n[1] for n in bars[0]["n"]] == [0.125] * 4
+
+
+def test_merge_bars_keeps_a_lone_pickup_and_tail():
+    bar = {"len": 1.0, "n": [[0.0, 0.5, [[5, 0]]]]}
+    out = tabdata.merge_bars([bar] * 5, 1)
+    assert [b["len"] for b in out] == [1.0, 2.0, 2.0]

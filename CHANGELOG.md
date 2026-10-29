@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.27.1
+
+Songsterr tabs written at double the tempo the app measures (133 BPM against 66.7, so every tab bar is half a recording bar) are no longer rejected. Their bars are merged in pairs so they line up with the recording bar for bar, and the tab then plays and follows like any other. Songs that were already checked and recorded as having no tab need a new tab search to pick this up.
+
 ## 0.27.0
 
 New Share button in the player copies a `prismix://song/…` link to the song, and "at this moment" makes it open at the current position, so the lyrics, chords and tabs land in the same place. Opening the link in the desktop app goes straight to that song and, if it isn't in the library, downloads it from the band cloud first. Android doesn't open these links yet.

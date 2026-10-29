@@ -369,12 +369,35 @@ def _lead_parts(parts: dict[str, dict]) -> dict[str, dict]:
     return lead or dict(list(pitched.items())[:1])
 
 
-def fit(parts: dict[str, dict], structure: dict) -> dict | None:
-    """Pick the transposition and bar mapping that fit best; None when the tab is not this recording."""
-    parts = _lead_parts(parts)
-    rec = _bar_chroma(structure)
-    if len(rec) < 4 or not parts:
-        return None
+def merge_bars(bars: list[dict], offset: int) -> list[dict]:
+    """Two tab bars become one: the tab counts the beat twice as fast as the recording's bar tracker (133 vs 66.7 BPM).
+
+    The first `offset` bars stay single (a pickup); an odd bar at the end stays single too.
+    """
+    out = list(bars[:offset])
+    rest = bars[offset:]
+    for i in range(0, len(rest), 2):
+        a = rest[i]
+        if i + 1 >= len(rest):
+            out.append(a)
+            continue
+        b = rest[i + 1]
+        total = a["len"] + b["len"]
+        notes = []
+        for bar, shift in ((a, 0.0), (b, a["len"])):
+            for pos, dur, *tail in bar["n"]:
+                notes.append([round((shift + pos * bar["len"]) / total, 4), round(dur * bar["len"] / total, 4), *tail])
+        merged = {"len": round(total, 4), "n": notes}
+        for k in ("sig", "auto"):
+            if k in a:
+                merged[k] = a[k]
+        if mark := a.get("mark") or b.get("mark"):
+            merged["mark"] = mark
+        out.append(merged)
+    return out
+
+
+def _tab_chroma(parts: dict[str, dict]) -> list[list[float]]:
     n = max(len(p["bars"]) for p in parts.values())
     tab = []
     for i in range(n):
@@ -383,13 +406,42 @@ def fit(parts: dict[str, dict], structure: dict) -> dict | None:
             if i < len(p["bars"]):
                 v = [a + b for a, b in zip(v, _unit(_chroma(p["bars"][i], p["tuning"])), strict=True)]
         tab.append(_unit(v))
-    best = max(((*align(tab, rec, t), t) for t in range(12)), key=lambda x: x[0] * x[1])
-    sim, cover, pair, t = best
+    return tab
+
+
+def fit(parts: dict[str, dict], structure: dict) -> dict | None:
+    """Pick the transposition and bar mapping that fit best; None when the tab is not this recording.
+
+    A tab written at double (or half) the tracked tempo has bars half as long as the recording's: the same music
+    counted differently. Pairs of its bars are then merged, in place, so every part lines up bar for bar.
+    """
+    lead = _lead_parts(parts)
+    rec = _bar_chroma(structure)
+    if len(rec) < 4 or not lead:
+        return None
+    variants: list[tuple[int | None, dict[str, dict]]] = [(None, lead)]
+    for off in (0, 1):
+        variants.append((off, {k: {**p, "bars": merge_bars(p["bars"], off)} for k, p in lead.items()}))
+    best = None
+    for off, vp in variants:
+        for t in range(12):
+            sim, cover, pair = align(_tab_chroma(vp), rec, t)
+            score = sim * cover * (1.0 if off is None else 0.95)  # the plain reading wins a close call
+            if best is None or score > best[0]:
+                best = (score, sim, cover, pair, t, off)
+    _, sim, cover, pair, t, off = best
     if sim < MIN_SCORE + (0.05 if t else 0) or cover < MIN_COVERAGE:
         log.info("tab rejected: similarity %.2f, coverage %.2f, transpose %d", sim, cover, t)
         return None
+    if off is not None:
+        log.info("tab bars are half as long as the recording's: merged in pairs (offset %d)", off)
+        for p in parts.values():
+            p["bars"] = merge_bars(p["bars"], off)
     # the tab is written in another key than the audio at hand (a karaoke cut, a lowered cover): follow the audio
-    return {"similarity": round(sim, 3), "coverage": round(cover, 3), "map": pair, "shift": -t if t <= 6 else 12 - t}
+    fitted = {"similarity": round(sim, 3), "coverage": round(cover, 3), "map": pair, "shift": -t if t <= 6 else 12 - t}
+    if off is not None:
+        fitted["merged"] = off
+    return fitted
 
 
 def gapfill(parts: dict[str, dict], fitted: dict, structure: dict) -> None:
