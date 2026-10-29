@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.30.0
+
+The player is more compact: smaller margins and padding around the header and the blocks, so more of the lyrics, chords and tabs fits on screen. Scrolling down from the stems now settles the lyrics, chords and tabs row so it fills the screen above the dock. The pull is gentle and only works near that position, so a deliberate scroll is never blocked, and it is off when the system asks for reduced motion.
+
 ## 0.29.0
 
 Tabs are now chosen, not just accepted: every Songsterr candidate is fitted to the recording and ranked, and the best one becomes the template that is aligned and gap-filled. The ranking weighs the bar fit, whether the artist matches the track, whether the tab had to be transposed, and how well it sticks to the chords Chordify lists for the same video (only its public page summary is read). A tab by a different artist in another key with a loose fit is now rejected, which fixes a wrong "Рондо" tab being picked for a Сироткин track. Tracks checked earlier keep their old result until the tab search is re-run.

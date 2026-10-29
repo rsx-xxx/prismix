@@ -130,7 +130,7 @@ h1, h2, h3, p { margin: 0; }
 .icon-btn:hover { background: var(--surface-2); color: var(--text); }
 
 /* ── layout ── */
-main { width: min(1180px, 100% - 40px); margin: 0 auto; padding: 28px 0 calc(var(--dock-h) + 40px); }
+main { width: min(1180px, 100% - 28px); margin: 0 auto; padding: 16px 0 calc(var(--dock-h) + 32px); }
 .section-head { display: flex; align-items: baseline; gap: 12px; margin: 36px 0 16px; }
 .section-head h2 { font-size: 20px; letter-spacing: -0.01em; }
 
@@ -223,8 +223,8 @@ dialog legend { font-size: 12px; text-transform: uppercase; letter-spacing: .08e
 .job .row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* ── studio ── */
-.trackhead { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
-.trackhead img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; background: var(--surface-2); }
+.trackhead { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.trackhead img { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; background: var(--surface-2); }
 .th-text { flex: 1; min-width: 200px; }
 .th-text h1.renamable { cursor: text; border-radius: 6px; outline-offset: 4px; }
 .th-text h1.renamable:hover { text-decoration: underline dotted; }
@@ -558,7 +558,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 /* blocks: toolbar, header buttons, tracked frame */
 .blockbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
 .blockbar .chip.lit { border-color: var(--accent); }
-.block { margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 20px; transition: border-color .25s, box-shadow .25s; scroll-margin-top: 12px; }
+.block { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 16px; transition: border-color .25s, box-shadow .25s; scroll-margin-top: 12px; }
 .block.off, .block.out { display: none !important; }
 .block.tracked { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 24%, transparent); }
 .block-head .blk { opacity: .75; }
@@ -566,7 +566,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .block-head .blk[aria-pressed=true] { color: var(--accent); border-color: var(--accent); }
 .video-head .blk { padding: 2px 8px; font-size: 11px; }
 .stems .chips { margin: 8px 0 12px; }
-.panes { --pane-h: clamp(320px, calc(100dvh - var(--dock-h) - 190px), 860px); /* fills the screen above the dock, so the line being sung never sits under it */ display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin-top: 16px; }
+.panes { --pane-h: clamp(320px, calc(100dvh - var(--dock-h) - 150px), 900px); /* fills the screen above the dock, so the line being sung never sits under it */ display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; margin-top: 10px; }
 .panes > .block { margin-top: 0; min-width: 0; }
 .panes > .lyrics { flex: 1 1 340px; }
 .panes > .score, .panes > .tabview { flex: 2 1 520px; }
@@ -666,7 +666,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 
 /* wide screens: lyrics and chords share their header row and body row, so a lyric line and its bars sit at one height */
 @media (min-width: 900px) {
-  .panes { position: relative; display: grid; grid-template-columns: minmax(300px, var(--ly, 1fr)) minmax(420px, var(--rc, 2fr)); grid-template-rows: auto auto; column-gap: 16px; row-gap: 0; align-items: stretch; }
+  .panes { position: relative; display: grid; grid-template-columns: minmax(300px, var(--ly, 1fr)) minmax(420px, var(--rc, 2fr)); grid-template-rows: auto auto; column-gap: 10px; row-gap: 0; align-items: stretch; }
   .panes > .block { display: grid; grid-template-rows: subgrid; grid-row: 1 / span 2; align-content: start; }
   .panes > .block[hidden] { display: none; }
   .panes > .lyrics { grid-column: 1; }
@@ -1159,3 +1159,10 @@ body:has(#tabview:not([hidden], .off, .out)) #ahead { display: none !important; 
 .instr i { display: inline-grid; place-items: center; line-height: 0; }
 .card .badges .instr { margin-left: auto; }
 .pp-go .instr { flex: none; margin-left: 12px; }
+
+/* Magnet: scrolling down from the stems, the lyrics/chords/tabs row settles so it fills the screen above the dock.
+   Proximity only: it pulls when close and lets go of a deliberate scroll, so it never fights the reader. */
+@media (prefers-reduced-motion: no-preference) {
+  html:has(#studio:not([hidden])) { scroll-snap-type: y proximity; }
+  #panes { scroll-snap-align: start; scroll-snap-stop: normal; scroll-margin-top: 8px; }
+}
