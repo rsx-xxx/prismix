@@ -438,10 +438,18 @@
   </aside>
   <aside id="update-toast" class="toast" role="alertdialog" aria-label="Update ready" hidden>
     <img src="/app-icon.png" alt="" width="40" height="40">
-    <div class="toast-text"><b id="update-toast-title">Update ready</b><span class="muted">Restart Prismix to finish installing it.</span></div>
-    <button id="update-toast-go" class="btn primary small" type="button">Restart now</button>
+    <div class="toast-text"><b id="update-toast-title">Update ready</b><span class="muted">Install it and Prismix restarts by itself.</span></div>
+    <button id="update-toast-go" class="btn primary small" type="button">Install update</button>
     <button id="update-toast-close" class="icon-btn" type="button" aria-label="Later" title="Later">×</button>
   </aside>
+  <dialog id="update-dialog" class="upd-dlg" aria-label="Updating Prismix" aria-live="polite">
+    <img src="/app-icon.png" alt="" width="56" height="56">
+    <h3>Updating Prismix</h3>
+    <p class="muted" id="update-dlg-msg">Starting the update…</p>
+    <div class="bar" id="update-dlg-bar"><i></i></div>
+    <small class="muted" id="update-dlg-pct"></small>
+    <small class="muted">Prismix closes and reopens by itself when it is done.</small>
+  </dialog>
   <aside id="queue" class="qdock" hidden>
     <button id="queue-head" class="qhead" type="button" aria-expanded="false" title="Show the whole queue">
       <span id="queue-sum"></span><i class="qbar"><i id="queue-bar"></i></i><span class="qchev" aria-hidden="true">▴</span>

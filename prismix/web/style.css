@@ -1163,3 +1163,13 @@ body:has(#tabview:not([hidden], .off, .out)) #ahead { display: none !important; 
 .instr i { display: inline-grid; place-items: center; line-height: 0; }
 .card .badges .instr { margin-left: auto; }
 .pp-go .instr { flex: none; margin-left: 12px; }
+
+/* Update in progress: a modal that cannot be mistaken for "nothing happened"; Escape does not dismiss it */
+.upd-dlg { text-align: center; width: min(360px, calc(100vw - 2rem)); }
+.upd-dlg[open] { display: grid; gap: 10px; justify-items: center; }
+.upd-dlg::backdrop { background: rgb(0 0 0 / .5); backdrop-filter: blur(4px); }
+.upd-dlg img { border-radius: 14px; animation: upd-pulse 1.6s ease-in-out infinite; }
+.upd-dlg .bar { width: 100%; }
+.upd-dlg small { font-size: 12px; }
+@keyframes upd-pulse { 50% { transform: scale(.92); opacity: .7; } }
+@media (prefers-reduced-motion: reduce) { .upd-dlg img { animation: none; } }

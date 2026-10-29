@@ -745,7 +745,15 @@ function wireUpdate(u) {
   a.href = u.url;
   const label = { downloading: 'Downloading', installing: 'Installing', restarting: 'Restarting' };
   let busy = false;
-  const fail = (why) => { busy = false; a.textContent = 'Update failed, open download'; a.href = u.download || u.url; a.target = '_blank'; a.title = why; };
+  const dlg = $('update-dialog');
+  dlg.addEventListener('cancel', (e) => e.preventDefault()); // no Escape while files are being swapped
+  const progress = (pct, msg) => {
+    if (!dlg.open) dlg.showModal();
+    $('update-dlg-msg').textContent = msg;
+    $('update-dlg-bar').firstElementChild.style.width = `${pct}%`;
+    $('update-dlg-pct').textContent = pct ? `${pct}%` : '';
+  };
+  const fail = (why) => { busy = false; dlg.open && dlg.close(); a.textContent = 'Update failed, open download'; a.href = u.download || u.url; a.target = '_blank'; a.title = why; };
   const toast = $('update-toast');
   const hideToast = () => { toast.hidden = true; sessionStorage.setItem(`upd-later-${u.latest}`, '1'); };
   $('update-toast-close').addEventListener('click', hideToast);
@@ -753,14 +761,16 @@ function wireUpdate(u) {
     const pct = Math.round((st.percent ?? 0) * 100);
     const live = st.state in label;
     const ready = st.state === 'ready';
-    a.textContent = ready ? `Restart to update to v${u.latest}` : live ? `${label[st.state]} · ${pct}%` : `Update to v${u.latest}`;
-    a.title = ready ? (st.waiting ? `Waiting until Prismix stops ${st.waiting}` : 'The update is downloaded. Restart Prismix to finish installing it') : 'Download and install the update, then restart Prismix';
+    a.dataset.ready = ready ? '1' : '';
+    a.textContent = ready ? `Install update v${u.latest}` : live ? `${label[st.state]} · ${pct}%` : `Update to v${u.latest}`;
+    a.title = ready ? (st.waiting ? `Waiting until Prismix stops ${st.waiting}` : 'The update is downloaded. Install it and Prismix restarts by itself') : 'Download and install the update, then restart Prismix';
     a.classList.toggle('is-wait', ready && !!st.waiting);
     a.setAttribute('aria-disabled', String(ready && !!st.waiting));
-    if (ready && st.waiting) a.textContent = `Restart to update · after ${st.waiting}`;
+    if (ready && st.waiting) a.textContent = `Install update · after ${st.waiting}`;
     // Nothing is running any more: say so with a popup (once per version and session), plus the banner the host sends
     $('update-toast-title').textContent = `Prismix ${u.latest} is ready`;
     toast.hidden = !(ready && !st.waiting && !live && !sessionStorage.getItem(`upd-later-${u.latest}`));
+    if (busy || live) progress(pct, st.message || `${label[st.state] ?? 'Updating'}…`);
     $('upd-bar').hidden = !live;
     $('upd-bar').firstElementChild.style.width = `${pct}%`;
     $('upd-msg').textContent = live || st.state === 'ready' ? st.message || '' : '';
@@ -768,7 +778,7 @@ function wireUpdate(u) {
   };
   const poll = async () => {
     const st = await api('/api/update').catch(() => null);
-    if (!st) { a.textContent = 'Restarting…'; return setTimeout(poll, 800); } // server gone: the app is swapping itself
+    if (!st) { a.textContent = 'Restarting…'; if (busy) progress(100, 'Restarting Prismix…'); return setTimeout(poll, 800); } // server gone: the app is swapping itself
     if (st.state === 'error') return fail(st.error);
     show(st);
     if (st.state === 'ready' && !busy) { setTimeout(poll, 4000); return; }
@@ -777,7 +787,7 @@ function wireUpdate(u) {
   a.addEventListener('click', async (e) => {
     if (a.target === '_blank') return; // after a failure it is a plain download link
     e.preventDefault();
-    go(a.textContent.startsWith('Restart to'));
+    go(!!a.dataset.ready);
   });
   async function go(ready) {
     if (busy) return;
@@ -785,8 +795,9 @@ function wireUpdate(u) {
     busy = true;
     toast.hidden = true;
     a.textContent = 'Starting…';
+    progress(0, 'Starting the update…');
     const r = await fetch(ready ? '/api/update/restart' : '/api/update/install', { method: 'POST' });
-    if (r.status === 409) { busy = false; notice((await r.text().then((t) => { try { return JSON.parse(t).detail; } catch { return t; } })), 'info'); poll(); return; }
+    if (r.status === 409) { busy = false; dlg.close(); notice((await r.text().then((t) => { try { return JSON.parse(t).detail; } catch { return t; } })), 'info'); poll(); return; }
     if (!r.ok) return fail(await r.text());
     poll();
   }

@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.32.0
+
+Installing an update now shows an "Updating Prismix" popup with a pulsing icon, a progress bar and what is happening (downloading, installing, restarting) from the moment you click, so it is clear it started. The restart buttons are renamed "Install update", since Prismix restarts by itself afterwards.
+
 ## 0.31.0
 
 Settings has a "Check for updates" button, and the app now looks for a new release when it opens and again whenever its window comes back after 30 minutes or more, instead of only once at launch. Stems could stop processing because the phone/LAN servers started a second copy of the job queue on their own thread; they no longer do, so splitting works again after a restart. The scroll magnet from 0.30.0 is gone (it grabbed ordinary scrolling), the filled cloud on synced songs is white, and "at this moment" is now its own Share button.
