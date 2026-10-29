@@ -31,7 +31,10 @@ WORKERS = 6
 
 # words that mark a different recording than the studio one, unless the Spotify title has them too
 _ALTERNATE = ("live", "cover", "remix", "karaoke", "instrumental", "sped up", "slowed", "reverb", "8d", "nightcore",
-              "mashup", "tutorial", "lesson", "acoustic", "reaction")
+              "mashup", "tutorial", "lesson", "acoustic", "reaction", "piano", "guitar", "lofi", "lo fi", "bass boosted",
+              "ringtone", "tiktok", "loop", "full album", "interview", "behind the scenes", "making of")
+CONFIDENT = 22  # a result this good ends the search; weaker ones try the next query
+LIMIT = 8
 
 
 def is_spotify(text: str) -> bool:
@@ -103,19 +106,35 @@ def _words(s: str) -> str:
 
 
 def score(want: dict, cand: dict) -> float:
-    """How well a YouTube result fits a Spotify song: length first, then names, then recording type."""
+    """How well a YouTube result fits a Spotify song: length, names, the artist's own channel, then recording type."""
     title, chan = _words(cand["title"]), _words(cand.get("channel") or "")
     wtitle = _words(want["title"])
     pts = 0.0
     if want["duration"] and cand.get("duration"):
-        pts -= min(abs(cand["duration"] - want["duration"]), 40) * 1.5
+        diff = abs(cand["duration"] - want["duration"])
+        pts -= min(diff, 40) * 1.5 + (15 if diff > 40 else 0)
     main = _words(re.sub(r"\s*[(\[].*?[)\]]|\s+-\s+.*$", "", want["title"]))
-    pts += 12 if main in title else 0
-    first = _words(want["artist"].split(",")[0])
-    pts += 10 if first in chan or first in title else 0
-    pts += 6 if chan.strip().endswith("topic") else 0  # YouTube's auto-generated studio uploads
+    pts += 12 if main in title else -8
+    artists = [_words(a) for a in want["artist"].split(",") if a.strip()]
+    in_chan = any(a in chan for a in artists)
+    topic = chan.strip().endswith("topic")  # YouTube's auto-generated studio uploads
+    if in_chan or any(a in title for a in artists):
+        pts += 10
+    elif not topic:
+        pts -= 6  # neither the artist's channel nor named in the title: probably someone else's upload
+    pts += 6 if topic else 0
+    pts += 4 if in_chan and not topic else 0  # the artist's own (or VEVO) channel
+    pts += 3 if " official " in title else 0
     pts -= 25 * sum(1 for w in _ALTERNATE if f" {w} " in title and f" {w} " not in wtitle)
     return pts
+
+
+def _queries(song: dict) -> list[str]:
+    """Searches from most to least specific; later ones only run when the earlier ones found nothing convincing."""
+    artist, title = song["artist"].split(",")[0].strip(), song["title"]
+    plain = re.sub(r"\s*[(\[].*?[)\]]|\s+-\s+.*$", "", title).strip() or title
+    out = [f"{artist} {title} official audio", f"{artist} - {title}", f"{artist} {plain} topic", f"{plain} {artist}"]
+    return list(dict.fromkeys(q.strip() for q in out))
 
 
 _cache: dict[str, dict] = {}
@@ -123,7 +142,7 @@ _lock = threading.Lock()
 
 
 def _cache_file():
-    return library.LIBRARY_DIR / ".spotify-matches.json"
+    return library.LIBRARY_DIR / library.SPOTIFY_MATCHES
 
 
 def _load() -> None:
@@ -138,15 +157,28 @@ def match(song: dict) -> dict | None:
         _load()
         if hit := _cache.get(song["id"]):
             return hit
-    try:
-        found = pipeline.search(f"{song['artist'].split(',')[0]} {song['title']} official audio", limit=6)
-    except Exception as e:  # noqa: BLE001 - one failed search must not sink a whole playlist
-        log.warning("spotify: search failed for %r: %s", song["title"], e)
+    pool: dict[str, dict] = {}
+    best, best_score = None, float("-inf")
+    for query in _queries(song):
+        try:
+            found = pipeline.search(query, limit=LIMIT)
+        except Exception as e:  # noqa: BLE001 - one failed search must not sink a whole playlist
+            log.warning("spotify: search %r failed: %s", query, e)
+            continue
+        for cand in found:
+            if cand["id"] in pool:
+                continue
+            pool[cand["id"]] = cand
+            if (pts := score(song, cand)) > best_score:
+                best, best_score = cand, pts
+        if best_score >= CONFIDENT:
+            break
+    if not best:
         return None
-    if not found:
-        return None
-    best = max(found, key=lambda c: score(song, c))
-    best = {**best, "title": f"{song['artist']} – {song['title']}" if song["artist"] else song["title"]}
+    if best_score < 0:
+        log.info("spotify: weak match for %r (%.0f): %s", song["title"], best_score, best["title"])
+    best = {**best, "title": f"{song['artist']} – {song['title']}" if song["artist"] else song["title"],
+            "spotify": {"artist": song["artist"].split(",")[0].strip(), "title": song["title"]}}
     with _lock:
         _cache[song["id"]] = best
         try:

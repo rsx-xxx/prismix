@@ -76,6 +76,18 @@ def clean_title(title: str) -> str:
     return cleaned or title
 
 
+SPOTIFY_MATCHES = ".spotify-matches.json"
+
+
+def spotify_hint(video_id: str) -> tuple[str, str] | None:
+    """Spotify's own (artist, title) for a video that was matched from a Spotify link, else None."""
+    cache = _read_json(LIBRARY_DIR / SPOTIFY_MATCHES) or {}
+    for hit in cache.values():
+        if hit.get("id") == video_id and (sp := hit.get("spotify")):
+            return sp["artist"], sp["title"]
+    return None
+
+
 def read_info(video_id: str) -> dict | None:
     info = _read_json(video_dir(video_id) / "info.json")
     if info and isinstance(info.get("title"), str):

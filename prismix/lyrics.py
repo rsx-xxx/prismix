@@ -73,6 +73,8 @@ def _entry(hit: dict) -> dict | None:
 def guess(info: dict) -> tuple[str, str]:
     """(artist, title) for a library item, from its tags or its YouTube title."""
     channel = (info.get("channel") or "").strip()
+    if info.get("id") and (known := library.spotify_hint(info["id"])):  # the Spotify link named the song
+        return known
     if channel in ("", "Uploaded file") and info.get("match"):
         artist, title = uploads._split_youtube_title(info["match"])
     else:

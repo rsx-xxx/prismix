@@ -85,6 +85,8 @@ def guess_query(info: dict) -> list[tuple[str, str]]:
     if src := mashup.source(info, "chords"):  # the user named the song whose chords this cover plays
         artist, name = src
         return [(_norm(artist or ""), _norm(name))] if _norm(name) else []
+    if info.get("id") and (known := library.spotify_hint(info["id"])):
+        return [(_norm(known[0]), _norm(known[1]))]
     out = []
     parts = re.split(r"\s+[-–—]\s+", title, maxsplit=1)
     if len(parts) == 2:

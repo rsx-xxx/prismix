@@ -78,3 +78,31 @@ def test_api_accepts_spotify_track_and_rejects_collections(tmp_path, monkeypatch
     r = c.get("/api/playlist", params={"url": f"https://open.spotify.com/album/{SID}"})
     assert r.status_code == 200 and r.json()["items"][0]["id"] == "dQw4w9WgXcQ"
     assert c.post("/api/process", json={"url": f"https://open.spotify.com/album/{SID}"}).status_code == 400
+
+
+def test_retries_until_a_convincing_match_and_remembers_spotify_names(tmp_path, monkeypatch):
+    monkeypatch.setattr(library, "LIBRARY_DIR", tmp_path)
+    monkeypatch.setattr(spotify, "_cache", {})
+    song = {"id": SID, "title": "Song", "artist": "Band", "duration": 200}
+    monkeypatch.setattr(spotify, "tracks", lambda k, s: {"title": "Mix", "tracks": [song]})
+    calls = []
+
+    def fake_search(q, limit=8, offset=0):
+        calls.append(q)
+        if len(calls) == 1:  # first search only finds a fan upload of the wrong length
+            return [{"id": "bbbbbbbbbbb", "title": "Song (slowed + reverb)", "channel": "Fan", "duration": 260}]
+        return [{"id": "aaaaaaaaaaa", "title": "Band - Song (Official Video)", "channel": "Band", "duration": 203}]
+
+    monkeypatch.setattr(pipeline, "search", fake_search)
+    out = spotify.resolve(f"https://open.spotify.com/playlist/{SID}")
+    assert out["items"][0]["id"] == "aaaaaaaaaaa" and len(calls) == 2
+    assert library.spotify_hint("aaaaaaaaaaa") == ("Band", "Song")
+
+
+def test_score_penalises_other_peoples_uploads_and_wrong_length():
+    want = {"title": "Song", "artist": "Band", "duration": 200}
+    own = {"title": "Song (Official Video)", "channel": "Band", "duration": 204}
+    stranger = {"title": "Song", "channel": "RandomUploads", "duration": 204}
+    long_cut = {"title": "Band - Song (Official Video)", "channel": "Band", "duration": 400}
+    assert spotify.score(want, own) > spotify.score(want, stranger)
+    assert spotify.score(want, own) > spotify.score(want, long_cut)

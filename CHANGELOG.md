@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.26.0
+
+Spotify links now find the right YouTube video more reliably: if the first search isn't a convincing match, other searches are tried, and the artist's own channel and the song's length count for more. Songs added from Spotify also remember Spotify's artist and title, so lyrics and chords are looked up by the real song name even when the video's own title is messy. Songs already matched before this update keep their old match.
+
 ## 0.25.0
 
 The big drum countdown now changes colour with the pattern: green on the first bar, through yellow, to red on the last one. A pattern that is only one bar long just shows a plain 1.
