@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.36.0
+
+Pick a folder of Guitar Pro (.gp3–.gp5), MusicXML or MIDI files you already have (Settings → Tab files) and the app matches them to your songs by name, keeping only files that fit the recording bar by bar. Missing drums are now also written from the drum stem when you transcribe missing instruments; this is onset-only (which drum, when) and made by the app, so check it by ear.
+
 ## 0.35.0
 
 Instruments that no published tab covers can now be written out from the recording itself: the separated stems are transcribed by the open MuScriptor model and laid on the recording's own bar grid, so they line up with the chords and the player. These parts are labelled as made by the app and are less exact than a published tab. It needs the optional `autotab` extra and a free Hugging Face login with the model license accepted (the weights are non-commercial); the button is in the song's sources dialog.

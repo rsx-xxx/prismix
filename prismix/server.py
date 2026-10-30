@@ -37,6 +37,7 @@ from . import (
     playlists,
     spotify,
     tabdata,
+    tabfiles,
     tabs,
     updates,
     uploads,
@@ -55,6 +56,10 @@ class ProcessRequest(BaseModel):
     model: str = DEFAULT_MODEL
     tasks: Literal["all", "stems", "chords"] = "all"
     urgent: bool = False
+
+
+class FolderRequest(BaseModel):
+    folder: str
 
 
 class PlaylistItem(BaseModel):
@@ -778,6 +783,15 @@ def create_app() -> FastAPI:
         except ValueError:
             raise HTTPException(404, "Not found") from None
         except (autotab.AutoTabError, tabdata.TabDataError) as e:
+            raise HTTPException(422, str(e)) from e
+
+    @app.post("/api/tabfiles")
+    async def import_tab_folder(body: FolderRequest, request: Request):
+        # A folder of the user's own Guitar Pro / MusicXML / MIDI files, matched to the library by name and checked against the audio
+        own_window(request)
+        try:
+            return await asyncio.to_thread(tabfiles.import_folder, body.folder)
+        except tabfiles.FileError as e:
             raise HTTPException(422, str(e)) from e
 
     @app.put("/api/tabdata/{video_id}/tracks/{key}")

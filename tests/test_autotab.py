@@ -41,3 +41,10 @@ def test_auto_parts_follow_the_tabs_bar_map(tmp_path, monkeypatch):
     got = tabdata.add_auto("v", {"keys": autotab.part("keys", "Keys", rec)}, 2)
     keys = got["tracks"]["keys"]["bars"]
     assert [bool(b["n"]) for b in keys] == [False, False, True] and got["tracks"]["keys"]["auto"]
+
+
+def test_drum_hits_become_kit_lanes():
+    bars = autotab.to_bars([(36, 0.0, 0.1), (42, 0.0, 0.1), (38, 0.5, 0.6), (48, 1.0, 1.1)], STRUCT, "drums")
+    first, second, third = bars[0]["n"]
+    assert sorted(m for _, m in first[2]) == [36, 42] and second[2] == [[1.5, 38]]
+    assert third[2] == [[0.5, 50]]  # the lowest toms share a lane with the next one up

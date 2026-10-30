@@ -23,17 +23,24 @@ log = logging.getLogger(__name__)
 
 RATE = 16000  # what the model reads
 SIZES = ("small", "medium", "large")
-STEM_KINDS = {"guitar": "guitar", "bass": "bass", "piano": "keys", "other": "other"}
+STEM_KINDS = {"guitar": "guitar", "bass": "bass", "piano": "keys", "other": "other", "drums": "drums"}
 TUNINGS = {
     "guitar": [64, 59, 55, 50, 45, 40],  # string 0 is the highest, as in the published tabs
     "bass": [43, 38, 33, 28],
     "keys": [84, 48, 12],  # three "strings" an octave-stack apart: any pitch has a fret of 0..36 on one of them
     "other": [84, 48, 12],
+    "drums": [],
 }
+# General MIDI drum note -> staff line of the drum score (the lines the published drum tabs use)
+DRUM_LINES = {
+    35: 3.5, 36: 3.5, 37: 1.5, 38: 1.5, 39: 1.5, 40: 1.5, 41: 3.5, 42: -0.5, 43: 3, 44: 4.5, 45: 2.5, 46: -0.5, 47: 2, 48: 1,
+    49: -1, 50: 0.5, 51: 0, 52: -1, 53: 0, 54: -0.5, 55: -1, 56: 0, 57: -1, 59: 0,
+}
+DRUM_FOLD = {41: 43, 45: 47, 48: 50}  # no separate line for the lowest toms: they share one with the next one up
 RANGE = {"guitar": (40, 40 + 24 + 20), "bass": (28, 28 + 24 + 15)}
 MAX_FRET = 24
 MIN_NOTE = 0.04  # seconds; shorter blips are the model's noise
-POLY = {"guitar": 6, "bass": 2, "keys": 10, "other": 8}
+POLY = {"guitar": 6, "bass": 2, "keys": 10, "other": 8, "drums": 6}
 _lock = threading.Lock()
 _loaded: tuple[str, object] | None = None
 
@@ -86,8 +93,8 @@ def _audio(path):
     return torch.from_numpy(np.frombuffer(out.stdout, dtype=np.float32).copy()), RATE
 
 
-def transcribe_stem(path, size: str = "medium") -> list[tuple[int, float, float]]:
-    """(MIDI pitch, onset, offset) in seconds of every pitched note the model hears in the file."""
+def transcribe_stem(path, size: str = "medium", drums: bool = False) -> list[tuple[int, float, float]]:
+    """(MIDI pitch, onset, offset) in seconds of every pitched note (or, with `drums`, every drum hit) the model hears in the file."""
     from muscriptor import NoteEndEvent, NoteStartEvent
 
     audio = _audio(path)
@@ -96,12 +103,13 @@ def transcribe_stem(path, size: str = "medium") -> list[tuple[int, float, float]
     with _lock:
         for ev in _model(size).transcribe(audio):
             if isinstance(ev, NoteStartEvent):
-                if ev.instrument != "drums":
+                if (ev.instrument == "drums") == drums:
                     starts[ev.index] = ev
             elif isinstance(ev, NoteEndEvent):
                 ends[ev.start_event_index] = ev.end_time
     return sorted(
-        (ev.pitch, ev.start_time, ends.get(i, ev.start_time + 0.25)) for i, ev in starts.items()
+        (ev.pitch, ev.start_time, ends.get(i, ev.start_time + 0.25) if not drums else ev.start_time + 0.1)
+        for i, ev in starts.items()
     )
 
 
@@ -122,6 +130,9 @@ def _beat_pos(beats: list[float], t: float) -> float:
 
 def _strings(kind: str, pitches: list[int]) -> list[list[int]]:
     """[string, fret] for each pitch: the lowest frets, one note per string, notes that fit nowhere dropped."""
+    if kind == "drums":
+        lanes = {DRUM_LINES.get(DRUM_FOLD.get(p, p)): p for p in pitches}
+        return [[line, DRUM_FOLD.get(p, p)] for line, p in lanes.items() if line is not None]
     tuning = TUNINGS[kind]
     top = 36 if kind in ("keys", "other") else MAX_FRET
     lo, hi = RANGE.get(kind, (0, 127))
@@ -162,7 +173,7 @@ def to_bars(notes: list[tuple[int, float, float]], structure: dict, kind: str) -
         return j
 
     for pitch, on, off in notes:
-        if off - on < MIN_NOTE:
+        if off - on < MIN_NOTE and kind != "drums":
             continue
         a, b = _beat_pos(beats, on), _beat_pos(beats, off)
         j = bar_of(a)
@@ -219,7 +230,7 @@ def run(video_id: str, size: str = "medium", kinds: list[str] | None = None) -> 
     parts = {}
     try:
         for kind, stem in todo.items():
-            notes = transcribe_stem(stem_file(video_id, stem), size)
+            notes = transcribe_stem(stem_file(video_id, stem), size, drums=kind == "drums")
             bars = to_bars(notes, structure, kind)
             if density(bars) > 0:
                 parts[kind] = part(kind, kind.capitalize(), bars)

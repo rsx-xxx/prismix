@@ -814,6 +814,25 @@ document.addEventListener('visibilitychange', () => {
   updateCheckedAt = Date.now();
   checkUpdates().catch(() => {});
 });
+$('tabfolder-btn').addEventListener('click', async () => {
+  const b = $('tabfolder-btn');
+  const api = window.pywebview?.api;
+  let folder = '';
+  try { folder = api?.pick_folder ? await api.pick_folder() : (prompt('Folder with Guitar Pro, MusicXML or MIDI files:') || ''); } catch { /* cancelled */ }
+  if (!folder) return;
+  b.disabled = true;
+  b.textContent = 'Matching…';
+  try {
+    const r = await fetch('/api/tabfiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.detail || 'failed');
+    notice(j.matched.length
+      ? `Matched ${j.matched.length} song${j.matched.length > 1 ? 's' : ''} from ${j.scanned} files: ${j.matched.slice(0, 3).map((m) => m.title).join(', ')}${j.matched.length > 3 ? '…' : ''}`
+      : `No song matched among ${j.scanned} files`, 'info');
+  } catch (e) { notice(`Tab folder: ${e.message}`, 'error'); }
+  b.disabled = false;
+  b.textContent = 'Pick a folder…';
+});
 $('upd-check').addEventListener('click', async () => {
   const b = $('upd-check');
   b.disabled = true;

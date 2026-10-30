@@ -16,6 +16,13 @@ class NowPlaying:
     def __init__(self) -> None:
         self.window = None
 
+    def pick_folder(self) -> str:
+        """The desktop folder chooser; '' when cancelled."""
+        import webview
+
+        got = self.window.create_file_dialog(webview.FOLDER_DIALOG) if self.window else None
+        return str(got[0]) if got else ""
+
     def now_playing(self, title: str, artist: str, playing: bool, pos: float, dur: float, rate: float, art: str = "") -> bool:
         if sys.platform != "darwin":
             return False
