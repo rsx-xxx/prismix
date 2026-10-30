@@ -47,28 +47,44 @@ export class StemPlayer extends EventTarget {
     this.duck = this.ctx.createGain(); // short fades around seek/pause to avoid clicks
     this.duck.connect(this.master);
 
-    const loaded = new Array(meta.stems.length).fill(0);
-    const total = new Array(meta.stems.length).fill(1);
+    // Per stem: bytes fetched / bytes expected (9/10 of its share), then decoding (the last 1/10). A stem whose size is
+    // unknown (chunked or relayed responses carry no Content-Length) is guessed from its siblings, and never reads 100% before it is done.
+    const n = meta.stems.length;
+    const loaded = new Array(n).fill(0);
+    const total = new Array(n).fill(0);
+    const done = new Array(n).fill(false);
+    const decoded = new Array(n).fill(false);
     const report = () => {
-      const got = loaded.reduce((a, b) => a + b, 0);
-      const sum = total.reduce((a, b) => a + b, 0);
-      onProgress(Math.min(got / sum, 1));
+      const known = total.filter((t) => t > 0);
+      const guess = known.length ? known.reduce((x, y) => x + y, 0) / known.length : Math.max(1, (meta.duration || 200) * 32000);
+      let sum = 0;
+      for (let i = 0; i < n; i++) {
+        const frac = done[i] ? 1 : Math.min(loaded[i] / (total[i] || guess), 0.97);
+        sum += decoded[i] ? 1 : frac * 0.9;
+      }
+      onProgress(sum / n);
     };
+    report();
 
     this.stems = await Promise.all(meta.stems.map(async (s, i) => {
       const res = await fetch(`${baseUrl}/${s.file}`);
       if (!res.ok) throw new Error(`Could not load ${s.name} (${res.status})`);
-      total[i] = Number(res.headers.get('content-length')) || 1;
+      // Content-Length of an encoded response is the compressed size, not what the reader yields: only trust plain bodies.
+      total[i] = res.headers.get('content-encoding') ? 0 : Number(res.headers.get('content-length')) || 0;
       const reader = res.body.getReader();
       const chunks = [];
       for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        const { done: end, value } = await reader.read();
+        if (end) break;
         chunks.push(value);
         loaded[i] += value.length;
         report();
       }
+      done[i] = true;
+      report();
       const buf = await this.ctx.decodeAudioData(await new Blob(chunks).arrayBuffer());
+      decoded[i] = true;
+      report();
       const gain = this.ctx.createGain();
       gain.connect(this.duck);
       return { name: s.name, buf, node: null, gain, src: null, volume: 1, muted: false, solo: false };

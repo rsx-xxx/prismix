@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.32.3
+
+Opening a song now shows real loading progress: the bar used to jump to 100% at once when the server sent no file size (typical for phones joined to a host). It now counts fetched and decoded stems and only fills when they are ready. Song covers on the phone page load more reliably: a failed cover is retried, then falls back to the YouTube thumbnail, and covers are cached for an hour instead of being re-checked on every scroll.
+
 ## 0.32.2
 
 The "Updating Prismix" popup is now a small card in the bottom corner and no longer blocks the screen. In the desktop sidebar, Settings sits right under the last button and opens inline, with no duplicate title, close button or extra background, so the player gets more room. The white background in the fingering panel now covers only the chord diagram, not the whole panel. A drum part with a single bar now shows a red countdown number instead of yellow. The percussion clef column left of the drum bars is gone, as it carried no information.

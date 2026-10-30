@@ -1067,6 +1067,20 @@ let lists = [];
 let plView = null; // id of the playlist whose tracks are showing in the Songs sheet
 let plTab = 'songs';
 const withPin = (u) => (store.pin ? `${u}?k=${encodeURIComponent(store.pin)}` : u);
+/** Cover <img>: retries a failed load once (phones drop requests on flaky links), then the YouTube thumbnail, then hides. */
+const coverImg = (id) => {
+  const img = el('img', { className: 'cover', loading: 'lazy', decoding: 'async', alt: '' });
+  const upload = /^u-[0-9a-f]{9}$/.test(id);
+  let tries = 0;
+  img.onerror = () => {
+    tries += 1;
+    if (tries === 1) setTimeout(() => { img.src = `${withPin(`/media/${id}/thumb.jpg`)}${store.pin ? '&' : '?'}r=1`; }, 800);
+    else if (tries === 2 && !upload) img.src = `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+    else img.classList.add('none');
+  };
+  img.src = withPin(`/media/${id}/thumb.jpg`);
+  return img;
+};
 
 async function loadPlaylists() {
   try { lists = await getJson('/api/playlists'); } catch { lists = []; }
@@ -1099,8 +1113,7 @@ function paintPlaylists() {
   const pl = lists.find((p) => p.id === plView);
   if (!pl) {
     box.replaceChildren(...(lists.length ? [el('ul', { className: 'lib' }, ...lists.map((p) => {
-      const img = el('img', { className: 'cover', loading: 'lazy', alt: '', src: p.items[0] ? withPin(`/media/${p.items[0].id}/thumb.jpg`) : '' });
-      img.onerror = () => img.classList.add('none');
+      const img = p.items[0] ? coverImg(p.items[0].id) : el('img', { className: 'cover none', alt: '' });
       const li = el('li', { className: S.pl?.id === p.id ? 'on' : '' }, img,
         el('span', { className: 'meta' }, el('b', { textContent: p.name }), el('small', { textContent: `${p.items.length} songs` })));
       li.onclick = () => { plView = p.id; paintPlaylists(); };
@@ -1115,8 +1128,7 @@ function paintPlaylists() {
   box.replaceChildren(el('div', { className: 'pl-top' }, back, el('b', { textContent: pl.name }), ...(droid?.offlineSave && !OFFLINE ? [all] : [])),
     el('ul', { className: 'lib' }, ...pl.items.map((it, n) => {
       const model = modelOf(it.id);
-      const img = el('img', { className: 'cover', loading: 'lazy', alt: '', src: withPin(`/media/${it.id}/thumb.jpg`) });
-      img.onerror = () => img.classList.add('none');
+      const img = coverImg(it.id);
       const li = el('li', { className: `${S.track?.id === it.id ? 'on' : ''}${model ? '' : ' wait'}` }, img,
         el('span', { className: 'meta' }, el('b', { textContent: `${n + 1}. ${it.title || it.id}` }),
           el('small', { textContent: model ? `${it.channel || ''}${it.channel ? ' · ' : ''}${fmt(it.duration)}` : 'Not ready on the host yet' })));
@@ -1226,8 +1238,7 @@ function paintLibrary() {
   const items = library.filter((it) => !q || `${it.title} ${it.channel || ''}`.toLowerCase().includes(q));
   $('lib').replaceChildren(...items.map((it) => {
     const model = it.models?.[0];
-    const img = el('img', { className: 'cover', loading: 'lazy', alt: '', src: `/media/${it.id}/thumb.jpg${store.pin ? `?k=${encodeURIComponent(store.pin)}` : ''}` });
-    img.onerror = () => img.classList.add('none');
+    const img = coverImg(it.id);
     const meta = el('span', { className: 'meta' }, el('b', { textContent: it.title }), el('small', { textContent: `${it.channel || ''}${it.channel ? ' · ' : ''}${fmt(it.duration)}` }));
     const li = el('li', { className: S.track?.id === it.id ? 'on' : '' }, img, meta);
     li.onclick = () => playSong(it.id, model, null);

@@ -180,6 +180,8 @@ class MediaFiles(StaticFiles):
         resp = await super().get_response(path, scope)
         if path.endswith((".flac", ".m4a")):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif path.endswith(".jpg"):
+            resp.headers["Cache-Control"] = "public, max-age=3600"  # covers rarely change; phones re-fetch dozens per scroll otherwise
         else:
             resp.headers["Cache-Control"] = "no-cache"
         return resp
