@@ -1,6 +1,6 @@
 [project]
 name = "prismix"
-version = "0.38.1"
+version = "0.38.2"
 description = "Practice any song with your band: split it into stems, see chords and synced lyrics, change tempo and key, and follow along on phones."
 readme = "README.md"
 license = { text = "MIT" }

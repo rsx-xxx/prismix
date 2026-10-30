@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.38.2
+
+On the phone, the Tab view no longer disappears after you open a song that has no tab: the view you chose is restored for the next song, instead of staying on Lyrics until the page is reloaded.
+
 ## 0.38.1
 
 Share no longer freezes the desktop app: the link is copied without a blocking prompt, the button flashes on click, and a failed copy shows the link in a notice. In the tab picker a lone "Other" instrument now carries its own name, and several of them get a dropdown to pick each one.

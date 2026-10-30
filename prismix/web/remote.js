@@ -265,6 +265,7 @@ async function loadTrack(id, model) {
   const mine = ++loadToken;
   S.track = null;
   S.fail = null;
+  S.view = store.view || 'lyrics'; // chrome() falls back to lyrics for a song without a tab: the next song gets the chosen view back
   stickers.load();
   $('title').textContent = 'Loading…';
   $('sub').textContent = '';
