@@ -661,6 +661,32 @@ def _save(video_id: str, data: dict) -> None:
     _write(_path(video_id), data)
 
 
+def add_auto(video_id: str, parts: dict[str, dict], nbars: int) -> dict:
+    """Keep machine-transcribed parts beside the published ones (or alone when the track has no tab); returns the tab."""
+    raw = _raw(video_id)
+    if not raw or not raw.get("found"):
+        info = library.read_info(video_id) or {}
+        raw = {
+            "found": True, "v": FORMAT, "source": "auto", "url": "", "artist": info.get("uploader") or "",
+            "title": info.get("title") or "", "similarity": 1.0, "coverage": 1.0, "map": list(range(nbars)),
+            "shift": 0, "filled": {"copied": 0, "inserted": 0, "open": []}, "weak": 0, "tracks": {},
+        }
+    tracks = raw["tracks"]
+    if raw["source"] != "auto":  # the tab's bar list is the shared one: take each recording bar the tab bar was matched to
+        ref = next(iter(tracks.values()))["bars"]
+        for part in parts.values():
+            rec = part["bars"]
+            part["bars"] = [
+                dict(rec[j]) if j is not None and j < len(rec) else {"len": ref[i]["len"], "n": []}
+                for i, j in enumerate(raw["map"])
+            ]
+    for kind, part in parts.items():
+        n = 1 + sum(1 for p in tracks.values() if p.get("kind") == kind)
+        tracks[part_key(kind, n)] = part
+    _save(video_id, raw)
+    return read(video_id) or raw
+
+
 def _download(song: dict) -> dict[str, dict]:
     sid = song["songId"]
     meta = _json(META.format(id=sid))

@@ -165,7 +165,9 @@ export function createTab({ player, chordsIn = () => [] }) {
     if (!cur) return;
     const { tab, st, rec: secs } = cur;
     const p = tab.tracks[part];
-    credit.replaceChildren(`${shortName(p, part)} · tab by `, el('a', { href: tab.url, target: '_blank', rel: 'noopener', textContent: tab.source === 'soundslice' ? 'Soundslice' : 'Songsterr' }), p.edited ? ' · edited' : '');
+    credit.replaceChildren(...(p.auto
+      ? [`${shortName(p, part)} · written from the recording by the app, check it by ear`]
+      : [`${shortName(p, part)} · tab by `, el('a', { href: tab.url, target: '_blank', rel: 'noopener', textContent: tab.source === 'soundslice' ? 'Soundslice' : 'Songsterr' })]), p.edited ? ' · edited' : '');
     paintPicker();
     paintTools();
     announce();

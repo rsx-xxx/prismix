@@ -17,7 +17,31 @@ export function createSources({ api, onChange, onTab }) {
       $('src-lyrics').value = got.lyrics || '';
       $('src-chords').value = got.chords || '';
     } catch { /* the form opens empty */ }
+    $('auto-msg').textContent = '';
+    const btn = $('auto-tab');
+    btn.hidden = true;
+    api(`/api/tabdata/${id}/auto`).then((d) => {
+      btn.hidden = !d.available || !d.kinds.length;
+      if (d.available && d.kinds.length) btn.textContent = `Transcribe ${d.kinds.join(', ')}`;
+    }).catch(() => {});
     dlg.showModal();
+  });
+
+  $('auto-tab').addEventListener('click', async () => {
+    const target = id;
+    if (!target) return;
+    const btn = $('auto-tab');
+    btn.disabled = true;
+    $('auto-msg').textContent = 'Listening to the stems… this can take a few minutes.';
+    try {
+      await api(`/api/tabdata/${target}/auto`, { method: 'POST' });
+      close();
+      onTab(target);
+    } catch (err) {
+      $('auto-msg').textContent = err.message;
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   $('sources-form').addEventListener('submit', async (e) => {

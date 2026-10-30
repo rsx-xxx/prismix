@@ -376,6 +376,9 @@
       <label class="band-row">Tab from Soundslice <input id="src-slice" type="url" maxlength="300" placeholder="https://www.soundslice.com/slices/PtNBc/"></label>
       <p class="muted" id="slice-msg" role="status"></p>
       <button class="btn" id="slice-import" type="button">Import tab</button>
+      <p class="muted">Or write out the instruments no tab covers from the recording itself. It is a machine transcription: less exact than a published tab, and it takes a few minutes the first time (the model downloads once).</p>
+      <p class="muted" id="auto-msg" role="status"></p>
+      <button class="btn" id="auto-tab" type="button" hidden>Transcribe missing instruments</button>
     </form>
   </dialog>
 

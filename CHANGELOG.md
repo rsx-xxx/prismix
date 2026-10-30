@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.35.0
+
+Instruments that no published tab covers can now be written out from the recording itself: the separated stems are transcribed by the open MuScriptor model and laid on the recording's own bar grid, so they line up with the chords and the player. These parts are labelled as made by the app and are less exact than a published tab. It needs the optional `autotab` extra and a free Hugging Face login with the model license accepted (the weights are non-commercial); the button is in the song's sources dialog.
+
 ## 0.34.0
 
 Tab lookup is now cover-aware: when a track looks like a cover, the original named in its description, tags or title is searched on Songsterr too, and it still has to fit the recording bar by bar, in the recording's key. Bars where the tab disagrees with the chords heard in the recording are outlined with a dotted amber border, so a cover that changes the harmony is visible at a glance and the detected chords above the bar remain the reference.
