@@ -1183,3 +1183,5 @@ body:has(#tabview:not([hidden], .off, .out)) #ahead { display: none !important; 
 .upd-dlg #update-dlg-pct { grid-column: 2; }
 @keyframes upd-pulse { 50% { transform: scale(.92); opacity: .7; } }
 @media (prefers-reduced-motion: reduce) { .upd-dlg img { animation: none; } }
+#share-btn.copied, #share-at-btn.copied { background: var(--accent); color: var(--on-primary); border-color: transparent; transform: scale(.96); }
+#share-btn, #share-at-btn { transition: background .15s, color .15s, transform .15s; }

@@ -1321,16 +1321,34 @@ const sharedRoute = (text) => {
   const model = /^\w+$/.test(q.get('m') || '') ? q.get('m') : state.defaultModel;
   return `#/v/${m[1]}/${model}${/^\d+(\.\d+)?$/.test(q.get('t') || '') ? `?t=${q.get('t')}` : ''}`;
 };
-async function shareLink(atMoment) {
+/** Clipboard write that also works where navigator.clipboard is denied (the desktop webview); never blocks the UI. */
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* fall through */ }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.append(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { /* ignore */ }
+  ta.remove();
+  return ok;
+}
+async function shareLink(atMoment, btn) {
   if (!state.current) return;
   const { id, model } = state.current;
   const at = atMoment ? `&t=${Math.floor(player.position)}` : '';
   const link = `${SHARE_PAGE}#song/${id}?m=${model}${at}`;
-  try { await navigator.clipboard.writeText(link); notice(`Link copied${at ? ` (at ${fmt(player.position)})` : ''}`, 'ok'); }
-  catch { prompt('Copy this link', link); }
+  const ok = await copyText(link);
+  if (ok) {
+    btn.classList.add('copied');
+    setTimeout(() => btn.classList.remove('copied'), 900);
+    notice(`Link copied${at ? ` (at ${fmt(player.position)})` : ''}`, 'ok');
+  } else notice(`Could not copy. The link is ${link}`);
 }
-$('share-btn').addEventListener('click', () => shareLink(false));
-$('share-at-btn').addEventListener('click', () => shareLink(true));
+$('share-btn').addEventListener('click', (e) => shareLink(false, e.currentTarget));
+$('share-at-btn').addEventListener('click', (e) => shareLink(true, e.currentTarget));
 $('ex-cancel').addEventListener('click', () => $('export').close());
 
 $('export-form').addEventListener('submit', async (e) => {

@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.38.1
+
+Share no longer freezes the desktop app: the link is copied without a blocking prompt, the button flashes on click, and a failed copy shows the link in a notice. In the tab picker a lone "Other" instrument now carries its own name, and several of them get a dropdown to pick each one.
+
 ## 0.38.0
 
 Songs processed by an older release are now brought up to date in the background: each cached result (chords, lyrics, tabs) carries the schema it was made with, and when a release changes one, that result is redone after the app starts, a song at a time, without touching your tab edits. Songs already in the cloud are sent again once upgraded; stems are never re-separated.

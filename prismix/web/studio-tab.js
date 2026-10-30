@@ -285,14 +285,25 @@ export function createTab({ player, chordsIn = () => [] }) {
     const keys = Object.keys(cur.tab.tracks);
     const kind = cur.tab.tracks[part].kind;
     const kinds = KINDS.filter((k) => keys.some((x) => cur.tab.tracks[x].kind === k));
+    const ofKind = (k) => keys.filter((x) => cur.tab.tracks[x].kind === k);
+    const nameOf = (k) => cur.tab.tracks[k].name.replaceAll(' | ', ' · ') || cap(cur.tab.tracks[k].kind);
     pick.replaceChildren(...kinds.map((k) => {
-      const n = keys.filter((x) => cur.tab.tracks[x].kind === k).length;
-      const b = el('button', { type: 'button', className: 'btn small ghost', textContent: k === 'other' ? 'Others' : cap(k) });
+      const mine = ofKind(k);
+      if (k === 'other' && mine.length > 1) { // several unnamed instruments: one dropdown to pick each
+        const s = el('select', { className: 'tab-sel', ariaLabel: 'Other instruments' });
+        s.setAttribute('aria-pressed', String(k === kind));
+        mine.forEach((x) => s.append(el('option', { value: x, selected: x === part, textContent: nameOf(x) })));
+        if (k !== kind) s.prepend(el('option', { value: '', selected: true, disabled: true, textContent: 'Others' }));
+        s.addEventListener('change', () => choose(s.value));
+        return s;
+      }
+      const label = k === 'other' ? nameOf(mine[0]) : cap(k); // a lone instrument is called by its own name
+      const b = el('button', { type: 'button', className: 'btn small ghost', textContent: label });
       b.setAttribute('aria-pressed', String(k === kind));
       b.addEventListener('click', () => {
         if (k === kind) return;
         const last = localStorage.getItem(`${PART_KEY}:${k}`);
-        choose(cur.tab.tracks[last]?.kind === k ? last : keys.find((x) => cur.tab.tracks[x].kind === k));
+        choose(cur.tab.tracks[last]?.kind === k ? last : mine[0]);
       });
       return b;
     }));
@@ -306,7 +317,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     });
     sel.addEventListener('change', () => choose(sel.value));
     variants.replaceChildren(sel);
-    variants.hidden = same.length < 2;
+    variants.hidden = same.length < 2 || kind === 'other'; // Others have their own dropdown above
   }
 
   function choose(k) {
