@@ -49,6 +49,15 @@ export function createMedia(ctl) {
     set('stop', () => act('pause'));
   }
 
+  // Hardware media keys (F8 on a Mac) reach a plain browser tab as key events when the system does not route them to Now Playing.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'MediaPlayPause') act('toggle');
+    else if (e.key === 'MediaTrackNext') act('step', 10);
+    else if (e.key === 'MediaTrackPrevious') act('step', -10);
+    else return;
+    e.preventDefault();
+  });
+
   let lock = null;
   let wantAwake = false;
   async function awake(on) {
@@ -87,7 +96,7 @@ export function createMedia(ctl) {
       if (ok === false) sent = null; // the shell could not start its service: try again on the next tick
       return;
     }
-    native()?.now_playing(m.title, m.artist || '', m.playing, m.pos, m.dur, m.rate || 1);
+    native()?.now_playing(m.title, m.artist || '', m.playing, m.pos, m.dur, m.rate || 1, m.art ? new URL(m.art, location.href).href : '');
     if (!ms) return;
     if (fresh) {
       ms.metadata = new MediaMetadata({

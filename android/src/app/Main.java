@@ -1056,10 +1056,9 @@ public class Main extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (cloudMode && web.getVisibility() == View.VISIBLE) {
-            // the player closes its own sheet first; with nothing open, back leaves for the cloud screen
-            web.evaluateJavascript("window.__back&&window.__back()", v -> { if (!"true".equals(v)) showCloud(null); });
-        } else if (web.getVisibility() == View.VISIBLE && web.canGoBack()) web.goBack();
-        else super.onBackPressed();
+        if (web.getVisibility() != View.VISIBLE) { super.onBackPressed(); return; }
+        // the page closes its own sheet or settings first; with nothing open, back sends the app to the background
+        // (the connection screen is reached from Controls > Connection, never by accident)
+        web.evaluateJavascript("window.__back&&window.__back()", v -> { if (!"true".equals(v)) moveTaskToBack(true); });
     }
 }

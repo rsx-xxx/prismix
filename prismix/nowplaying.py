@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
 
 log = logging.getLogger(__name__)
 _keep: list = []
+_art: dict = {}  # url -> MPMediaItemArtwork (or None while loading / unavailable)
 
 
 class NowPlaying:
@@ -14,7 +16,7 @@ class NowPlaying:
     def __init__(self) -> None:
         self.window = None
 
-    def now_playing(self, title: str, artist: str, playing: bool, pos: float, dur: float, rate: float) -> bool:
+    def now_playing(self, title: str, artist: str, playing: bool, pos: float, dur: float, rate: float, art: str = "") -> bool:
         if sys.platform != "darwin":
             return False
         try:
@@ -29,16 +31,48 @@ class NowPlaying:
 
             self._remote()
             center = MPNowPlayingInfoCenter.defaultCenter()
-            center.setNowPlayingInfo_({
+            info = {
                 MPMediaItemPropertyTitle: title, MPMediaItemPropertyArtist: artist,
                 MPMediaItemPropertyPlaybackDuration: float(dur), MPNowPlayingInfoPropertyElapsedPlaybackTime: float(pos),
                 MPNowPlayingInfoPropertyPlaybackRate: float(rate if playing else 0.0),
-            })
+            }
+            cover = self._cover(art)
+            if cover is not None:
+                from MediaPlayer import MPMediaItemPropertyArtwork
+
+                info[MPMediaItemPropertyArtwork] = cover
+            center.setNowPlayingInfo_(info)
             center.setPlaybackState_(1 if playing else 2)  # MPNowPlayingPlaybackStatePlaying / Paused
             return True
         except Exception:  # noqa: BLE001 - the page keeps working without the system widget
             log.exception("Now Playing unavailable")
             return False
+
+    def _cover(self, url: str):
+        """The song's cover as Now Playing artwork. Fetched off-thread from the local server; shown from the next update on."""
+        if not url:
+            return None
+        if url not in _art:
+            _art[url] = None
+            threading.Thread(target=self._fetch_cover, args=(url,), daemon=True).start()
+        return _art[url]
+
+    def _fetch_cover(self, url: str) -> None:
+        try:
+            import urllib.request
+
+            from AppKit import NSImage
+            from Foundation import NSData
+            from MediaPlayer import MPMediaItemArtwork
+
+            with urllib.request.urlopen(url, timeout=5) as r:  # noqa: S310 - the page's own origin
+                data = r.read()
+            image = NSImage.alloc().initWithData_(NSData.dataWithBytes_length_(data, len(data)))
+            if image is None:
+                return
+            _art[url] = MPMediaItemArtwork.alloc().initWithBoundsSize_requestHandler_(image.size(), lambda size: image)
+        except Exception:  # noqa: BLE001 - no cover is fine
+            log.debug("cover for Now Playing failed", exc_info=True)
 
     def now_playing_stop(self) -> None:
         if sys.platform != "darwin":

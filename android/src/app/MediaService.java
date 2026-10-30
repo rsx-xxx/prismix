@@ -153,33 +153,45 @@ public class MediaService extends Service {
         }
     }
 
-    /** The cover comes from the host the app is connected to, whose certificate is self-signed. */
+    /** The cover comes from the host the app is connected to, whose certificate is self-signed; a song whose file is missing there falls back to YouTube's. */
     private void fetchArt(final String url) {
         final int gen = ++artGen;
         new Thread(() -> {
-            Bitmap b = null;
-            try {
-                URL u = new URL(url);
-                Cloud.Credential cred = Main.cloud();
-                java.net.HttpURLConnection c;
-                if (cred != null && u.getHost().equals(cred.host())) {
-                    c = (java.net.HttpURLConnection) u.openConnection();
-                    c.setRequestProperty("Authorization", "Bearer " + cred.token);
-                } else {
-                    if (!u.getHost().equals(Main.hostName())) return;
-                    HttpsURLConnection lan = (HttpsURLConnection) u.openConnection();
-                    lan.setSSLSocketFactory(Main.tls());
-                    lan.setHostnameVerifier((h, s) -> true);
-                    c = lan;
-                }
-                c.setConnectTimeout(3000);
-                c.setReadTimeout(5000);
-                try (InputStream in = c.getInputStream()) { b = BitmapFactory.decodeStream(in); }
-                c.disconnect();
-            } catch (Exception e) { /* no cover: the notification works without one */ }
+            Bitmap b = load(url);
+            if (b == null) {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("/media/([\\w-]{11})/thumb\\.jpg").matcher(url);
+                if (m.find()) b = load("https://i.ytimg.com/vi/" + m.group(1) + "/mqdefault.jpg");
+            }
             final Bitmap got = b;
-            if (got != null) Main.post(() -> { if (gen == artGen && url.equals(artUrl)) { art = got; if (started) show(); } });
+            Main.post(() -> {
+                if (gen != artGen || !url.equals(artUrl)) return;
+                if (got != null) { art = got; if (started) show(); }
+                else artUrl = ""; // not there yet (the host was busy): the next update asks again
+            });
         }).start();
+    }
+
+    private Bitmap load(String url) {
+        try {
+            URL u = new URL(url);
+            Cloud.Credential cred = Main.cloud();
+            java.net.HttpURLConnection c;
+            if (cred != null && u.getHost().equals(cred.host())) {
+                c = (java.net.HttpURLConnection) u.openConnection();
+                c.setRequestProperty("Authorization", "Bearer " + cred.token);
+            } else if (u.getHost().equals(Main.hostName())) {
+                HttpsURLConnection lan = (HttpsURLConnection) u.openConnection();
+                lan.setSSLSocketFactory(Main.tls());
+                lan.setHostnameVerifier((h, s) -> true);
+                c = lan;
+            } else if ("https".equals(u.getProtocol()) && u.getHost().endsWith("ytimg.com")) {
+                c = (java.net.HttpURLConnection) u.openConnection();
+            } else return null;
+            c.setConnectTimeout(4000);
+            c.setReadTimeout(6000);
+            try (InputStream in = c.getInputStream()) { return BitmapFactory.decodeStream(in); }
+            finally { c.disconnect(); }
+        } catch (Exception e) { return null; }
     }
 
     @Override

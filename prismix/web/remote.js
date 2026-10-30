@@ -1009,6 +1009,13 @@ $('more').onclick = openSheet;
 $('where').onclick = openSheet;
 $('tune').onclick = () => { paintMixer(); mixer.showModal(); };
 $('sheet-close').onclick = () => sheet.close();
+// The Android back button/gesture asks the page first: an open sheet (Songs, Playback, Controls) closes before anything else.
+window.__back = () => {
+  const open = [...document.querySelectorAll('dialog[open]')].pop();
+  if (!open) return false;
+  open.close();
+  return true;
+};
 sheet.addEventListener('click', (e) => { if (e.target === sheet) sheet.close(); });
 $('lat').value = String(S.lat);
 $('lat-out').textContent = `${S.lat} ms`;

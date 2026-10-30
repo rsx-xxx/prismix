@@ -1290,12 +1290,23 @@ function syncExport() {
 document.querySelectorAll('input[name=scope]').forEach((r) => r.addEventListener('change', syncExport));
 $('export-btn').addEventListener('click', openExport);
 
-// ── sharing: a prismix:// link to this song, optionally to the moment being played ──
+// ── sharing: a link to this song, optionally to the moment being played ──
+// An https page (docs/open) is what chats make clickable and browsers accept; it hands the song on to the installed app.
+// prismix://song/… links, and a link pasted into the search box, open the same way.
+const SHARE_PAGE = 'https://rsx-xxx.github.io/prismix/open/';
+/** The studio route of a shared-song link (either form), or null for any other text. */
+const sharedRoute = (text) => {
+  const m = text.trim().match(/^(?:prismix:\/\/song\/|https:\/\/rsx-xxx\.github\.io\/prismix\/open\/?#song\/)([\w-]{11})(?:\?([^\s#]*))?$/);
+  if (!m) return null;
+  const q = new URLSearchParams(m[2] || '');
+  const model = /^\w+$/.test(q.get('m') || '') ? q.get('m') : state.defaultModel;
+  return `#/v/${m[1]}/${model}${/^\d+(\.\d+)?$/.test(q.get('t') || '') ? `?t=${q.get('t')}` : ''}`;
+};
 async function shareLink(atMoment) {
   if (!state.current) return;
   const { id, model } = state.current;
   const at = atMoment ? `&t=${Math.floor(player.position)}` : '';
-  const link = `prismix://song/${id}?m=${model}${at}`;
+  const link = `${SHARE_PAGE}#song/${id}?m=${model}${at}`;
   try { await navigator.clipboard.writeText(link); notice(`Link copied${at ? ` (at ${fmt(player.position)})` : ''}`, 'ok'); }
   catch { prompt('Copy this link', link); }
 }

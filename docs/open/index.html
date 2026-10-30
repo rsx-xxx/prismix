@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Open in Prismix</title>
+<style>body{font:16px system-ui;background:#111;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;text-align:center}
+a.b{display:inline-block;margin:1rem 0;padding:.7rem 1.4rem;border-radius:8px;background:#e8453c;color:#fff;text-decoration:none}
+code{display:block;margin:1rem auto;max-width:90vw;word-break:break-all;color:#aaa;font-size:13px}</style></head>
+<body><main>
+<h1>Open this song in Prismix</h1>
+<a class="b" id="go" href="#">Open in Prismix</a>
+<p>Nothing happened? Install Prismix, or paste this into its search box:</p>
+<code id="raw"></code>
+<p><a href="https://github.com/rsx-xxx/prismix/releases" style="color:#e8453c">Get Prismix</a></p>
+</main>
+<script>
+const m = location.hash.match(/^#song\/([\w-]{11})(\?[^\s#]*)?$/);
+if (m) {
+  const link = `prismix://song/${m[1]}${m[2] || ''}`;
+  document.getElementById('go').href = link;
+  document.getElementById('raw').textContent = location.href;
+  location.href = link;
+} else {
+  document.querySelector('h1').textContent = 'Not a Prismix song link';
+  document.getElementById('go').remove();
+}
+</script></body></html>

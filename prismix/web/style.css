@@ -130,7 +130,7 @@ h1, h2, h3, p { margin: 0; }
 .icon-btn:hover { background: var(--surface-2); color: var(--text); }
 
 /* ── layout ── */
-main { width: min(1180px, 100% - 28px); margin: 0 auto; padding: 16px 0 calc(var(--dock-h) + 32px); }
+main { width: min(1180px, 100% - 28px); margin: 0 auto; padding: 8px 0 calc(var(--dock-h) + 32px); }
 .section-head { display: flex; align-items: baseline; gap: 12px; margin: 36px 0 16px; }
 .section-head h2 { font-size: 20px; letter-spacing: -0.01em; }
 
@@ -223,7 +223,8 @@ dialog legend { font-size: 12px; text-transform: uppercase; letter-spacing: .08e
 .job .row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* ── studio ── */
-.trackhead { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.trackhead { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+#studio { --row-h: 64px; }
 .trackhead img { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; background: var(--surface-2); }
 .th-text { flex: 1; min-width: 200px; }
 .th-text h1.renamable { cursor: text; border-radius: 6px; outline-offset: 4px; }
@@ -239,7 +240,7 @@ dialog legend { font-size: 12px; text-transform: uppercase; letter-spacing: .08e
 .loading { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
 .loading .bar { flex: 1; max-width: 360px; }
 
-.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .chip { border: 1px solid var(--line-strong); background: transparent; border-radius: 999px; padding: 6px 14px; font-size: 13px; color: var(--muted); transition: all .15s; }
 .chip:hover { color: var(--text); border-color: var(--text); }
 .chip[aria-pressed=true] { background: var(--text); color: var(--bg); border-color: transparent; }
@@ -556,7 +557,8 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .pl-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* blocks: toolbar, header buttons, tracked frame */
-.blockbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+.blockbar { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; vertical-align: middle; }
+#nt-toggle { margin: 0 8px 8px 0; vertical-align: middle; }
 .blockbar .chip.lit { border-color: var(--accent); }
 .block { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 16px; transition: border-color .25s, box-shadow .25s; scroll-margin-top: 12px; }
 .block.off, .block.out { display: none !important; }

@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.33.0
+
+The system player (phone notification bar, Mac Now Playing and media keys such as F8) now shows the song cover and can be controlled with play/pause and skip keys. On the phone app Back closes an open popup such as Settings first instead of jumping to the connection page, and Settings gains a "Hosts & band cloud" entry. Share now copies an https link that chats make clickable and that opens the song in the app; a prismix:// or share link pasted into the search box opens the song too. Signing out of the band cloud asks for confirmation, and the player header is tighter so lyrics and chords get more room.
+
 ## 0.32.3
 
 Opening a song now shows real loading progress: the bar used to jump to 100% at once when the server sent no file size (typical for phones joined to a host). It now counts fetched and decoded stems and only fills when they are ready. Song covers on the phone page load more reliably: a failed cover is retried, then falls back to the YouTube thumbnail, and covers are cached for an hour instead of being re-checked on every scroll.

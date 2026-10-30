@@ -221,6 +221,7 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
     } catch (x) { err.textContent = x.message; }
   });
   $('cloud-out').addEventListener('click', async () => {
+    if (!confirm(`Sign out of ${state.band?.name || 'the band cloud'}? Songs already downloaded stay on this computer.`)) return;
     await post('/api/cloud/logout');
     $('cloud-dialog').close();
     await refresh();
