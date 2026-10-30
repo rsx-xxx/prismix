@@ -226,6 +226,7 @@ export function createTab({ player, chordsIn = () => [] }) {
       cell.dataset.t0 = String(starts[i]);
       cell.dataset.t1 = String(ends[i]);
       if (tb.auto) { cell.classList.add('auto'); cell.title = 'Filled in from a matching bar'; }
+      if (tb.weak) { cell.classList.add('weak'); cell.title = 'This bar differs from the recording (a cover or another arrangement); trust the chords above it'; }
       if (tb.mark) cell.append(el('span', { className: 'tag', textContent: tb.mark }));
       const chs = el('div', { className: 'tch' });
       if (j != null && p.kind !== 'drums') {

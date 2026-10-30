@@ -779,6 +779,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .tbar { position: relative; padding: 22px 6px 6px; border-radius: 10px; cursor: pointer; background: var(--surface); border: 1px solid var(--line); }
 .tbar:hover { border-color: var(--line-strong); }
 .tbar.auto { border-style: dashed; }
+.tbar.weak { border-style: dotted; border-color: var(--warn, #e0a030); background: color-mix(in oklab, var(--warn, #e0a030) 8%, transparent); }
 .tbar.now { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .tbar .n { position: absolute; top: 3px; left: 7px; font-size: 10px; color: var(--muted); }
 .tbar .tag { position: absolute; top: 3px; right: 7px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }

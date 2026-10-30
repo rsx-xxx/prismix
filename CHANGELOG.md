@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.34.0
+
+Tab lookup is now cover-aware: when a track looks like a cover, the original named in its description, tags or title is searched on Songsterr too, and it still has to fit the recording bar by bar, in the recording's key. Bars where the tab disagrees with the chords heard in the recording are outlined with a dotted amber border, so a cover that changes the harmony is visible at a glance and the detected chords above the bar remain the reference.
+
 ## 0.33.0
 
 The system player (phone notification bar, Mac Now Playing and media keys such as F8) now shows the song cover and can be controlled with play/pause and skip keys. On the phone app Back closes an open popup such as Settings first instead of jumping to the connection page, and Settings gains a "Hosts & band cloud" entry. Share now copies an https link that chats make clickable and that opens the song in the app; a prismix:// or share link pasted into the search box opens the song too. Signing out of the band cloud asks for confirmation, and the player header is tighter so lyrics and chords get more room.

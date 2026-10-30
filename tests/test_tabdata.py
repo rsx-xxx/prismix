@@ -276,3 +276,22 @@ def test_rank_prefers_the_tab_that_sticks_to_the_reference_chords():
     assert tabdata.rank_candidate(parts, fitted, 1.0, near) > tabdata.rank_candidate(parts, fitted, 1.0, far)
     assert tabdata.rank_candidate(parts, fitted, 1.0, None) > tabdata.rank_candidate(parts, fitted, 0.0, None)
     assert tabdata.rank_candidate(parts, fitted, 1.0, None) > tabdata.rank_candidate(parts, {**fitted, "shift": 5}, 1.0, None)
+
+
+def test_mark_weak_flags_only_the_bars_that_differ():
+    tab_roots = [0, 5, 7, 0, 5, 7, 0, 5]
+    rec_roots = [0, 5, 7, 0, 2, 7, 0, 5]  # bar 5 is a different chord in this arrangement
+    structure = _structure(rec_roots)
+    parts = {"guitar": _tab(tab_roots)}
+    fitted = tabdata.fit(parts, _structure(tab_roots))
+    tabdata.mark_weak(parts, fitted, structure)
+    assert [i for i, b in enumerate(parts["guitar"]["bars"]) if b.get("weak")] == [4]
+    assert fitted["weak"] == 1
+
+
+def test_candidates_of_a_cover_include_the_named_original(monkeypatch):
+    seen = []
+    monkeypatch.setattr(tabdata, "_get", lambda url: seen.append(url) or b"[]")
+    info = {"title": "Люби меня люби (cover)", "channel": "Some Band", "description": "Cover of Linkin Park - Numb"}
+    tabdata.candidates(info)
+    assert any("Numb" in u or "numb" in u for u in seen)

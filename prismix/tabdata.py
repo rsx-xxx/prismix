@@ -30,6 +30,7 @@ PART = "https://dqsljvtekg760.cloudfront.net/{id}/{rev}/{image}/{part}.json"
 UA = "Mozilla/5.0 (compatible; prismix)"
 MIN_TITLE = 0.6
 MIN_SCORE = 0.5  # mean bar similarity (0..1) of the matched bars
+WEAK_BAR = 0.35  # a matched bar below this chord similarity is flagged as differing from the recording
 MIN_COVERAGE = 0.6  # share of the tab's playing bars that found a bar in the recording
 CANDIDATES = 5
 MIN_ARTIST = 0.5  # a transposed tab by an artist this unlike the track's needs a very close fit
@@ -195,6 +196,13 @@ def candidates(info: dict) -> list[dict]:
     # A cover or a re-upload names an artist Songsterr does not know: the title alone still finds the song,
     # and the bar-by-bar fit rejects a different song with the same name.
     queries += [("", t) for t in dict.fromkeys(t for _, t in queries)]
+    from . import lyrics  # late: lyrics pulls in the audio stack
+
+    if lyrics.is_cover(info):  # "Song (cover)", "кавер на …": the description and tags name the original
+        for artist, title in lyrics.candidates(info):
+            pair = (tabs._norm(artist or ""), tabs._norm(title))
+            if pair[1] and pair not in queries:
+                queries.append(pair)
     for artist, title in queries:
         url = f"{SEARCH}?{urllib.parse.urlencode({'pattern': f'{artist} {title}'.strip(), 'size': 8})}"
         try:
@@ -496,6 +504,27 @@ def fit(parts: dict[str, dict], structure: dict) -> dict | None:
     return fitted
 
 
+def mark_weak(parts: dict[str, dict], fitted: dict, structure: dict) -> None:
+    """Flag (`weak`) the bars where the tab and the recording's chords disagree: a cover that changes the harmony,
+    a section the original does not have. Run after gapfill (so the map fits the bar list) and before retune."""
+    lead = _lead_parts(parts)
+    rec = _bar_chroma(structure)
+    if not lead or not rec:
+        return
+    t = -fitted["shift"] % 12
+    tab = _tab_chroma(lead)
+    weak = 0
+    for i, j in enumerate(fitted["map"][:len(tab)]):
+        if j is None or not any(tab[i]) or j >= len(rec):
+            continue
+        if _dot(tab[i], rec[j], t) < WEAK_BAR:
+            weak += 1
+            for p in parts.values():
+                if i < len(p["bars"]):
+                    p["bars"][i]["weak"] = 1
+    fitted["weak"] = weak
+
+
 def gapfill(parts: dict[str, dict], fitted: dict, structure: dict) -> None:
     """Fill the bars the tab left out from its own repeats (see tabfill); updates `fitted` with the new map."""
     fitted["map"], fitted["filled"] = tabfill.fill(parts, fitted["map"], _bar_chroma(structure))
@@ -710,6 +739,7 @@ def lookup(video_id: str, *, force: bool = False) -> dict:
     if best:
         _, song, parts, fitted = best
         gapfill(parts, fitted, structure)
+        mark_weak(parts, fitted, structure)
         retune(parts, fitted["shift"])
         result = {
             "found": True, "v": FORMAT, "source": "songsterr", "songId": song["songId"],
