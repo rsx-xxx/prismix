@@ -728,6 +728,12 @@ def _refresh(video_id: str, hit: dict) -> dict:
     return read(video_id) or hit
 
 
+def outdated(video_id: str) -> bool:
+    """A downloaded tab made by an older format; lookup fetches it again. Tabs from files and transcriptions are the user's."""
+    hit = _raw(video_id)
+    return bool(hit and hit.get("found") and hit.get("source") == "songsterr" and hit.get("v", 1) < FORMAT)
+
+
 def lookup(video_id: str, *, force: bool = False) -> dict:
     """Find, align and cache the tab. Always returns a result; {"found": False} when no tab fits."""
     if not force and (hit := read(video_id)) is not None:

@@ -55,3 +55,39 @@ def test_backfill_covers_skips_cloud_songs(tmp_path, monkeypatch):
         (tmp_path / vid / "info.json").write_text(json.dumps({"id": vid, "title": "t", **extra}))
     assert pipeline.backfill_covers() == 1
     assert fetched == ["https://i.ytimg.com/vi/aaaaaaaaaaa/hqdefault.jpg"]
+
+
+def test_outdated_tab_is_missing_again(tmp_path, monkeypatch):
+    vid = _song(tmp_path, monkeypatch)
+    monkeypatch.setattr(analysis, "read_structure", lambda v: {"version": analysis.SCHEMA})
+    (library.video_dir(vid) / "lyrics.json").write_text(json.dumps({"version": lyrics.SCHEMA}))
+    tab = {"found": True, "source": "songsterr", "v": tabdata.FORMAT - 1, "tracks": {}}
+    monkeypatch.setattr(tabdata, "_raw", lambda v: dict(tab))
+    assert prefetch.missing(vid) == ["tabs"]
+    tab["source"] = "file"
+    assert prefetch.missing(vid) == []
+
+
+def test_upgrade_restamps_and_refreshes_cloud(tmp_path, monkeypatch):
+    import asyncio
+
+    vid = _song(tmp_path, monkeypatch)
+    state = {"done": False}
+    monkeypatch.setattr(prefetch, "missing", lambda v: [] if state["done"] else ["lyrics"])
+    monkeypatch.setattr(prefetch.Prefetcher, "_todo", lambda self: [] if state["done"] else [(vid, "htdemucs", "lyrics")])
+    monkeypatch.setattr(lyrics, "lookup", lambda v: state.update(done=True))
+    sent = []
+    monkeypatch.setattr(prefetch.Prefetcher, "_published", lambda self, v, m: sent.append(v))
+
+    async def go():
+        p = prefetch.Prefetcher(None)
+        p.start()
+        for _ in range(50):
+            await asyncio.sleep(0.05)
+            if sent:
+                break
+        await p.stop()
+
+    asyncio.run(go())
+    assert sent == [vid]
+    assert library.read_info(vid)["stages"]["lyrics"] == lyrics.SCHEMA

@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.38.0
+
+Songs processed by an older release are now brought up to date in the background: each cached result (chords, lyrics, tabs) carries the schema it was made with, and when a release changes one, that result is redone after the app starts, a song at a time, without touching your tab edits. Songs already in the cloud are sent again once upgraded; stems are never re-separated.
+
 ## 0.37.0
 
 Auto-transcription now signs you in to Hugging Face from inside the app: press "Sign in", confirm the shown code in the browser, and the model downloads, with no token to copy and no terminal. The model's license still has to be accepted once on its Hugging Face page, which the dialog links to.

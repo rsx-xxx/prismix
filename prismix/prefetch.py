@@ -1,5 +1,6 @@
-"""Fills in, in the background, what a library song is missing: chords and structure, lyrics and tabs.
-Songs open instantly when everything is already on disk; a song that lacks something is topped up here."""
+"""Fills in, in the background, what a library song is missing or has out of date: chords and structure, lyrics and tabs.
+Every cached result carries the schema it was made with; when a release bumps a schema, the old results show up here as
+missing and are redone, then the song is sent to the cloud again if it was published. Stems are never re-separated."""
 from __future__ import annotations
 
 import asyncio
@@ -8,7 +9,9 @@ import json
 import logging
 import time
 
-from . import analysis, library, lyrics, tabdata
+import httpx
+
+from . import analysis, cloud, export, library, lyrics, tabdata
 from .jobs import JobManager
 
 log = logging.getLogger(__name__)
@@ -18,6 +21,7 @@ RETRY_AFTER = 24 * 3600  # a step that found nothing (no lyrics published, no ta
 IDLE_SCAN = 20  # seconds between looks at the library while nothing is missing
 
 STEPS = ("chords", "lyrics", "tabs")
+SCHEMAS = {"chords": ("structure", analysis.SCHEMA), "lyrics": ("lyrics", lyrics.SCHEMA), "tabs": ("tabs", tabdata.FORMAT)}  # step: (stage in info.json, current schema)
 
 
 def _marker(video_id: str):
@@ -45,7 +49,7 @@ def _remember(video_id: str, step: str) -> None:
 
 
 def missing(video_id: str) -> list[str]:
-    """Which of the steps still have nothing cached for this song."""
+    """Which of the steps have nothing cached for this song, or a result made by an older schema."""
     out = []
     if analysis.read_structure(video_id) is None:
         out.append("chords")
@@ -55,7 +59,7 @@ def missing(video_id: str) -> list[str]:
             raise ValueError
     except (OSError, ValueError):
         out.append("lyrics")
-    if tabdata.read(video_id) is None:
+    if tabdata.read(video_id) is None or tabdata.outdated(video_id):
         out.append("tabs")
     return out
 
@@ -109,6 +113,7 @@ class Prefetcher:
                 continue
             total = len(work)
             titles = {v: (await loop.run_in_executor(None, library.read_info, v) or {}).get("title") for v in {w[0] for w in work[:40]}}
+            changed: set[str] = set()
             for n, (vid, model, step) in enumerate(work):
                 info = await loop.run_in_executor(None, library.read_info, vid) or {}
                 self._state = {
@@ -120,11 +125,32 @@ class Prefetcher:
                     await self._fetch(loop, vid, model, step)
                     if step in await loop.run_in_executor(None, missing, vid):
                         self._note(vid, step)  # nothing stored (offline, say): not again right away
+                    else:
+                        stage, schema = SCHEMAS[step]
+                        await loop.run_in_executor(None, library.stamp, vid, stage, schema)
+                        changed.add(vid)
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
                     log.info("prefetch %s for %s: %s", step, vid, e)
                     self._note(vid, step)
+                if vid in changed and (n + 1 == total or work[n + 1][0] != vid):
+                    changed.discard(vid)
+                    await loop.run_in_executor(None, self._published, vid, model)
+
+    def _published(self, vid: str, model: str) -> None:
+        """Send a song that was upgraded to the cloud again, if it is already there. Unchanged files are not uploaded twice."""
+        cl = cloud.current()
+        if not cl:
+            return
+        try:
+            manifest = cl.manifest(vid)
+            if manifest:
+                cloud.publish(cl, vid, manifest.get("model") if manifest.get("model") in library.MODELS else model)
+        except (cloud.CloudError, httpx.HTTPError, export.ExportError, ValueError, OSError) as e:
+            log.info("cloud refresh of %s skipped: %s", vid, e)
+        finally:
+            cl.close()
 
     def _note(self, vid: str, step: str) -> None:
         self._failed[(vid, step)] = time.time()
