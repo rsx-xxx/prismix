@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.37.0
+
+Auto-transcription now signs you in to Hugging Face from inside the app: press "Sign in", confirm the shown code in the browser, and the model downloads, with no token to copy and no terminal. The model's license still has to be accepted once on its Hugging Face page, which the dialog links to.
+
 ## 0.36.1
 
 The downloadable apps now include the auto-transcription model code and the Guitar Pro / MIDI readers; 0.35.0 and 0.36.0 builds were made without them, so those features only worked from source. The build checks at startup that they load.

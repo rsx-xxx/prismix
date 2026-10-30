@@ -20,11 +20,40 @@ export function createSources({ api, onChange, onTab }) {
     $('auto-msg').textContent = '';
     const btn = $('auto-tab');
     btn.hidden = true;
+    $('hf-box').hidden = $('hf-login').hidden = $('hf-code-link').hidden = true;
     api(`/api/tabdata/${id}/auto`).then((d) => {
-      btn.hidden = !d.available || !d.kinds.length;
-      if (d.available && d.kinds.length) btn.textContent = `Transcribe ${d.kinds.join(', ')}`;
+      const ready = d.available && d.kinds.length;
+      btn.hidden = !ready || !d.signedIn;
+      $('hf-box').hidden = $('hf-login').hidden = !ready || d.signedIn;
+      if (ready) btn.textContent = `Transcribe ${d.kinds.join(', ')}`;
     }).catch(() => {});
     dlg.showModal();
+  });
+
+  $('hf-login').addEventListener('click', async () => {
+    const login = $('hf-login');
+    login.disabled = true;
+    try {
+      const s = await api('/api/hf/login', { method: 'POST' });
+      $('hf-code').textContent = s.code;
+      $('hf-code-link').href = s.url;
+      $('hf-code-link').hidden = false;
+      for (let i = 0; i < 120; i++) {
+        await new Promise((r) => setTimeout(r, 2500));
+        const st = await api('/api/hf/login');
+        if (st.status === 'done') {
+          $('hf-box').hidden = login.hidden = true;
+          $('auto-tab').hidden = false;
+          $('auto-msg').textContent = 'Signed in.';
+          return;
+        }
+        if (st.status === 'error') throw new Error(st.message);
+      }
+    } catch (err) {
+      $('auto-msg').textContent = err.message;
+    } finally {
+      login.disabled = false;
+    }
   });
 
   $('auto-tab').addEventListener('click', async () => {

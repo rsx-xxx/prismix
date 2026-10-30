@@ -26,6 +26,7 @@ from . import (
     client,
     cloud,
     export,
+    hflogin,
     lan,
     library,
     lyrics,
@@ -765,13 +766,26 @@ def create_app() -> FastAPI:
         except tabdata.TabDataError:
             return {"found": False}
 
+    @app.get("/api/hf/login")
+    async def hf_login_state(request: Request):
+        own_window(request)
+        return await asyncio.to_thread(hflogin.state)
+
+    @app.post("/api/hf/login")
+    async def hf_login_start(request: Request):
+        own_window(request)
+        try:
+            return await asyncio.to_thread(hflogin.start)
+        except hflogin.HFLoginError as e:
+            raise HTTPException(422, str(e)) from e
+
     @app.get("/api/tabdata/{video_id}/auto")
     async def auto_tabdata_missing(video_id: str):
         # Which instruments could be written out from the recording's own stems
         if not autotab.available():
             return {"available": False, "kinds": []}
         try:
-            return {"available": True, "kinds": sorted(await asyncio.to_thread(autotab.missing, video_id))}
+            return {"available": True, "signedIn": await asyncio.to_thread(hflogin.logged_in), "kinds": sorted(await asyncio.to_thread(autotab.missing, video_id))}
         except ValueError:
             raise HTTPException(404, "Not found") from None
 

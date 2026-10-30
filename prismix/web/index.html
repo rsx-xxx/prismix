@@ -378,6 +378,8 @@
       <button class="btn" id="slice-import" type="button">Import tab</button>
       <p class="muted">Or write out the instruments no tab covers from the recording itself. It is a machine transcription: less exact than a published tab, and it takes a few minutes the first time (the model downloads once).</p>
       <p class="muted" id="auto-msg" role="status"></p>
+      <p class="muted" id="hf-box" hidden>The model is free but gated: <a id="hf-link" href="https://huggingface.co/MuScriptor/muscriptor-small" target="_blank" rel="noopener">accept its license</a> once, then sign in. <a id="hf-code-link" target="_blank" rel="noopener" hidden>Confirm the code <b id="hf-code"></b></a></p>
+      <button class="btn" id="hf-login" type="button" hidden>Sign in to Hugging Face</button>
       <button class="btn" id="auto-tab" type="button" hidden>Transcribe missing instruments</button>
     </form>
   </dialog>
