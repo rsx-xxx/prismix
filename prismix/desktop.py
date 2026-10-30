@@ -46,7 +46,8 @@ def selftest() -> None:
 
     for name in ("torch", "demucs.pretrained", "demucs.apply", "beat_this.inference", "librosa", "pylibrb",
                  "transformers", "huggingface_hub", "yt_dlp", "imageio_ffmpeg", "soundfile", "einops",
-                 "rotary_embedding_torch", "prismix.pipeline", "prismix.transcribe", "prismix.analysis", "prismix.export"):
+                 "rotary_embedding_torch", "prismix.pipeline", "prismix.transcribe", "prismix.analysis", "prismix.export",
+                 "muscriptor", "guitarpro", "mido", "prismix.autotab", "prismix.tabfiles"):  # auto-transcription and tab files
         importlib.import_module(name)
     import librosa
     import numpy as np

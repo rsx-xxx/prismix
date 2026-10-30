@@ -1,6 +1,6 @@
 """Build the desktop app with PyInstaller: dist/Prismix/ (Windows) or dist/Prismix.app (macOS).
 
-    uv run --group desktop python packaging/build.py
+    uv run --group desktop --extra autotab python packaging/build.py
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ COLLECT_ALL = [
     "demucs", "beat_this", "librosa", "soundfile", "pylibrb", "imageio_ffmpeg", "yt_dlp", "yt_dlp_ejs",
     "transformers", "huggingface_hub", "einops", "rotary_embedding_torch", "beartype", "numba", "llvmlite",
     "lazy_loader", "wordfreq", "langcodes", "language_data", "webview", "uvicorn", "certifi", "zeroconf", "segno",
-    "bs_roformer", "ml_collections", "torchaudio", "websockets",  # bs_roformer reads data/*.json next to its code
+    "bs_roformer", "ml_collections", "torchaudio", "websockets", "muscriptor", "guitarpro", "mido",  # bs_roformer reads data/*.json next to its code
 ]
 HIDDEN = ["uvicorn.logging", "uvicorn.loops.auto", "uvicorn.protocols.http.auto", "uvicorn.lifespan.on", "multipart",
           "PyObjCTools.AppHelper", "AppKit", "WebKit", "UserNotifications", "MediaPlayer"]

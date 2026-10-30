@@ -43,11 +43,11 @@ jobs:
         with:
           deno-version: v2.x
       - name: Install
-        run: uv sync --group desktop
+        run: uv sync --group desktop --extra autotab
       - name: Build app
         run: |
-          uv run --group desktop python packaging/gen_icon.py
-          uv run --group desktop python packaging/build.py
+          uv run --group desktop --extra autotab python packaging/gen_icon.py
+          uv run --group desktop --extra autotab python packaging/build.py
       - name: Azure login (code signing)
         if: env.SIGN == 'true'
         uses: azure/login@v3
@@ -103,11 +103,11 @@ jobs:
         with:
           deno-version: v2.x
       - name: Install
-        run: uv sync --group desktop
+        run: uv sync --group desktop --extra autotab
       - name: Build app
         run: |
-          uv run --group desktop python packaging/gen_icon.py
-          uv run --group desktop python packaging/build.py
+          uv run --group desktop --extra autotab python packaging/gen_icon.py
+          uv run --group desktop --extra autotab python packaging/build.py
       - name: Smoke test the bundle
         run: dist/Prismix.app/Contents/MacOS/Prismix --selftest
       - name: Build DMG
