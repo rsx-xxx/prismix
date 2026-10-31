@@ -22,6 +22,7 @@ import { createCloud } from './cloud.js';
 import { createQueue } from './queue.js';
 import { createMedia } from './media.js';
 import { initLinks } from './links.js';
+import { paintCover, isUpload, ytThumb } from './cover.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -34,14 +35,8 @@ const fmt = (s) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 const thumb = (id) => `/media/${id}/thumb.jpg`;
-const isUpload = (id) => /^u-[0-9a-f]{9}$/.test(id);
-const ytThumb = (id) => (isUpload(id) ? thumb(id) : `https://i.ytimg.com/vi/${id}/mqdefault.jpg`);
-/** Cover that falls back to the YouTube thumbnail when the saved file is missing. */
-const cover = (img, id) => {
-  img.addEventListener('error', () => { if (!isUpload(id) && !img.src.includes('ytimg')) img.src = ytThumb(id); }, { once: true });
-  img.src = thumb(id);
-  return img;
-};
+/** Cover with a fade-in placeholder and a YouTube fallback; the first screenful loads eagerly. */
+const cover = (img, id, eager = false) => paintCover(img, id, { eager });
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 const ICON = {
@@ -153,7 +148,7 @@ let searchRun = 0;
 
 function resultRow(it, box) {
   const pic = el('button', { className: 'pic', type: 'button', title: 'Preview', ariaLabel: `Preview ${it.title}` },
-    el('img', { src: ytThumb(it.id), alt: '', loading: 'lazy' }));
+    paintCover(el('img', { alt: '' }), it.id, { local: ytThumb(it.id) }));
   const info = el('div', { className: 'info' }, el('div', { className: 't', textContent: it.title }),
     el('div', { className: 's', textContent: `${it.channel}${it.duration ? ' · ' + fmt(it.duration) : ''}` }));
   const go = el('button', { className: 'btn small go', type: 'button', textContent: inLibrary(it.id) ? 'Open' : 'Split' });
@@ -415,10 +410,10 @@ paintView();
 function renderRecent() {
   const items = recentIds().map((id) => state.library.find((i) => i.id === id)).filter(Boolean);
   $('recent-sec').hidden = items.length === 0;
-  $('recent').replaceChildren(...items.map((it) => {
+  $('recent').replaceChildren(...items.map((it, n) => {
     const open = it.models.includes(state.defaultModel) ? state.defaultModel : it.models[0];
     const a = el('a', { className: 'tile', href: `#/v/${it.id}/${open}`, title: it.title },
-      cover(el('img', { alt: '', loading: 'lazy', draggable: false }), it.id),
+      cover(el('img', { alt: '', draggable: false }), it.id, n < 6),
       el('b', { textContent: it.title }),
       el('small', { className: 'muted', textContent: it.channel }));
     a.addEventListener('click', () => { state.plist = null; });
@@ -431,10 +426,10 @@ function renderLibrary() {
   const lib = $('library');
   $('empty').hidden = state.library.length > 0;
   $('lib-count').textContent = state.library.length ? `${state.library.length} track${state.library.length > 1 ? 's' : ''}` : '';
-  lib.replaceChildren(...state.library.map((it) => {
+  lib.replaceChildren(...state.library.map((it, n) => {
     const open = it.models.includes(state.defaultModel) ? state.defaultModel : it.models[0];
     const card = el('div', { className: 'card', role: 'link', tabIndex: 0, title: it.title },
-      cover(el('img', { className: 'cover', alt: '', loading: 'lazy' }), it.id),
+      cover(el('img', { className: 'cover', alt: '' }), it.id, n < 12),
       el('span', { className: 'dur', textContent: fmt(it.duration) }),
       el('div', { className: 'meta' },
         el('div', { className: 'title', textContent: it.title }),
@@ -468,6 +463,8 @@ function dragSong(card, id) {
     const r = card.getBoundingClientRect();
     const ghost = card.cloneNode(true);
     ghost.classList.add('drag-ghost');
+    // The ghost sits off-screen, where lazy images never load: its covers must be ready now, taken from the card's own decoded pictures.
+    ghost.querySelectorAll('img').forEach((i) => { i.loading = 'eager'; i.decoding = 'sync'; i.classList.add('ok'); });
     ghost.style.width = `${r.width}px`;
     document.body.append(ghost);
     e.dataTransfer.setDragImage(ghost, e.clientX - r.left, e.clientY - r.top);
@@ -1193,15 +1190,16 @@ laneCol.addEventListener('pointerdown', (e) => {
 const FORMATS = [
   { id: 'mp3', label: 'MP3', hint: 'Plays everywhere. High-quality VBR (~245 kbps).' },
   { id: 'm4a', label: 'M4A', hint: 'AAC 256 kbps. Best for Apple devices.' },
-  { id: 'flac', label: 'FLAC', hint: 'Lossless, about half the size of WAV.' },
+  { id: 'flac', label: 'FLAC', hint: 'Lossless, about half the size of WAV. Best quality, with tags and cover.' },
   { id: 'wav', label: 'WAV', hint: 'Lossless 24-bit. Biggest files, for editing in a DAW.' },
   { id: 'ogg', label: 'OGG', hint: 'Vorbis, good quality at small size.' },
   { id: 'opus', label: 'Opus', hint: '160 kbps; the most efficient lossy codec.' },
 ];
-const exportState = { format: localStorage.getItem('stems:format') || 'mp3', picked: new Set(), source: 'mix' };
+const exportState = { format: localStorage.getItem('stems:format') || 'flac', picked: new Set(), source: 'mix' };
 const ORIGINAL = {
   audio: [
-    { id: 'original', label: 'As downloaded', hint: 'The audio stream exactly as YouTube serves it (usually Opus or AAC). No quality loss.' },
+    { id: 'best', label: 'Best (tagged)', hint: 'The best stream YouTube serves (Opus or AAC), untouched, with title, artist and cover embedded. No quality loss.' },
+    { id: 'original', label: 'Raw stream', hint: 'The audio stream exactly as YouTube serves it, without tags or cover.' },
     ...FORMATS,
   ],
   video: [
@@ -1211,7 +1209,7 @@ const ORIGINAL = {
   ],
 };
 const HEIGHTS = [['', 'Best available'], ['1080', '1080p'], ['720', '720p'], ['480', '480p'], ['360', '360p']];
-const orig = { kind: 'audio', audio: 'original', video: 'mp4', height: '' };
+const orig = { kind: 'audio', audio: 'best', video: 'mp4', height: '' };
 
 const pitchLabel = () => {
   const p = player.pitch;

@@ -161,10 +161,10 @@ def render(spec: ExportSpec) -> tuple[bytes, str, str]:
 
     ext, mime, _ = FORMATS[spec.format]
     title = meta.get("title", "track")
-    base = _safe(title) + describe(spec)
     mdir = library.model_dir(spec.video_id, spec.model)
     found, cover = tagging.for_track(spec.video_id)
     title = found.get("title") or title
+    base = _safe(tagging.file_stem(found, title)) + describe(spec)
     tags = {**found, "title": title, "artist": found.get("artist") or meta.get("channel", ""),
             "comment": f"Stems: {', '.join(names)}; tempo {spec.tempo:.2f}x; {spec.semitones:+g} semitones"}
 

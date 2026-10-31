@@ -1185,3 +1185,9 @@ body:has(#tabview:not([hidden], .off, .out)) #ahead { display: none !important; 
 @media (prefers-reduced-motion: reduce) { .upd-dlg img { animation: none; } }
 #share-btn.copied, #share-at-btn.copied { background: var(--accent); color: var(--on-primary); border-color: transparent; transform: scale(.96); }
 #share-btn, #share-at-btn { transition: background .15s, color .15s, transform .15s; }
+
+/* Covers: a quiet placeholder until the picture is decoded, then a fade-in (never the browser's broken-image glyph) */
+img.cv { opacity: 0; transition: opacity .2s ease-out; }
+img.cv.ok { opacity: 1; }
+img.cv.none { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { img.cv { transition: none; } }

@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from . import library
+from . import genius, library
 from .config import ffmpeg_exe
 
 ONLINE = os.environ.get("PRISMIX_ONLINE_TAGS", "1") != "0"
@@ -28,7 +28,7 @@ NOISE = re.compile(
 
 
 def _clean(text: str) -> str:
-    return re.sub(r"\s+", " ", NOISE.sub(" ", text or "")).strip(" -–—|")
+    return genius.clean_title(re.sub(r"\s+", " ", NOISE.sub(" ", text or "")).strip(" -–—|"))
 
 
 def _split(title: str, channel: str) -> tuple[str, str]:
@@ -38,7 +38,7 @@ def _split(title: str, channel: str) -> tuple[str, str]:
         if sep in t:
             a, s = t.split(sep, 1)
             return a.strip(), s.strip()
-    return _clean(channel), t
+    return genius.clean_artist(channel), t
 
 
 def _sim(a: str, b: str) -> float:
@@ -117,8 +117,27 @@ def for_track(video_id: str) -> tuple[dict[str, str], Path | None]:
         tags = {k: found[k] for k in ("title", "artist", "album", "date", "genre", "track") if found.get(k)}
         if found.get("artist"):
             tags["album_artist"] = found["artist"]
-        tags.setdefault("title", info.get("title", ""))
-        tags.setdefault("artist", info.get("channel", ""))
+        guess_artist, guess_title = _split(info.get("title", ""), info.get("channel", ""))
+        tags.setdefault("title", guess_title or info.get("title", ""))
+        tags.setdefault("artist", guess_artist or info.get("channel", ""))
         return tags, (cover if cover.is_file() else None)
     except Exception:  # noqa: BLE001
         return {}, None
+
+
+def file_stem(tags: dict[str, str], fallback: str) -> str:
+    """'Artist - Title' for a saved file, from clean tags (never the raw YouTube title with its 'Official Video' tails)."""
+    artist, title = tags.get("artist", ""), tags.get("title", "")
+    return f"{artist} - {title}" if artist and title and artist.lower() not in title.lower() else title or fallback
+
+
+def picture_tag(cover: Path) -> list[str]:
+    """ffmpeg args that embed `cover` in an Ogg/Opus file (a FLAC picture block in a Vorbis comment; ffmpeg cannot attach pictures there)."""
+    import base64
+    import struct
+
+    data = cover.read_bytes()
+    mime = b"image/png" if data[:4] == b"\x89PNG" else b"image/jpeg"
+    block = (struct.pack(">II", 3, len(mime)) + mime + struct.pack(">I", 0)
+             + struct.pack(">IIIII", 0, 0, 24, 0, len(data)) + data)
+    return ["-metadata", "METADATA_BLOCK_PICTURE=" + base64.b64encode(block).decode()]

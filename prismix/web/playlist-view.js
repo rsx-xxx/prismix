@@ -2,6 +2,7 @@
 // and the "add to playlist" picker used from library cards.
 
 import { instrumentMarks } from './instruments.js';
+import { paintCover } from './cover.js';
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
   const n = Object.assign(document.createElement(tag), props);
@@ -12,7 +13,7 @@ const JSON_POST = (method, body) => ({ method, headers: { 'Content-Type': 'appli
 const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const SONG = 'application/x-prismix-song';
 const itemOf = (s) => ({ id: s.id, title: s.title, channel: s.channel, duration: s.duration });
-const art = (id) => (/^u-[0-9a-f]{9}$/.test(id) ? `/media/${id}/thumb.jpg` : `https://i.ytimg.com/vi/${id}/mqdefault.jpg`);
+const art = (img, id, eager = false) => paintCover(img, id, { eager });
 
 export function createPlaylistView({ api, library, open, notice, quality, cloudMark }) {
   let lists = [];
@@ -31,7 +32,7 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
     $('pl-cards').replaceChildren(...lists.map((p) => {
       const first = p.items[0];
       const card = el('button', { type: 'button', className: 'plcard', title: p.name },
-        first ? el('img', { src: art(first.id), alt: '', loading: 'lazy' }) : el('div', { className: 'pl-ph' }),
+        first ? art(el('img', { alt: '' }), first.id, true) : el('div', { className: 'pl-ph' }),
         el('b', { textContent: p.name }), el('small', { className: 'muted', textContent: `${p.items.length} song${p.items.length === 1 ? '' : 's'}` }));
       card.addEventListener('click', () => { location.hash = `#/p/${p.id}`; });
       card.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes(SONG)) { e.preventDefault(); card.classList.add('drop'); } });
@@ -66,7 +67,7 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
       row.dataset.id = it.id;
       const go = el('button', { type: 'button', className: 'pp-go' },
         el('span', { className: 'pp-n', textContent: String(n + 1) }),
-        el('img', { src: art(it.id), alt: '', loading: 'lazy', draggable: false }),
+        art(el('img', { alt: '', draggable: false }), it.id, n < 10),
         el('span', { className: 'pl-meta' }, el('b', { textContent: it.title || it.id }),
           el('small', { className: 'muted', textContent: [it.channel, it.duration ? fmt(it.duration) : ''].filter(Boolean).join(' · ') })),
         el('span', { className: 'pl-tag', textContent: '' }));
@@ -134,6 +135,7 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
     const dy = e.clientY - box.top;
     const ghost = row.cloneNode(true);
     ghost.classList.add('pp-ghost');
+    ghost.querySelectorAll('img').forEach((i) => { i.loading = 'eager'; i.classList.add('ok'); });
     Object.assign(ghost.style, { width: `${box.width}px`, left: `${box.left}px`, top: `${box.top}px` });
     document.body.append(ghost);
     row.classList.add('drag');

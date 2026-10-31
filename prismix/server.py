@@ -188,7 +188,7 @@ class MediaFiles(StaticFiles):
         if path.endswith((".flac", ".m4a")):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         elif path.endswith(".jpg"):
-            resp.headers["Cache-Control"] = "public, max-age=3600"  # covers rarely change; phones re-fetch dozens per scroll otherwise
+            resp.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800"  # covers rarely change; phones re-fetch dozens per scroll otherwise
         else:
             resp.headers["Cache-Control"] = "no-cache"
         return resp

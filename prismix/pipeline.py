@@ -233,8 +233,26 @@ def _save_thumbnail(meta: dict, dest: Path) -> None:
         r = httpx.get(url, timeout=15, follow_redirects=True)
         r.raise_for_status()
         dest.write_bytes(r.content[:5_000_000])
+        shrink_thumbnail(dest)
     except Exception as e:  # cosmetic only
         log.warning("thumbnail fetch failed: %s", e)
+
+
+THUMB_WIDTH = 640  # covers show at most ~300 px wide (2x on retina): the 1280 px original is dead weight on a phone
+THUMB_MAX_BYTES = 90_000
+
+
+def shrink_thumbnail(path: Path) -> None:
+    """Re-save a cover as a JPEG at most THUMB_WIDTH wide, so lists paint at once instead of waiting on a 200 KB+ image."""
+    tmp = path.with_name("thumb.tmp.jpg")
+    proc = subprocess.run(
+        [ffmpeg_exe(), "-v", "error", "-nostdin", "-y", "-i", str(path), "-vf", f"scale='min({THUMB_WIDTH},iw)':-2",
+         "-frames:v", "1", "-q:v", "4", "-huffman", "optimal", str(tmp)],
+        capture_output=True, check=False,
+    )
+    if proc.returncode == 0 and tmp.is_file() and tmp.stat().st_size < path.stat().st_size:
+        tmp.replace(path)
+    tmp.unlink(missing_ok=True)
 
 
 def backfill_covers() -> int:
@@ -243,7 +261,11 @@ def backfill_covers() -> int:
 
     saved = 0
     for d in LIBRARY_DIR.iterdir() if LIBRARY_DIR.is_dir() else []:
-        if not library.VIDEO_ID_RE.match(d.name) or (d / "thumb.jpg").is_file():
+        if not library.VIDEO_ID_RE.match(d.name):
+            continue
+        if (d / "thumb.jpg").is_file():
+            if (d / "thumb.jpg").stat().st_size > THUMB_MAX_BYTES:  # saved at full size by an older version
+                shrink_thumbnail(d / "thumb.jpg")
             continue
         info = library.read_info(d.name)
         if not info or info.get("fromCloud"):  # cloud songs bring their own cover

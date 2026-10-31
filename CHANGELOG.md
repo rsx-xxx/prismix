@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.39.0
+
+Covers now appear at once: pictures are saved at a size that fits the screen (older ones are slimmed in the background), the first screenful loads eagerly, and each cover fades in over a quiet placeholder instead of showing the empty-image glyph, on desktop, the web remote and the Android app. A song dragged to a playlist now carries its cover along. Downloaded audio defaults to the best quality: the original stream with title, artist and cover embedded (Opus or AAC, no re-encode) and mixes default to FLAC; "Official Audio", "Official Video", "Topic" and similar tails are gone from tags and file names, which read "Artist - Title".
+
 ## 0.38.2
 
 On the phone, the Tab view no longer disappears after you open a song that has no tab: the view you chose is restored for the next song, instead of staying on Lyrics until the page is reloaded.
