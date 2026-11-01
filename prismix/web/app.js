@@ -1549,6 +1549,20 @@ $('acc-sel').value = getAccidentals();
 $('acc-sel').addEventListener('change', () => { setAccidentals($('acc-sel').value); window.dispatchEvent(new Event('accidentals')); });
 $('help-btn').addEventListener('click', () => { closeSettings(); cheats.toggle(); });
 
+// Mobile app: one QR to a landing page that sends each scanner to its own install route
+$('getapp-btn').addEventListener('click', async () => {
+  closeSettings();
+  const dlg = $('getapp');
+  try {
+    const g = await api('/api/getapp');
+    $('getapp-qr').innerHTML = g.qr || '';
+    $('getapp-qr').hidden = !g.qr;
+    $('getapp-url').textContent = g.url;
+  } catch (err) { notice(err.message); return; }
+  dlg.showModal();
+});
+$('getapp-close').addEventListener('click', () => $('getapp').close());
+
 // Stem quality: sizes and times are computed by the server for this machine and the model picked on the home screen.
 const fmtDur = (s) => (s < 90 ? `${s} s` : `${Math.round(s / 60)} min`);
 async function loadQuality() {

@@ -24,3 +24,4 @@ packaging/icon.*
 
 # Android build output
 android/build/
+ios/build/

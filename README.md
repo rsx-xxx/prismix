@@ -15,6 +15,7 @@
 | macOS (Apple Silicon) | `brew tap rsx-xxx/prismix && brew install --cask prismix` |
 | Windows | [`Prismix-Setup.exe`](https://github.com/rsx-xxx/prismix/releases/latest) |
 | Android | [`Prismix.apk`](https://github.com/rsx-xxx/prismix/releases/latest) |
+| iPhone, iPad | free via AltStore or SideStore: add the source `https://github.com/rsx-xxx/prismix/releases/latest/download/altstore.json` (or scan the QR in Settings, Mobile app) |
 | Any (from source) | `uv sync && uv run prismix` (Python 3.11–3.13, [uv](https://docs.astral.sh/uv/)) |
 
 All installers are on the [latest release](https://github.com/rsx-xxx/prismix/releases/latest). They are unsigned, so macOS or Windows asks for confirmation on first launch.
@@ -92,7 +93,7 @@ uv run pytest
 uv run ruff check .
 ```
 
-Build the desktop app with `packaging/build.py` (see `packaging/`) and the Android app with `android/build.sh`. `v*` tags publish a release with all installers. See the [changelog](CHANGELOG.md) for what changed.
+Build the desktop app with `packaging/build.py` (see `packaging/`) the Android app with `android/build.sh` and the iPhone/iPad app with `ios/build.sh` (needs Xcode; the IPA is unsigned and signed on the phone by AltStore). `v*` tags publish a release with all installers. See the [changelog](CHANGELOG.md) for what changed.
 
 ## Disclaimer
 

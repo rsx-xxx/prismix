@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.45.0
+
+Prismix now has an iPhone and iPad app. It finds your computer on the Wi-Fi (or scans its QR code), shows the phone page with lock-screen controls and background audio, and on iPad keeps the song list beside the player; the same split layout appears on Android tablets. It is free to install: add the Prismix source in AltStore or SideStore and it signs the app with your own Apple ID. Settings has a new Mobile app entry with one QR code that sends Android phones to the APK and iPhones and iPads to the AltStore install.
+
 ## 0.44.0
 
 New Tuner in the sidebar, the bottom bar and the phone's Controls: it listens to your instrument and shows the note and how many cents off it is, for guitar (all the usual tunings, following the song's), bass, ukulele and violin, with an adjustable A4. A Tone tab plays a tuning fork or any open string as a reference; it works in the desktop app and in the Android app, which now asks for the microphone. Also updates FastAPI, Starlette, Pydantic, pytest and ruff.

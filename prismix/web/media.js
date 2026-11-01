@@ -3,7 +3,7 @@
 // media, so a silent looping <audio> stands in for them. Inside the Android app the native shell draws the
 // notification instead (a foreground service keeps it and the audio alive with the screen off).
 
-const droid = window.Android;
+const droid = window.PrismixShell || window.Android; // the native shell: Android bridge or the iOS shim
 const native = () => window.pywebview?.api?.now_playing ? window.pywebview.api : null; // the macOS desktop shell
 
 /** One second of 16-bit audio whose only signal is a 1-LSB, 50 Hz square wave (about -90 dB, inaudible). Firefox/Zen and WebKit
@@ -37,7 +37,7 @@ export function createMedia(ctl) {
     else if (op === 'step') ctl.step(arg);
     else if (op === 'toggle') (sent?.playing ? ctl.pause() : ctl.play());
   };
-  window.__media = (op, arg) => act(op, +arg || 0); // called by the Android shell
+  window.__media = (op, arg) => act(op, +arg || 0); // called by the Android and iOS shells
 
   if (ms && !droid?.media) {
     const set = (name, fn) => { try { ms.setActionHandler(name, fn); } catch { /* not supported here */ } };

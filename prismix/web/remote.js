@@ -21,13 +21,13 @@ const store = (() => {
   try {
     const mine = JSON.parse(localStorage.getItem(LS)) || {};
     // each origin has its own localStorage: the app keeps one copy of the settings for both
-    if (OFFLINE) return { ...mine, ...JSON.parse(window.Android?.stashed?.() || '{}'), pin: '' };
+    if (OFFLINE) return { ...mine, ...JSON.parse((window.PrismixShell || window.Android)?.stashed?.() || '{}'), pin: '' };
     return mine;
   } catch { return {}; }
 })();
 const save = () => {
   localStorage.setItem(LS, JSON.stringify(store));
-  try { window.Android?.stash?.(JSON.stringify({ ...store, pin: undefined })); } catch { /* the copy is a convenience */ }
+  try { (window.PrismixShell || window.Android)?.stash?.(JSON.stringify({ ...store, pin: undefined })); } catch { /* the copy is a convenience */ }
 };
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -36,7 +36,7 @@ const el = (tag, props = {}, ...kids) => {
   n.append(...kids);
   return n;
 };
-const droid = window.Android; // bridge from the native shell, absent in a plain browser
+const droid = window.PrismixShell || window.Android; // bridge from the native shell (Android or iOS), absent in a plain browser
 
 function floorIndex(arr, x) {
   let lo = 0, hi = arr.length - 1, r = -1;
@@ -135,6 +135,7 @@ function onMessage(m) {
     $('boot').hidden = true;
     $('join').hidden = true;
     $('app').hidden = false;
+    layout();
     S.locked = m.locked;
     S.id = m.id;
     S.speaker = m.speaker;
@@ -901,7 +902,19 @@ addEventListener('resize', () => { // a rotated phone fits a different number of
 const sheet = $('sheet');
 const songs = $('songs');
 let library = [];
-const openSongs = () => { songs.showModal(); $('song-q').value = ''; loadLibrary(); loadPlaylists(); };
+// Platform: the iOS shell sets data-platform itself; a browser on an iPad is told apart by iPadOS posing as a Mac with a touch screen.
+const root = document.documentElement;
+const ipadLike = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+root.dataset.platform ||= ipadLike ? 'ipad' : /iPhone|iPod/.test(navigator.userAgent) ? 'ios' : /Android/.test(navigator.userAgent) ? 'android' : 'web';
+// A wide, tall touch screen (iPad, Android tablet, unfolded foldable) keeps the song list beside the player instead of in a sheet.
+const wide = matchMedia('(min-width: 900px) and (min-height: 600px) and (pointer: coarse)');
+const isSplit = () => wide.matches;
+const openSongs = () => { if (isSplit()) songs.show(); else songs.showModal(); $('song-q').value = ''; loadLibrary(); loadPlaylists(); };
+const layout = () => {
+  root.classList.toggle('split', wide.matches);
+  if (wide.matches) { if (!songs.open) openSongs(); } else if (songs.open && !songs.matches(':modal')) songs.close();
+};
+wide.addEventListener('change', layout);
 $('songs-btn').onclick = openSongs;
 $('who')?.addEventListener('click', openSongs);
 $('songs-close').onclick = () => songs.close();
@@ -1099,7 +1112,7 @@ function setSongTab(tab) {
 $('song-tabs').onclick = (e) => { const t = e.target.dataset?.tab; if (t) setSongTab(t); };
 
 function playSong(id, model, plist) {
-  songs.close();
+  if (!root.classList.contains('split')) songs.close();
   if (plist !== undefined) S.pl = plist;
   if (S.mode === 'solo') { S.solo.tempo = 1; S.solo.semitones = 0; S.solo.chord = 0; loadTrack(id, model); } else send('load', { id, model });
   syncPlNav();
@@ -1295,6 +1308,7 @@ function offlineStart() {
   $('join').hidden = true;
   if (!store.role) { showJoin(); return; }
   $('app').hidden = false;
+  layout();
   $('mode-seg').style.display = 'none';
   $('lat-row').style.display = 'none';
   $('song-tabs').style.display = 'none';

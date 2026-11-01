@@ -405,6 +405,13 @@
     </div>
   </dialog>
 
+  <dialog id="getapp">
+    <div class="pl-head"><h3>Install on a phone or tablet</h3><button class="icon-btn" id="getapp-close" type="button" aria-label="Close">×</button></div>
+    <p class="muted">Scan with the phone's camera. Android gets the app file, iPhone and iPad get the free install through AltStore or SideStore. One code works for both.</p>
+    <div id="getapp-qr" class="band-qr" hidden></div>
+    <p id="getapp-url" class="band-url"></p>
+  </dialog>
+
   <dialog id="band">
     <div class="pl-head"><h3>Band</h3><button class="icon-btn" id="band-close" type="button" aria-label="Close">×</button></div>
     <div class="band-tabs" id="band-mode" role="tablist">
@@ -475,6 +482,7 @@
     <div class="set-row"><span>Theme</span><button class="icon-btn" id="theme-btn" type="button" aria-label="Theme"></button></div>
     <div class="set-row"><span>Keyboard shortcuts</span><button class="btn small ghost" id="help-btn" type="button">Show</button></div>
     <div class="set-row"><span title="Guitar Pro, MusicXML or MIDI files you already have; matched to your songs by name and checked against the audio">Tab files</span><button class="btn small ghost" id="tabfolder-btn" type="button">Pick a folder…</button></div>
+    <div class="set-row"><span title="A QR code that installs Prismix on a phone or tablet: the Android app or the iPhone and iPad app, chosen by the scanner">Mobile app</span><button class="btn small ghost" id="getapp-btn" type="button">Show QR…</button></div>
     <div class="set-row"><span>Version</span><a class="ver" id="ver" href="https://github.com/rsx-xxx/prismix/releases" target="_blank" rel="noopener" title="Release notes" hidden></a></div>
     <div class="set-row"><span>Update</span><div class="upd-box"><a class="btn small primary upd" id="upd" href="https://github.com/rsx-xxx/prismix/releases/latest" target="_blank" rel="noopener" hidden></a><div class="bar" id="upd-bar" hidden><i></i></div><small class="muted upd-msg" id="upd-msg" hidden></small><span class="muted" id="upd-none">Up to date</span><button class="btn small ghost" id="upd-check" type="button">Check for updates</button></div></div>
   </div>

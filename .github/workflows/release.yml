@@ -151,9 +151,26 @@ jobs:
           name: android
           path: android/build/Prismix.apk
 
+  build-ios:
+    # Unsigned IPA: AltStore / SideStore / Sideloadly sign it on the phone with the installer's free Apple ID.
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build IPA and AltStore source
+        run: |
+          sh ios/build.sh
+          mkdir -p dist
+          cp ios/build/Prismix.ipa dist/Prismix.ipa
+          python3 packaging/altstore.py "$PRISMIX_VERSION" dist/Prismix.ipa dist/altstore.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios
+          path: dist/
+
   # Tag pushes get a versioned release; everything else updates a rolling 'latest' release.
   release:
-    needs: [build-windows, build-mac, build-android]
+    needs: [build-windows, build-mac, build-android, build-ios]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -187,6 +204,8 @@ jobs:
             artifacts/windows/Prismix-Setup.exe
             artifacts/mac/Prismix.dmg
             artifacts/android/Prismix.apk
+            artifacts/ios/Prismix.ipa
+            artifacts/ios/altstore.json
           draft: false
           prerelease: false
           make_latest: true

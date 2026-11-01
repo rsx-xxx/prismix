@@ -99,6 +99,9 @@ class JoinRequest(BaseModel):
     host: str = Field(min_length=1, max_length=300)
 
 
+GET_APP_URL = "https://rsx-xxx.github.io/prismix/get/"
+
+
 class BandConfig(BaseModel):
     name: str | None = Field(default=None, max_length=40)
     token: str | None = Field(default=None, max_length=32)
@@ -311,6 +314,11 @@ def create_app() -> FastAPI:
         # the app's own scheme makes the camera open the Prismix app directly; https opens any phone's browser
         app_url = re.sub(r"^https:", "prismix:", band.share_url)
         return {**band.status(), "name": lan.display_name(), "url": band.share_url, "qr": band_qr(band.share_url), "appQr": band_qr(app_url)}
+
+    @app.get("/api/getapp")
+    def get_app():
+        # one code for every phone: the page behind it picks the Android APK or the iOS (AltStore) route from the scanner
+        return {"url": GET_APP_URL, "qr": band_qr(GET_APP_URL)}
 
     @app.post("/api/band")
     def band_config(body: BandConfig):

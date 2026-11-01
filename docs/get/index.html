@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Get Prismix</title>
+<style>body{font:16px system-ui;background:#111;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;text-align:center}
+main{max-width:30rem;padding:1.5rem}
+a.b{display:block;margin:.5rem 0;padding:.8rem 1.4rem;border-radius:10px;background:#e8453c;color:#fff;text-decoration:none}
+a.b.alt{background:#2a2724}
+ol{text-align:left;color:#bbb;line-height:1.6}
+code{color:#aaa;word-break:break-all;font-size:13px}
+[hidden]{display:none!important}</style></head>
+<body><main>
+<h1 id="h">Get Prismix</h1>
+
+<section id="android" hidden>
+<p>Android app (APK). Allow installs from this browser when asked.</p>
+<a class="b" href="https://github.com/rsx-xxx/prismix/releases/latest/download/Prismix.apk">Download for Android</a>
+</section>
+
+<section id="ios" hidden>
+<p id="ios-what">iPhone and iPad app. Free, no developer account: AltStore signs it with your Apple ID.</p>
+<ol>
+<li>Install <a href="https://altstore.io" style="color:#e8453c">AltStore</a> or <a href="https://sidestore.io" style="color:#e8453c">SideStore</a> once.</li>
+<li>Tap the button below to add the Prismix source.</li>
+<li>Open the Sources tab, tap Prismix, then Free.</li>
+</ol>
+<a class="b" id="alt" href="#">Add to AltStore</a>
+<a class="b alt" id="side" href="#">Add to SideStore</a>
+<a class="b alt" href="https://github.com/rsx-xxx/prismix/releases/latest/download/Prismix.ipa">Download the IPA (Sideloadly)</a>
+<p><small>Signing lasts 7 days. AltStore renews on its own while it can reach your computer or Wi-Fi.</small></p>
+</section>
+
+<section id="desktop" hidden>
+<p>Open this page on a phone or tablet, or pick your system:</p>
+<a class="b" href="https://github.com/rsx-xxx/prismix/releases/latest">All downloads</a>
+</section>
+</main>
+<script>
+// One code for every phone: sniff the scanner and show only its route.
+const ua = navigator.userAgent;
+const touch = navigator.maxTouchPoints > 1;
+const android = /Android/i.test(ua);
+const ipad = /iPad/i.test(ua) || (/Macintosh/i.test(ua) && touch); // iPadOS reports a Mac
+const ios = /iPhone|iPod/i.test(ua) || ipad;
+const show = (id) => { document.getElementById(id).hidden = false; };
+if (android) show('android');
+else if (ios) {
+  show('ios');
+  document.getElementById('ios-what').textContent = (ipad ? 'iPad' : 'iPhone') + ' app. Free, no developer account: AltStore signs it with your Apple ID.';
+  const src = 'https://github.com/rsx-xxx/prismix/releases/latest/download/altstore.json';
+  document.getElementById('alt').href = 'https://altstore.io/source/' + src;
+  document.getElementById('side').href = 'sidestore://source?url=' + encodeURIComponent(src);
+} else show('desktop');
+</script></body></html>
