@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.44.0
+
+New Tuner in the sidebar, the bottom bar and the phone's Controls: it listens to your instrument and shows the note and how many cents off it is, for guitar (all the usual tunings, following the song's), bass, ukulele and violin, with an adjustable A4. A Tone tab plays a tuning fork or any open string as a reference; it works in the desktop app and in the Android app, which now asks for the microphone. Also updates FastAPI, Starlette, Pydantic, pytest and ruff.
+
 ## 0.43.0
 
 Songs can now import a Guitar Pro (.gp) or MusicXML file as their tab from the Sources dialog; it is aligned to the lyrics like any other tab. Tabs also show strum arrows with ovals, palm-mute brackets that run across bars, chord names and time signatures taken from the file, and repeats and endings are unrolled into the played bars.

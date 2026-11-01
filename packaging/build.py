@@ -59,11 +59,12 @@ def main() -> None:
 
 
 def register_scheme(app: Path) -> None:
-    """Let prismix://join links from the cloud open this app (PyInstaller's CLI cannot add URL types)."""
+    """Let prismix://join links from the cloud open this app and name the microphone use (PyInstaller's CLI cannot add Info.plist keys)."""
     import plistlib
 
     path = app / "Contents" / "Info.plist"
     info = plistlib.loads(path.read_bytes())
+    info["NSMicrophoneUsageDescription"] = "The tuner listens to your instrument through the microphone."
     info["CFBundleURLTypes"] = [{"CFBundleURLName": "com.rsx.prismix", "CFBundleURLSchemes": ["prismix"]}]
     path.write_bytes(plistlib.dumps(info))
 

@@ -20,6 +20,7 @@ import { createJoin } from './join.js';
 import { instrumentMarks } from './instruments.js';
 import { createCloud } from './cloud.js';
 import { createQueue } from './queue.js';
+import { createTuner } from './tuner.js';
 import { createMedia } from './media.js';
 import { initLinks } from './links.js';
 import { paintCover, isUpload, ytThumb } from './cover.js';
@@ -1477,6 +1478,8 @@ for (const nav of [$('botnav'), $('sidebar')]) {
 }
 
 createJoin({ $ });
+const tuner = createTuner({ onOpen: () => player.pause(), guitarTuning: () => score.tuning.get() });
+for (const id of ['side-tuner', 'bot-tuner']) $(id).addEventListener('click', tuner.open);
 const cloud = createCloud({
   $, el, api, notice, fmt, onChange: () => { renderLibrary(); plview.rerender(); },
   lookup: (id) => { const item = state.library.find((i) => i.id === id); return item && { item, model: item.models.includes(state.defaultModel) ? state.defaultModel : item.models[0] }; },

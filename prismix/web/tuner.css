@@ -1,0 +1,52 @@
+/* Tuner dialog, shared by the desktop and phone pages (each defines its own colour variables; the fallbacks bridge them). */
+dialog.tuner {
+  --tn-ok: var(--ok, oklch(.76 .15 155));
+  --tn-bad: var(--bad, var(--danger, oklch(.7 .18 25)));
+  --tn-ink: var(--text, var(--ink, #eee));
+  --tn-dim: var(--muted, var(--ink-2, #999));
+  --tn-card: var(--surface-2, #2a2a2a);
+  --tn-hot: var(--accent, oklch(.78 .14 55));
+  width: min(100%, 26rem); max-width: 100%; max-height: 92dvh; margin: auto; padding: 18px 20px calc(20px + env(safe-area-inset-bottom));
+  border: 1px solid var(--line, #3333); border-radius: 24px; background: var(--surface, var(--bg)); color: var(--tn-ink); overflow: auto;
+}
+dialog.tuner { box-sizing: border-box; }
+.tuner [hidden] { display: none !important; }
+dialog.tuner[open] { display: flex; flex-direction: column; gap: 14px; }
+.tuner button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; touch-action: manipulation; }
+.tuner select { font: inherit; color: inherit; background: var(--tn-card); border: 1px solid var(--line, #3333); border-radius: 10px; padding: 8px 10px; min-width: 0; flex: 1; }
+.tn-bar { display: flex; align-items: center; justify-content: space-between; }
+.tn-bar h2 { margin: 0; font-size: 1.1rem; }
+.tn-x { width: 40px; height: 40px; font-size: 1.6rem; border-radius: 50%; color: var(--tn-dim); }
+.tn-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--tn-card); border-radius: 12px; }
+.tn-modes button { padding: 9px; border-radius: 9px; font-weight: 600; color: var(--tn-dim); }
+.tn-modes button[aria-selected=true] { background: var(--surface, var(--bg)); color: var(--tn-ink); box-shadow: 0 1px 4px #0003; }
+.tn-pick { display: flex; gap: 8px; }
+.tn-read { display: flex; justify-content: center; align-items: flex-start; height: 6.5rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.tn-note { font-size: 5.5rem; font-weight: 700; letter-spacing: -.03em; transition: color .15s; }
+.tn-oct { font-size: 1.4rem; margin: .7rem 0 0 .15rem; color: var(--tn-dim); }
+.tn-meter { position: relative; height: 54px; margin: 0 4px; border-radius: 14px; background: var(--tn-card); overflow: hidden; }
+.tn-meter::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, var(--tn-dim) 0 1px, transparent 1px 10%); opacity: .35; mask: linear-gradient(transparent 55%, #000 55%); }
+.tn-zone { position: absolute; top: 0; bottom: 0; left: calc(50% - 4%); width: 8%; background: color-mix(in oklab, var(--tn-ok) 22%, transparent); }
+.tn-needle { position: absolute; top: 6px; bottom: 6px; left: calc(50% + var(--c, 0) * 46%); width: 4px; margin-left: -2px; border-radius: 2px; background: var(--tn-dim); transition: left .12s var(--ease, ease-out), background .15s; }
+dialog.tuner[data-state=ok] .tn-needle { background: var(--tn-ok); }
+dialog.tuner[data-state=ok] .tn-note { color: var(--tn-ok); }
+dialog.tuner[data-state=close] .tn-needle { background: var(--tn-hot); }
+dialog.tuner[data-state=far] .tn-needle { background: var(--tn-bad); }
+.tn-hint { margin: 0; text-align: center; font-size: 1.15rem; font-weight: 600; min-height: 1.6em; }
+.tn-hz { margin: -8px 0 0; text-align: center; color: var(--tn-dim); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.tn-tone { display: grid; place-items: center; min-height: 11rem; }
+.tn-fork { display: grid; gap: 4px; place-items: center; width: 9.5rem; height: 9.5rem; border-radius: 50%; background: var(--tn-card); border: 2px solid transparent; font-weight: 600; }
+.tn-fork b { font-weight: 500; font-size: .85rem; color: var(--tn-dim); }
+.tn-fork[aria-pressed=true] { border-color: var(--tn-hot); box-shadow: 0 0 0 8px color-mix(in oklab, var(--tn-hot) 18%, transparent); }
+.tn-strings { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.tn-strings button { display: grid; place-items: center; width: 3.2rem; height: 3.6rem; border-radius: 14px; background: var(--tn-card); border: 2px solid transparent; line-height: 1.1; }
+.tn-strings small { color: var(--tn-dim); font-size: .7rem; }
+.tn-strings button.near { border-color: var(--tn-hot); }
+dialog.tuner[data-state=ok] .tn-strings button.near { border-color: var(--tn-ok); }
+.tn-strings button[aria-pressed=true] { background: var(--tn-hot); color: var(--on-accent, var(--on-primary, #111)); }
+.tn-strings button[aria-pressed=true] small { color: inherit; }
+.tn-ref { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--tn-dim); font-size: .9rem; }
+.tn-ref button { width: 36px; height: 36px; border-radius: 50%; background: var(--tn-card); color: var(--tn-ink); font-size: 1.2rem; }
+.tn-ref output { min-width: 4.5rem; text-align: center; color: var(--tn-ink); font-variant-numeric: tabular-nums; }
+.tn-msg { margin: 0; min-height: 1.2em; text-align: center; font-size: .85rem; color: var(--tn-bad); }
+@media (prefers-reduced-motion: reduce) { .tn-needle { transition: none; } }

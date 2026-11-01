@@ -9,6 +9,7 @@ import { describe } from './band.js';
 import { timeLine, splitAt } from './lyrics.js';
 import { createSocket } from './socket.js';
 import { createNotes } from './notes.js';
+import { createTuner } from './tuner.js';
 
 const $ = (id) => document.getElementById(id);
 const LS = 'prismix.remote';
@@ -1009,6 +1010,7 @@ if (droid?.download) {
 const openSheet = () => { sheet.showModal(); showHostName(); modeUi(); $('me').textContent = `${store.name || 'You'} · ${ROLES[store.role] || ''}`; };
 $('more').onclick = openSheet;
 $('where').onclick = openSheet;
+createTuner({ opener: $('tuner-open') });
 $('tune').onclick = () => { paintMixer(); mixer.showModal(); };
 $('sheet-close').onclick = () => sheet.close();
 // The Android back button/gesture asks the page first: an open sheet (Songs, Playback, Controls) closes before anything else.

@@ -1062,7 +1062,7 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
 .botnav { display: none; }
 @media (max-width: 760px) {
   :root { --nav-h: calc(60px + env(safe-area-inset-bottom)); }
-  .botnav { position: fixed; z-index: 42; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); height: var(--nav-h); padding-bottom: env(safe-area-inset-bottom); background: var(--glass); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border-top: 1px solid var(--line); }
+  .botnav { position: fixed; z-index: 42; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(6, 1fr); height: var(--nav-h); padding-bottom: env(safe-area-inset-bottom); background: var(--glass); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border-top: 1px solid var(--line); }
   .botnav > * { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 48px; min-width: 48px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11px; text-decoration: none; cursor: pointer; }
   .botnav > *:active, .botnav [aria-current] { color: var(--accent); }
   body:has(#studio:not([hidden])) .botnav { display: none; }

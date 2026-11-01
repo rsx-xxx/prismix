@@ -33,6 +33,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -211,6 +212,17 @@ public class Main extends Activity {
     }
 
     /** Runs `r` once the Wi-Fi binding is in place (or given up on), so the first probes already take the right route. */
+    PermissionRequest micRequest;
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
+        super.onRequestPermissionsResult(code, perms, res);
+        if (code != 3 || micRequest == null) return;
+        PermissionRequest req = micRequest;
+        micRequest = null;
+        if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED) req.grant(req.getResources()); else req.deny();
+    }
+
     private void whenNet(Runnable r) {
         if (netReady) r.run(); else afterNet.add(r);
     }
@@ -393,6 +405,19 @@ public class Main extends Activity {
         Chrome(Main m) { this.m = m; }
         @Override
         public void onProgressChanged(WebView v, int p) { if (p >= 70) m.reveal(); }
+        /** The tuner listens through the page's getUserMedia: grant the microphone to our own pages once the user allowed it to the app. */
+        @Override
+        public void onPermissionRequest(PermissionRequest req) {
+            boolean audioOnly = req.getResources().length == 1 && PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(req.getResources()[0]);
+            if (!audioOnly) { req.deny(); return; }
+            m.ui.post(() -> {
+                if (m.checkSelfPermission("android.permission.RECORD_AUDIO") == PackageManager.PERMISSION_GRANTED) { req.grant(req.getResources()); return; }
+                m.micRequest = req;
+                m.requestPermissions(new String[] { "android.permission.RECORD_AUDIO" }, 3);
+            });
+        }
+        @Override
+        public void onPermissionRequestCanceled(PermissionRequest req) { if (m.micRequest == req) m.micRequest = null; }
     }
 
     private static class Wifi extends ConnectivityManager.NetworkCallback {
