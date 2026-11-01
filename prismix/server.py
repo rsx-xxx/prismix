@@ -821,6 +821,17 @@ def create_app() -> FastAPI:
         except (autotab.AutoTabError, tabdata.TabDataError) as e:
             raise HTTPException(422, str(e)) from e
 
+    @app.post("/api/tabdata/{video_id}/file")
+    async def import_tab_file(video_id: str, file: UploadFile = File(...)):
+        # One score the user picked (Guitar Pro, MusicXML, MIDI) for this track; read whole, capped by tabfiles.MAX_BYTES
+        data = await file.read(tabfiles.MAX_BYTES + 1)
+        try:
+            return await asyncio.to_thread(tabfiles.import_file, video_id, file.filename or "tab", data)
+        except ValueError:
+            raise HTTPException(404, "Not found") from None
+        except (tabfiles.FileError, tabdata.TabDataError) as e:
+            raise HTTPException(422, str(e)) from e
+
     @app.post("/api/tabfiles")
     async def import_tab_folder(body: FolderRequest, request: Request):
         # A folder of the user's own Guitar Pro / MusicXML / MIDI files, matched to the library by name and checked against the audio

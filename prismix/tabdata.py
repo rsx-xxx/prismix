@@ -431,6 +431,9 @@ def merge_bars(bars: list[dict], offset: int) -> list[dict]:
                 merged[k] = a[k]
         if mark := a.get("mark") or b.get("mark"):
             merged["mark"] = mark
+        if chords := [[round(c[0] * a["len"] / total, 4), c[1]] for c in a.get("ch", [])] + [
+                [round((a["len"] + c[0] * b["len"]) / total, 4), c[1]] for c in b.get("ch", [])]:
+            merged["ch"] = chords
         out.append(merged)
     return out
 
@@ -447,6 +450,9 @@ def split_bars(bars: list[dict]) -> list[dict]:
             halves[k]["n"].append([at, round(min(dur * 2, 1 - at), 4), *tail])
         if bar.get("mark"):
             halves[0]["mark"] = bar["mark"]
+        for c in bar.get("ch", []):
+            k = 1 if c[0] >= 0.5 - 1e-6 else 0
+            halves[k].setdefault("ch", []).append([round((c[0] - 0.5 * k) * 2, 4), c[1]])
         if bar.get("auto"):
             halves[0]["auto"] = halves[1]["auto"] = bar["auto"]
         out.extend(halves)
@@ -614,6 +620,8 @@ def _clean_bars(bars, strings: int) -> list[dict]:
                     keep["lr"] = 1
                 if isinstance(extra.get("bpm"), int) and 20 <= extra["bpm"] <= 400:
                     keep["bpm"] = extra["bpm"]
+                if extra.get("st") in ("u", "d"):
+                    keep["st"] = extra["st"]
                 notes.append(beat + [keep] if keep else beat)
         except (KeyError, TypeError, ValueError) as e:
             raise TabDataError("Bad tab") from e
@@ -623,6 +631,8 @@ def _clean_bars(bars, strings: int) -> list[dict]:
         for k in ("sig", "mark", "auto"):
             if k in b:
                 bar[k] = b[k]
+        if isinstance(b.get("ch"), list):
+            bar["ch"] = [[round(float(c[0]), 4), str(c[1])[:12]] for c in b["ch"] if len(c) == 2 and 0 <= float(c[0]) < 1.0001]
         out.append(bar)
     return out
 

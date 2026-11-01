@@ -64,3 +64,108 @@ def test_missing_folder():
     except tabfiles.FileError:
         return
     raise AssertionError
+
+
+def test_unroll_repeats_and_voltas():
+    plain = [{}, {"start": True}, {"end": True, "times": 2}, {}]
+    assert tabfiles.unroll(plain) == [0, 1, 2, 1, 2, 3]
+    volta = [{"start": True}, {"alt": [1], "end": True, "times": 2}, {"alt": [2]}, {}]
+    assert tabfiles.unroll(volta) == [0, 1, 0, 2, 3]
+
+
+def test_unroll_is_bounded():
+    assert len(tabfiles.unroll([{"start": True, "end": True, "times": 10**9}])) <= 1500
+
+
+GPIF = """<GPIF><MasterTrack><Automations><Automation><Type>Tempo</Type><Bar>0</Bar><Position>0</Position>
+<Value>96 2</Value></Automation></Automations></MasterTrack>
+<Tracks><Track id="0"><Name>Guitar</Name><InstrumentSet><Type>electricGuitar</Type></InstrumentSet>
+<Staves><Staff><Properties><Property name="Tuning"><Pitches>40 45 50 55 59 64</Pitches></Property>
+<Property name="DiagramCollection"><Items><Item id="0" name="Em"/></Items></Property></Properties></Staff></Staves></Track></Tracks>
+<MasterBars><MasterBar><Time>4/4</Time><Repeat start="true" end="false" count="0"/><Section><Text>Verse</Text></Section><Bars>0</Bars></MasterBar>
+<MasterBar><Time>4/4</Time><Repeat start="false" end="true" count="2"/><Bars>1</Bars></MasterBar></MasterBars>
+<Bars><Bar id="0"><Voices>0 -1</Voices></Bar><Bar id="1"><Voices>1 -1</Voices></Bar></Bars>
+<Voices><Voice id="0"><Beats>0 1</Beats></Voice><Voice id="1"><Beats>2</Beats></Voice></Voices>
+<Beats><Beat id="0"><Rhythm ref="0"/><Chord>0</Chord><Notes>0 1</Notes>
+<Properties><Property name="Brush"><Direction>Up</Direction></Property></Properties></Beat>
+<Beat id="1"><Rhythm ref="0"/></Beat><Beat id="2"><Rhythm ref="1"/><Notes>2</Notes></Beat></Beats>
+<Notes><Note id="0"><Properties><Property name="String"><String>0</String></Property><Property name="Fret"><Fret>0</Fret></Property>
+<Property name="PalmMuted"><Enable/></Property></Properties></Note>
+<Note id="1"><Properties><Property name="String"><String>5</String></Property><Property name="Fret"><Fret>3</Fret></Property></Properties></Note>
+<Note id="2"><Properties><Property name="String"><String>1</String></Property><Property name="Fret"><Fret>7</Fret></Property></Properties></Note></Notes>
+<Rhythms><Rhythm id="0"><NoteValue>Half</NoteValue></Rhythm><Rhythm id="1"><NoteValue>Whole</NoteValue></Rhythm></Rhythms></GPIF>"""
+
+
+def _gp7(path, gpif=GPIF):
+    import zipfile
+
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("Content/score.gpif", gpif)
+
+
+def test_gpif_reads_strings_marks_and_unrolls(tmp_path):
+    f = tmp_path / "x.gp"
+    _gp7(f)
+    parts = tabfiles.read_file(f)
+    bars = parts["guitar"]["bars"]
+    assert parts["guitar"]["tuning"] == [64, 59, 55, 50, 45, 40]
+    assert len(bars) == 4  # the repeated pair is played twice
+    assert bars[0]["mark"] == "Verse" and bars[0]["ch"] == [[0.0, "Em"]]
+    first = bars[0]["n"][0]
+    assert first[2] == [[0, 3], [5, 0, "m"]]  # string 0 of the file is the lowest; Prismix counts from the highest
+    assert first[3] == {"st": "u", "bpm": 96}
+    assert bars[2]["n"] == bars[0]["n"] and bars[3]["n"][0][1] == 1.0
+
+
+def test_gpif_rejects_garbage(tmp_path):
+    f = tmp_path / "x.gp"
+    f.write_bytes(b"not a zip")
+    try:
+        tabfiles.read_file(f)
+    except tabfiles.FileError:
+        return
+    raise AssertionError
+
+
+def _xml(path):
+    path.write_text("""<score-partwise><part-list><score-part id="P1"><part-name>Guitar</part-name></score-part></part-list>
+<part id="P1"><measure number="1"><attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+<harmony><root><root-step>A</root-step></root><kind>minor</kind></harmony>
+<note><pitch><step>E</step><octave>2</octave></pitch><duration>4</duration><staff>1</staff></note><backup><duration>4</duration></backup>
+<note><pitch><step>E</step><octave>2</octave></pitch><duration>4</duration><staff>2</staff>
+<notations><technical><string>6</string><fret>0</fret><palm-mute/></technical></notations></note></measure></part></score-partwise>""")
+
+
+def test_musicxml_uses_the_tab_staff_once(tmp_path):
+    f = tmp_path / "x.xml"
+    _xml(f)
+    bar = tabfiles.read_file(f)["guitar"]["bars"][0]
+    assert bar["n"] == [[0.0, 1.0, [[5, 0, "m"]]]]
+    assert bar["ch"] == [[0.0, "Am"]]
+
+
+def test_import_file_saves_fitted_tab(tmp_path, monkeypatch):
+    from prismix import analysis, library, tabdata
+
+    saved = {}
+    monkeypatch.setattr(library, "read_info", lambda v: {"title": "x"})
+    monkeypatch.setattr(analysis, "read_structure", lambda v: {"beats": [], "bars": []})
+    monkeypatch.setattr(tabdata, "fit", lambda parts, st: {"map": [0, 1, 2, 3], "shift": 0, "similarity": 1.0, "coverage": 1.0})
+    monkeypatch.setattr(tabdata, "gapfill", lambda *a: None)
+    monkeypatch.setattr(tabdata, "mark_weak", lambda *a: None)
+    monkeypatch.setattr(tabdata, "retune", lambda *a: None)
+    monkeypatch.setattr(tabdata, "_save", lambda v, d: saved.update(d))
+    monkeypatch.setattr(tabdata, "read", lambda v: None)
+    monkeypatch.setattr(tabdata, "_edits_path", lambda v: tmp_path / "edits.json")
+    f = tmp_path / "x.gp"
+    _gp7(f)
+    tabfiles.import_file("dQw4w9WgXcQ", "My Song.gp", f.read_bytes())
+    assert saved["source"] == "file" and saved["title"] == "My Song" and "guitar" in saved["tracks"]
+
+
+def test_import_file_refuses_unknown_type():
+    try:
+        tabfiles.import_file("vid", "x.exe", b"MZ")
+    except tabfiles.FileError:
+        return
+    raise AssertionError

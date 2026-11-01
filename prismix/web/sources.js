@@ -110,5 +110,24 @@ export function createSources({ api, onChange, onTab }) {
     }
   });
 
+  $('file-import').addEventListener('click', async () => {
+    const target = id, file = $('src-file').files[0];
+    if (!target || !file) { $('file-msg').textContent = 'Choose a file first'; return; }
+    $('file-import').disabled = true;
+    $('file-msg').textContent = 'Reading the file…';
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      await api(`/api/tabdata/${encodeURIComponent(target)}/file`, { method: 'POST', body });
+      $('file-msg').textContent = '';
+      close();
+      onTab(target);
+    } catch (err) {
+      $('file-msg').textContent = err.message;
+    } finally {
+      $('file-import').disabled = false;
+    }
+  });
+
   return { setTrack: (v) => { id = v; } };
 }

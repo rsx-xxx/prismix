@@ -376,6 +376,10 @@
       <label class="band-row">Tab from Soundslice <input id="src-slice" type="url" maxlength="300" placeholder="https://www.soundslice.com/slices/PtNBc/"></label>
       <p class="muted" id="slice-msg" role="status"></p>
       <button class="btn" id="slice-import" type="button">Import tab</button>
+      <p class="muted">Or open a score file you have: Guitar Pro (.gp, .gp3–.gp5), MusicXML (.musicxml, .xml, .mxl) or MIDI. Its bars are lined up with this recording and its lyrics.</p>
+      <label class="band-row">Tab from a file <input id="src-file" type="file" accept=".gp,.gp3,.gp4,.gp5,.musicxml,.xml,.mxl,.mid,.midi"></label>
+      <p class="muted" id="file-msg" role="status"></p>
+      <button class="btn" id="file-import" type="button">Import file</button>
       <p class="muted">Or write out the instruments no tab covers from the recording itself. It is a machine transcription: less exact than a published tab, and it takes a few minutes the first time (the model downloads once).</p>
       <p class="muted" id="auto-msg" role="status"></p>
       <p class="muted" id="hf-box" hidden>The model is free but gated: <a id="hf-link" href="https://huggingface.co/MuScriptor/muscriptor-small" target="_blank" rel="noopener">accept its license</a> once, then sign in. <a id="hf-code-link" target="_blank" rel="noopener" hidden>Confirm the code <b id="hf-code"></b></a></p>

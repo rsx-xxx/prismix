@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.43.0
+
+Songs can now import a Guitar Pro (.gp) or MusicXML file as their tab from the Sources dialog; it is aligned to the lyrics like any other tab. Tabs also show strum arrows with ovals, palm-mute brackets that run across bars, chord names and time signatures taken from the file, and repeats and endings are unrolled into the played bars.
+
 ## 0.42.0
 
 New Stem quality setting (Fast, Standard, High, Max) sets how thoroughly new songs are separated: higher levels average more passes for cleaner stems with less bleed, at the cost of time. Stems are already lossless FLAC, so file size is the same at every level; the setting shows the estimated time per level and the size for this computer, and switches to measured speeds after your first splits.

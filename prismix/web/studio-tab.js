@@ -230,10 +230,14 @@ export function createTab({ player, chordsIn = () => [] }) {
       if (tb.auto) { cell.classList.add('auto'); cell.title = 'Filled in from a matching bar'; }
       if (tb.weak) { cell.classList.add('weak'); cell.title = 'This bar differs from the recording (a cover or another arrangement); trust the chords above it'; }
       if (tb.mark) cell.append(el('span', { className: 'tag', textContent: tb.mark }));
+      if (tb.sig) cell.append(el('span', { className: 'sig', textContent: `${tb.sig[0]}/${tb.sig[1]}` }));
       const chs = el('div', { className: 'tch' });
-      if (j != null && p.kind !== 'drums') {
-        let before = j > 0 ? chordsIn(j - 1).at(-1)?.name : '';
-        for (const c of chordsIn(j)) {
+      if (p.kind !== 'drums') {
+        const heard = j != null ? chordsIn(j) : [];
+        // detected chords are timed to the recording; chord names written into the file fill in where none were heard
+        const named = heard.length ? heard : (tb.ch || []).map(([f, name]) => ({ name, f }));
+        let before = heard.length && j > 0 ? chordsIn(j - 1).at(-1)?.name : '';
+        for (const c of named) {
           chs.append(el('span', { className: c.name === before ? 'same' : '', textContent: c.name, style: `left:${c.f * 100}%` }));
           before = c.name;
         }
@@ -390,9 +394,15 @@ export function createTab({ player, chordsIn = () => [] }) {
           last.set(s, pos);
         }
         if (extra.bpm) fx.append(el('span', { className: 'tempo', textContent: `♩ = ${extra.bpm}`, style: `left:${pos * 100}%` }));
+        if (extra.st && frets.length > 1) {
+          fx.append(el('span', { className: 'strum', textContent: extra.st === 'u' ? '↑' : '↓', style: `left:${pos * 100}%` }));
+          const rows = frets.map((x) => x[0]);
+          stf.append(el('span', { className: 'oval', style: `left:${pos * 100}%;top:calc(${Math.min(...rows)} * var(--row));height:calc(${Math.max(...rows) - Math.min(...rows) + 1} * var(--row))` }));
+        }
         if (extra.lr) { ring ||= { from: pos }; ring.to = Math.min(1, pos + dur); } else if (ring) { drawRing(fx, ring); ring = null; }
       });
       if (ring) drawRing(fx, ring);
+      paintPalmMute(fx, tb, Number(cell.dataset.tb));
       paintRhythm(rh, tb);
     }
     if (editing && sel && tb && Number(cell.dataset.tb) === sel.i) {
@@ -400,6 +410,22 @@ export function createTab({ player, chordsIn = () => [] }) {
       stf.append(el('span', { className: 'selmark', style: `left:${(sel.slot / slots) * 100}%;top:calc(${sel.s} * var(--row))` }));
     }
     stf.append(el('span', { className: 'cursor' }));
+  }
+
+  // "P.M." over a run of palm-muted beats; a run that crosses a barline carries on in the next bar without repeating its label.
+  const muted = (b) => b.length > 0 && b[2].every((f) => (f[2] || '').includes('m'));
+  function paintPalmMute(fx, tb, i) {
+    const bars = part_().bars, prev = bars[i - 1]?.n.at(-1), next = bars[i + 1]?.n[0];
+    let run = null;
+    const close = (to, open) => {
+      fx.append(el('span', { className: `pm${run.cont ? ' cont' : ''}${open ? ' open' : ''}`, textContent: run.cont ? '' : 'P.M.', style: `left:${run.from * 100}%;width:${(to - run.from) * 100}%` }));
+      run = null;
+    };
+    tb.n.forEach((beat, k) => {
+      if (muted(beat)) run ||= { from: k === 0 && prev && muted(prev) ? 0 : beat[0], cont: k === 0 && prev && muted(prev) };
+      else if (run) close(beat[0], false);
+    });
+    if (run) close(1, next && muted(next));
   }
 
   const drawRing = (fx, r) => fx.append(el('span', { className: 'ring', textContent: 'let ring', style: `left:${r.from * 100}%;width:${(r.to - r.from) * 100}%` }));

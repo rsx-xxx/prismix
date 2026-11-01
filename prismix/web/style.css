@@ -791,6 +791,12 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .tbar .stf { position: relative; height: calc(var(--strings) * var(--row)); background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--row) / 2 - .5px), color-mix(in srgb, var(--muted) 55%, transparent) calc(var(--row) / 2 - .5px) calc(var(--row) / 2 + .5px), transparent calc(var(--row) / 2 + .5px) var(--row)); }
 .tbar .fx { position: relative; height: 26px; pointer-events: none; font-size: 10px; color: var(--muted); }
 .tbar .fx .tempo { position: absolute; top: 0; font-weight: 700; white-space: nowrap; color: var(--text); }
+.tbar .fx .strum { position: absolute; top: 0; font-size: 13px; font-weight: 700; line-height: 11px; color: var(--text); transform: translateX(-30%); }
+.tbar .fx .pm { position: absolute; bottom: 0; border-bottom: 1px dashed var(--muted); border-left: 1px solid var(--muted); font-size: 9px; font-weight: 700; line-height: 11px; padding-left: 3px; white-space: nowrap; overflow: hidden; }
+.tbar .fx .pm.cont { border-left: 0; }
+.tbar .fx .pm.open { border-right: 0; }
+.tbar .stf .oval { position: absolute; width: 18px; margin-left: -7px; box-sizing: border-box; border: 1px solid var(--muted); border-radius: 9px; pointer-events: none; z-index: 1; }
+.tbar .sig { position: absolute; top: 6px; left: 24px; font-size: 9px; font-weight: 700; color: var(--muted); }
 .tbar .fx .ring { position: absolute; bottom: 0; border-bottom: 1px dashed var(--muted); border-left: 1px solid var(--muted); border-right: 1px solid var(--muted); font-style: italic; line-height: 11px; padding-left: 3px; white-space: nowrap; overflow: hidden; }
 .tbar .f.tied { color: var(--muted); }
 .tbar .sl { position: absolute; height: var(--row); width: 9px; pointer-events: none; background: linear-gradient(to bottom right, transparent calc(50% - .6px), var(--text) calc(50% - .6px) calc(50% + .6px), transparent calc(50% + .6px)); transform: translate(8px, 0) scale(.8); }
