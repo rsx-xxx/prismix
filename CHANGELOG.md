@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.41.0
+
+Tapping a band invite link no longer freezes the Android app: it shows "Signing in…" at once, a second request can no longer drop the first, a failed sign-in always ends in a message, a used link is not replayed on relaunch, and links inside the app never navigate it away from the player. Starting playback on the phone now takes audio focus, so Spotify, YouTube and other apps pause, and Prismix pauses if another app takes over. The open-link page opens Prismix when it is installed and otherwise offers the APK (on Android Chrome it goes there by itself); it also handles invite links.
+
 ## 0.40.0
 
 Playlists can now be managed from the phone while it is connected to a computer: create one by name, rename it, add songs from the library, reorder them, remove songs, or delete it. The computer allows these edits (and only these) from phones on the network; importing by link and deleting songs stay on the computer. Offline and band-cloud modes still show no playlists.

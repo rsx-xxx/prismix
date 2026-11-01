@@ -2,24 +2,44 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Open in Prismix</title>
 <style>body{font:16px system-ui;background:#111;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;text-align:center}
-a.b{display:inline-block;margin:1rem 0;padding:.7rem 1.4rem;border-radius:8px;background:#e8453c;color:#fff;text-decoration:none}
-code{display:block;margin:1rem auto;max-width:90vw;word-break:break-all;color:#aaa;font-size:13px}</style></head>
+a.b{display:inline-block;margin:.4rem;padding:.7rem 1.4rem;border-radius:8px;background:#e8453c;color:#fff;text-decoration:none}
+a.b.alt{background:#2a2724}
+code{display:block;margin:1rem auto;max-width:90vw;word-break:break-all;color:#aaa;font-size:13px}
+#help{display:none}</style></head>
 <body><main>
-<h1>Open this song in Prismix</h1>
-<a class="b" id="go" href="#">Open in Prismix</a>
-<p>Nothing happened? Install Prismix, or paste this into its search box:</p>
-<code id="raw"></code>
-<p><a href="https://github.com/rsx-xxx/prismix/releases" style="color:#e8453c">Get Prismix</a></p>
+<h1 id="h">Opening Prismix…</h1>
+<div><a class="b" id="go" href="#">Open in Prismix</a><a class="b alt" id="get" href="https://github.com/rsx-xxx/prismix/releases/latest/download/Prismix.apk">Install Prismix</a></div>
+<div id="help"><p>Prismix did not open, so it is probably not installed. Install it, then open this link again.</p><code id="raw"></code></div>
 </main>
 <script>
-const m = location.hash.match(/^#song\/([\w-]{11})(\?[^\s#]*)?$/);
-if (m) {
-  const link = `prismix://song/${m[1]}${m[2] || ''}`;
-  document.getElementById('go').href = link;
-  document.getElementById('raw').textContent = location.href;
-  location.href = link;
-} else {
-  document.querySelector('h1').textContent = 'Not a Prismix song link';
+// #song/<id>[?t=…]  or  #join?o=<cloud origin>&t=<token>. Installed: the app opens. Not installed: Android Chrome falls back to the APK.
+const APK = 'https://github.com/rsx-xxx/prismix/releases/latest/download/Prismix.apk';
+const h = location.hash;
+let path = null;
+const s = h.match(/^#song\/([\w-]{11})(\?[^\s#]*)?$/);
+const j = h.match(/^#join\?([^\s#]*)$/);
+if (s) path = `song/${s[1]}${s[2] || ''}`;
+else if (j) path = `join?${j[1]}`;
+if (!path) {
+  document.getElementById('h').textContent = 'Not a Prismix link';
   document.getElementById('go').remove();
+} else {
+  const link = `prismix://${path}`;
+  const android = /Android/i.test(navigator.userAgent);
+  // Chrome on Android resolves intent:// itself: it opens the app when present and otherwise goes to the fallback URL (the APK).
+  const target = android
+    ? `intent://${path}#Intent;scheme=prismix;package=app.prismix.band;S.browser_fallback_url=${encodeURIComponent(APK)};end`
+    : link;
+  document.getElementById('go').href = target;
+  document.getElementById('raw').textContent = location.href;
+  let left = false;
+  document.addEventListener('visibilitychange', () => { if (document.hidden) left = true; });
+  addEventListener('pagehide', () => { left = true; });
+  location.href = target;
+  setTimeout(() => {
+    if (left) return; // the app took over
+    document.getElementById('h').textContent = android ? 'Prismix is not installed yet' : 'Open this on your phone';
+    document.getElementById('help').style.display = 'block';
+  }, 2000);
 }
 </script></body></html>

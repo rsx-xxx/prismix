@@ -104,11 +104,10 @@ public class Main extends Activity {
     private Network wifi;
     private ConnectivityManager.NetworkCallback wifiCallback;
     private boolean netReady; // Wi-Fi bound, or we gave up waiting for it
-    private Runnable afterNet;
+    private final java.util.List<Runnable> afterNet = new java.util.ArrayList<>(); // every waiter runs: a later request must not drop an earlier one
     private String wantName; // a name the user typed, looked for among the discovered hosts
     private boolean connecting; // the page is loading behind the progress screen
     private boolean cloudMode; // the web view shows the band cloud player, not a LAN host
-    private boolean cloudFresh; // history of the sign-in redirect is dropped once the player has loaded
     private NsdManager nsd;
     private NsdManager.DiscoveryListener nsdListener;
     private FrameLayout root;
@@ -206,14 +205,14 @@ public class Main extends Activity {
 
     private void netUp() {
         netReady = true;
-        Runnable r = afterNet;
-        afterNet = null;
-        if (r != null) r.run();
+        java.util.List<Runnable> rs = new java.util.ArrayList<>(afterNet);
+        afterNet.clear();
+        for (Runnable r : rs) r.run();
     }
 
     /** Runs `r` once the Wi-Fi binding is in place (or given up on), so the first probes already take the right route. */
     private void whenNet(Runnable r) {
-        if (netReady) r.run(); else afterNet = r;
+        if (netReady) r.run(); else afterNet.add(r);
     }
 
     /** Notifications need a grant on Android 13+; battery savers kill a silent background app, so ask once to be exempt. */
@@ -238,6 +237,7 @@ public class Main extends Activity {
     @Override
     protected void onNewIntent(Intent i) {
         super.onNewIntent(i);
+        setIntent(i);
         open(i);
     }
 
@@ -253,6 +253,7 @@ public class Main extends Activity {
         Uri d = i == null ? null : i.getData();
         String h = d == null ? null : d.getHost();
         if (h == null) { discover(); return; }
+        i.setData(null); // consumed: a recreated activity or a return from recents must not replay a one-time invite
         if ("prismix".equals(d.getScheme()) && "join".equals(h)) { // an invite opened from the join page: sign in at once
             String o = d.getQueryParameter("o"), t = d.getQueryParameter("t");
             if (o != null && t != null) { signInCloud(o + "/join?t=" + t, "", null, null); return; }
@@ -423,9 +424,22 @@ public class Main extends Activity {
             if (got != null && got.equals(m.host)) h.proceed(); else h.cancel();
         }
 
+        /** The app is one page: a link inside it never navigates the WebView away (that left the app on a website). Invites go to sign-in, the rest to the browser. */
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
+            Uri u = r.getUrl();
+            String h = u.getHost();
+            if (CloudApi.HOST.equals(h) || Offline.HOST.equals(h) || (h != null && h.equals(m.host))) return false;
+            if ("/join".equals(u.getPath()) && "https".equals(u.getScheme())) {
+                m.signInCloud(u.toString(), "", null, null);
+            } else if (r.hasGesture() && ("https".equals(u.getScheme()) || "http".equals(u.getScheme()))) {
+                try { m.startActivity(new Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE)); } catch (RuntimeException e) { /* no browser */ }
+            } else return false;
+            return true;
+        }
+
         @Override
         public void onPageFinished(WebView v, String url) {
-            if (m.cloudMode && m.cloudFresh && !url.contains("/join")) { m.cloudFresh = false; v.clearHistory(); }
             m.reveal();
         }
 
@@ -855,6 +869,14 @@ public class Main extends Activity {
     }
 
     private void signInCloud(final String text, final String address, final TextView err, final Button in) {
+        final int g;
+        if (err == null) { // a tapped link: say so at once instead of leaving the old screen up while the cloud is asked
+            stopSearch();
+            g = ++gen;
+            connecting = false;
+            screen("Signing in…", "Checking your invite");
+            panel.addView(spinner());
+        } else g = gen;
         whenNet(() -> new Thread(() -> {
             String bad = null;
             Cloud.Credential c = null;
@@ -863,10 +885,13 @@ public class Main extends Activity {
                 Cloud.verifyMember(c);
             } catch (Cloud.Failure f) {
                 bad = f.getMessage();
+            } catch (RuntimeException e) {
+                bad = "Could not sign in"; // never leave the screen waiting on a dead thread
             }
             final Cloud.Credential ok = bad == null ? c : null;
             final String why = bad;
             ui.post(() -> {
+                if (err == null && g != gen) return; // the user went elsewhere meanwhile
                 if (ok == null) {
                     if (err == null) showCloud(why); else { err.setText(why); in.setEnabled(true); }
                     return;
@@ -885,12 +910,13 @@ public class Main extends Activity {
         addLogo(c);
         panel.addView(spinner());
         cloudMode = true;
-        cloudFresh = false;
         host = "";
         listing = false;
         connecting = true;
         web.setVisibility(View.INVISIBLE);
         whenNet(() -> {
+            if (g != gen) return;
+            web.stopLoading();
             web.loadUrl("https://" + CloudApi.HOST + "/remote");
             ui.postDelayed(() -> { if (g == gen && connecting) { connecting = false; showCloud("The cloud is not answering"); } }, 20000);
         });

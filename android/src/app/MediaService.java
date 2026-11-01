@@ -11,6 +11,9 @@ import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.Icon;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
@@ -42,6 +45,16 @@ public class MediaService extends Service {
     private long pos, dur;
     private float rate = 1f;
     private int artGen;
+    private AudioManager audio;
+    private AudioFocusRequest focusReq;
+    private boolean focused;
+    private final AudioManager.OnAudioFocusChangeListener onFocus = change -> {
+        // another app took over (a call, Spotify, YouTube…): stop, do not fight for it
+        if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+            focused = false;
+            Main.js("pause", 0);
+        }
+    };
 
 
     /** Buttons on the lock screen, headsets and the notification shade. */
@@ -144,6 +157,7 @@ public class MediaService extends Service {
         } else {
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(ID, note);
         }
+        if (playing) grabFocus(); else dropFocus();
         if (playing) {
             lock.acquire(6 * 60 * 60 * 1000L);
             if (!wifi.isHeld()) wifi.acquire();
@@ -151,6 +165,33 @@ public class MediaService extends Service {
             if (lock.isHeld()) lock.release();
             if (wifi.isHeld()) wifi.release();
         }
+    }
+
+    /** Playing here silences every other app's audio (Spotify, YouTube…): ask for the media focus, they pause on losing it. */
+    private void grabFocus() {
+        if (focused) return;
+        if (audio == null) audio = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        int r;
+        if (Build.VERSION.SDK_INT >= 26) {
+            if (focusReq == null) {
+                focusReq = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                        .setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+                        .setOnAudioFocusChangeListener(onFocus)
+                        .build();
+            }
+            r = audio.requestAudioFocus(focusReq);
+        } else {
+            r = audio.requestAudioFocus(onFocus, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+        }
+        focused = r == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+    }
+
+    private void dropFocus() {
+        if (audio == null || !focused) return;
+        focused = false;
+        if (Build.VERSION.SDK_INT >= 26) { if (focusReq != null) audio.abandonAudioFocusRequest(focusReq); }
+        else audio.abandonAudioFocus(onFocus);
     }
 
     /** The cover comes from the host the app is connected to, whose certificate is self-signed; a song whose file is missing there falls back to YouTube's. */
@@ -196,6 +237,7 @@ public class MediaService extends Service {
 
     @Override
     public void onDestroy() {
+        dropFocus();
         if (lock != null && lock.isHeld()) lock.release();
         if (wifi != null && wifi.isHeld()) wifi.release();
         if (session != null) { session.setActive(false); session.release(); }
