@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.40.0
+
+Playlists can now be managed from the phone while it is connected to a computer: create one by name, rename it, add songs from the library, reorder them, remove songs, or delete it. The computer allows these edits (and only these) from phones on the network; importing by link and deleting songs stay on the computer. Offline and band-cloud modes still show no playlists.
+
 ## 0.39.0
 
 Covers now appear at once: pictures are saved at a size that fits the screen (older ones are slimmed in the background), the first screenful loads eagerly, and each cover fades in over a quiet placeholder instead of showing the empty-image glyph, on desktop, the web remote and the Android app. A song dragged to a playlist now carries its cover along. Downloaded audio defaults to the best quality: the original stream with title, artist and cover embedded (Opus or AAC, no re-encode) and mixes default to FLAC; "Official Audio", "Official Video", "Topic" and similar tails are gone from tags and file names, which read "Artist - Title".

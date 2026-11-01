@@ -264,3 +264,11 @@ button:active, .lib li:active, [role=tab]:active, [role=radio]:active { filter: 
 .tw { position: absolute; top: 0; white-space: nowrap; font-size: .9rem; color: var(--ink-2); transition: color .15s; }
 .tw.cur { color: var(--accent); font-weight: 700; }
 .tw.done { color: var(--ink); }
+.pl-name { flex: 1; min-width: 0; min-height: 36px; padding: 0 .7rem; border: 0; border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 650; }
+.pl-top .search { flex: 1; }
+.pl-top .btn-line:last-child:not(:first-child) { margin-left: 0; }
+.btn-line.arm { background: var(--accent); color: var(--surface-2); }
+.lib .pl-act { flex: none; width: 2rem; min-height: 2rem; border-radius: 8px; background: transparent; color: var(--ink-2); font: inherit; font-size: 1rem; }
+.lib .pl-act:disabled { opacity: .25; }
+.lib .keep + .pl-act, .lib .meta + .pl-act { margin-left: auto; }
+.lib .pl-act + .pl-act { margin-left: 0; }

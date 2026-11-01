@@ -114,3 +114,18 @@ def test_update_check_forces_a_fresh_look(monkeypatch):
     monkeypatch.setattr(updates, "check", lambda force=False, client=None: seen.append(force) or {"available": False, "latest": "0.0.1", "url": "", "download": None})
     r = TestClient(server.create_app()).post("/api/update/check")
     assert r.status_code == 200 and seen == [True] and r.json()["available"] is False
+
+
+def test_phone_may_edit_playlists_but_nothing_else(tmp_path, monkeypatch):
+    from prismix import band
+    monkeypatch.setattr(band, "is_loopback", lambda h: False)  # every caller is a phone on the LAN
+    with make_client(tmp_path, monkeypatch) as c:
+        pl = c.post("/api/playlists", json={"name": "Set"}).json()
+        assert c.patch(f"/api/playlists/{pl['id']}", json={"name": "B"}).status_code == 200
+        assert c.post(f"/api/playlists/{pl['id']}/items", json=[{"id": VID}]).status_code == 200
+        assert c.delete(f"/api/playlists/{pl['id']}/items/{VID}").status_code == 200
+        assert c.delete(f"/api/playlists/{pl['id']}").status_code == 200
+        assert c.post("/api/playlists/import", json={"url": "https://youtube.com/playlist?list=x"}).status_code == 403
+        assert c.post("/api/playlists/abcdef0123/process").status_code == 403
+        assert c.delete(f"/api/library/{VID}").status_code == 403
+        assert c.get("/api/band").status_code == 403

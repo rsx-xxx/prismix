@@ -59,6 +59,10 @@ class ProcessRequest(BaseModel):
     urgent: bool = False
 
 
+# The one change a phone may make: edit playlists (not import or process, which start downloads and jobs).
+PLAYLIST_EDIT = re.compile(r"^/api/playlists(?:/[0-9a-f]{10}(?:/items(?:/[A-Za-z0-9_-]{11})?)?)?$")
+
+
 class FolderRequest(BaseModel):
     folder: str
 
@@ -246,7 +250,7 @@ def create_app() -> FastAPI:
             path = request.url.path
             if path == "/" and request.method == "GET":  # a bare https://prismix.local/ is the phone page
                 return RedirectResponse("/remote", status_code=307)
-            if request.method not in ("GET", "HEAD", "OPTIONS") or path.startswith("/api/band"):
+            if path.startswith("/api/band") or (request.method not in ("GET", "HEAD", "OPTIONS") and not PLAYLIST_EDIT.match(path)):
                 return Response("Read-only for remote clients", status_code=403)
             if band.token and (path.startswith("/api/") or path.startswith("/media/")):
                 given = request.headers.get("x-band-token") or request.query_params.get("k")
