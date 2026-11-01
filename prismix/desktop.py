@@ -94,7 +94,7 @@ def open_link(link: str) -> None:
         cloud.accept_link(link)
         _window.evaluate_js("location.reload()")
     except cloud.CloudError as e:
-        _window.evaluate_js(f"alert({json.dumps(str(e))})")
+        _window.evaluate_js(f"setTimeout(() => alert({json.dumps(str(e))}), 0)")  # alert() would hold this call until dismissed
     except Exception:
         logging.getLogger(__name__).exception("could not open the link")
 
@@ -116,7 +116,9 @@ def _watch_links() -> None:
             def handleURL_withReply_(self, event, reply):  # noqa: N802 - Objective-C selector
                 link = event.paramDescriptorForKeyword_(code(b"----")).stringValue()
                 if link and link.startswith(SCHEME):
-                    open_link(str(link))
+                    # This runs on the Cocoa main thread. open_link makes network calls and evaluate_js waits for that same
+                    # thread, so calling it here deadlocked the whole window: always hand it to a worker.
+                    threading.Thread(target=open_link, args=(str(link),), daemon=True, name="open-link").start()
 
         global _handler
         _handler = LinkHandler.alloc().init()

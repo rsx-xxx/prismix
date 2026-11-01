@@ -1094,8 +1094,38 @@ const withPin = (u) => (store.pin ? `${u}?k=${encodeURIComponent(store.pin)}` : 
 /** Cover <img>: placeholder, fade-in, one retry, then the YouTube thumbnail (see cover.js). `eager` for what is on the first screen. */
 const coverImg = (id, eager = false) => paintCover(el('img', { className: 'cover', alt: '' }), id, { eager, local: withPin(`/media/${id}/thumb.jpg`) });
 
+// With no host (offline or band cloud) the playlists live on the phone itself; same shapes and routes as the host's API.
+const PL_KEY = 'prismix.playlists';
+const plLocal = () => { try { return JSON.parse(localStorage.getItem(PL_KEY)) || []; } catch { return []; } };
+function plLocalApi(method, url, body) {
+  const all = plLocal();
+  const [, pid, sub, vid] = url.match(/^\/api\/playlists(?:\/([0-9a-f]{10}))?(?:\/(items)(?:\/([\w-]{11}))?)?$/) || [];
+  const save = (v) => { localStorage.setItem(PL_KEY, JSON.stringify(all)); return v; };
+  const clean = (i) => (i && /^[\w-]{11}$/.test(i.id) ? { id: i.id, title: String(i.title || '').slice(0, 200), channel: String(i.channel || '').slice(0, 120), duration: Number(i.duration) || 0 } : null);
+  if (!pid) {
+    if (method === 'GET') return all;
+    const items = [...new Map((body.items || []).map(clean).filter(Boolean).map((i) => [i.id, i])).values()];
+    const pl = { id: [...crypto.getRandomValues(new Uint8Array(5))].map((b) => b.toString(16).padStart(2, '0')).join(''),
+      name: String(body.name || 'Playlist').trim().slice(0, 80) || 'Playlist', source: '', items, updated: Date.now() / 1000 };
+    all.push(pl);
+    return save(pl);
+  }
+  const pl = all.find((p) => p.id === pid);
+  if (!pl) throw new Error('404');
+  if (method === 'DELETE' && !sub) { all.splice(all.indexOf(pl), 1); return save({ ok: true }); }
+  if (method === 'PATCH') {
+    if (body.name != null) pl.name = String(body.name).trim().slice(0, 80) || pl.name;
+    if (body.order) { const by = new Map(pl.items.map((i) => [i.id, i])); pl.items = [...new Set(body.order)].filter((i) => by.has(i)).map((i) => by.get(i)); }
+  } else if (method === 'POST' && sub) {
+    for (const raw of body) { const c = clean(raw); if (c && !pl.items.some((i) => i.id === c.id)) pl.items.push(c); }
+  } else if (method === 'DELETE' && vid) pl.items = pl.items.filter((i) => i.id !== vid);
+  else throw new Error('400');
+  pl.updated = Date.now() / 1000;
+  return save(pl);
+}
+
 async function loadPlaylists() {
-  try { lists = await getJson('/api/playlists'); } catch { lists = []; }
+  try { lists = OFFLINE ? plLocal() : await getJson('/api/playlists'); } catch { lists = []; }
   if (S.pl) S.pl = lists.find((p) => p.id === S.pl.id) || null;
   paintPlaylists();
   syncPlNav();
@@ -1119,9 +1149,10 @@ function playSong(id, model, plist) {
 }
 const modelOf = (id) => library.find((i) => i.id === id)?.models?.[0];
 
-// Editing needs the host (the phone is read-only in offline and cloud mode); the host allows these writes from the LAN.
+// Connected to a host, edits go to it (it allows these writes from the LAN); offline and in the cloud they stay on the phone.
 async function plApi(method, url, body) {
   try {
+    if (OFFLINE) return plLocalApi(method, url, body);
     const r = await fetch(url, { method, headers: body === undefined ? {} : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
     if (!r.ok) throw new Error(`${r.status}`);
     return await r.json();
@@ -1160,7 +1191,7 @@ const plMove = (pl, n, d) => {
 function paintPlaylists() {
   const box = $('pls');
   if (plTab !== 'lists') return;
-  const editable = !OFFLINE;
+  const editable = true;
   const pl = lists.find((p) => p.id === plView);
   if (!pl) {
     const name = el('input', { className: 'search', type: 'text', placeholder: 'New playlist', maxLength: 80, autocomplete: 'off', ariaLabel: 'New playlist name' });
@@ -1174,7 +1205,7 @@ function paintPlaylists() {
           el('span', { className: 'meta' }, el('b', { textContent: p.name }), el('small', { textContent: `${p.items.length} songs` })));
         li.onclick = () => { plView = p.id; plAdding = false; paintPlaylists(); };
         return li;
-      }))] : [el('p', { className: 'note', textContent: editable ? 'No playlists yet. Name one above.' : 'No playlists here. Connect to a host to use them.' })]));
+      }))] : [el('p', { className: 'note', textContent: 'No playlists yet. Name one above.' })]));
     return;
   }
   const back = el('button', { className: 'btn-line', type: 'button', textContent: '‹ Playlists' });
@@ -1311,7 +1342,6 @@ function offlineStart() {
   layout();
   $('mode-seg').style.display = 'none';
   $('lat-row').style.display = 'none';
-  $('song-tabs').style.display = 'none';
   $('title').textContent = CLOUD ? cloudName : 'Offline songs';
   $('sub').textContent = CLOUD ? "Your band's library" : 'Saved on this phone';
   setLink(CLOUD ? 'ok' : 'bad', CLOUD ? cloudName : 'Offline');

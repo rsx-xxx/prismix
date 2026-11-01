@@ -22,6 +22,10 @@ Songs can now import a Guitar Pro (.gp) or MusicXML file as their tab from the S
 
 New Stem quality setting (Fast, Standard, High, Max) sets how thoroughly new songs are separated: higher levels average more passes for cleaner stems with less bleed, at the cost of time. Stems are already lossless FLAC, so file size is the same at every level; the setting shows the estimated time per level and the size for this computer, and switches to measured speeds after your first splits.
 
+## 0.41.1
+
+The Mac and Windows app no longer freezes when a prismix:// link (a band invite or a song) is opened: macOS delivers the link on the window's own thread, and signing in there blocked it for good. Playlists are back on the phone in the app's band-cloud and offline modes: the Playlists tab was hidden there. With no host, they are kept on the phone, and can be created, renamed, filled, reordered and deleted like the host's.
+
 ## 0.41.0
 
 Tapping a band invite link no longer freezes the Android app: it shows "Signing in…" at once, a second request can no longer drop the first, a failed sign-in always ends in a message, a used link is not replayed on relaunch, and links inside the app never navigate it away from the player. Starting playback on the phone now takes audio focus, so Spotify, YouTube and other apps pause, and Prismix pauses if another app takes over. The open-link page opens Prismix when it is installed and otherwise offers the APK (on Android Chrome it goes there by itself); it also handles invite links.
