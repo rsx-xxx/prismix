@@ -14,4 +14,5 @@ The installer is not code-signed. If SmartScreen shows "Windows protected your P
 The DMG is ad-hoc signed, not notarized. On first launch macOS asks for **System Settings, Privacy & Security, Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Prismix.app` once.
 
 ## iPhone and iPad
+[Step-by-step guide for beginners](https://rsx-xxx.github.io/prismix/ios/).
 `Prismix.ipa` is unsigned. Easiest: install [AltStore](https://altstore.io) or [SideStore](https://sidestore.io), then add the source `https://github.com/rsx-xxx/prismix/releases/latest/download/altstore.json` (or scan the QR in Prismix, Settings, Mobile app). Free Apple IDs sign for 7 days and AltStore renews it.

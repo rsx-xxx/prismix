@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Install Prismix on iPhone or iPad</title>
+<style>
+:root{color-scheme:dark light;--bg:#111;--ink:#eee;--mute:#aaa;--card:#1c1a18;--acc:#e8453c}
+@media(prefers-color-scheme:light){:root{--bg:#faf8f4;--ink:#1d1b19;--mute:#6a655e;--card:#fff}}
+body{font:17px/1.55 system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);margin:0}
+main{max-width:40rem;margin:0 auto;padding:1.5rem 1.2rem 4rem}
+h1{font-size:1.8rem;margin:.2rem 0 .4rem}h2{margin:2.2rem 0 .6rem;font-size:1.3rem}
+.lead{color:var(--mute)}
+.box{background:var(--card);border-radius:14px;padding:1rem 1.2rem;margin:1rem 0}
+ol{padding-left:1.3rem}li{margin:.55rem 0}
+a{color:var(--acc)}
+.note{color:var(--mute);font-size:.92rem}
+.tag{display:inline-block;background:var(--acc);color:#fff;border-radius:6px;padding:0 .45rem;font-size:.8rem;margin-right:.3rem}
+kbd{background:var(--card);border-radius:5px;padding:.05rem .4rem;font:inherit;font-weight:600}
+details{background:var(--card);border-radius:14px;padding:.7rem 1.2rem;margin:.7rem 0}summary{cursor:pointer;font-weight:600}
+</style></head>
+<body><main>
+<h1>Install Prismix on iPhone or iPad</h1>
+<p class="lead">Free, no developer account, no payment. About 15 minutes the first time, then it looks after itself.</p>
+
+<div class="box">
+<b>Why is this not just the App Store?</b>
+<p class="note">Apple charges developers a yearly fee to publish, and Prismix is free. So you install it with <b>AltStore</b>, a free helper app that signs Prismix with <i>your own</i> free Apple ID. It is a normal Apple-supported way of installing an app you made or trust.</p>
+</div>
+
+<h2>What you need</h2>
+<ul>
+<li>An iPhone or iPad with <b>iOS or iPadOS 17 or newer</b> (Settings → General → About shows it).</li>
+<li>A <b>Mac or Windows computer</b>, only for the first setup.</li>
+<li>A <b>USB cable</b> for the phone.</li>
+<li>Your <b>Apple ID</b> (the one you use for the App Store). Your password goes to Apple only. If you prefer, make a second free Apple ID just for this.</li>
+<li>The phone and the computer on the <b>same Wi-Fi</b>.</li>
+</ul>
+
+<h2>Part 1. Put AltStore on your phone (once)</h2>
+<p><span class="tag">Mac</span> or <span class="tag">Windows</span> choose your computer:</p>
+
+<details open><summary>On a Mac</summary>
+<ol>
+<li>On the Mac, open <a href="https://altstore.io">altstore.io</a> and download <b>AltServer for macOS</b>.</li>
+<li>Drag <b>AltServer</b> into your <b>Applications</b> folder and open it. A small diamond icon appears at the top of the screen.</li>
+<li>Plug the phone into the Mac with the cable. Unlock the phone and tap <b>Trust</b> if it asks.</li>
+<li>Open <b>Finder</b>, click your phone in the left list, and tick <b>Show this iPhone when on Wi-Fi</b>. Click Apply.</li>
+<li>Click the diamond icon at the top of the screen → <b>Install AltStore</b> → pick your phone.</li>
+<li>Type your Apple ID and password. Wait for the message that AltStore is installed.</li>
+</ol></details>
+
+<details><summary>On Windows</summary>
+<ol>
+<li>Install <b>iTunes</b> and <b>iCloud</b> from Apple's own website (apple.com). <b>Not</b> from the Microsoft Store, those versions do not work.</li>
+<li>On <a href="https://altstore.io">altstore.io</a> download <b>AltServer for Windows</b>, unzip it and run <b>setup.exe</b>.</li>
+<li>Open <b>AltServer</b> from the Start menu (right-click → Run as administrator). A diamond icon appears near the clock.</li>
+<li>Plug the phone in with the cable. Unlock it and tap <b>Trust</b>.</li>
+<li>Open <b>iTunes</b>, click the small phone icon, and tick <b>Sync with this iPhone over Wi-Fi</b>. Click Apply.</li>
+<li>Click the diamond icon near the clock → <b>Install AltStore</b> → pick your phone.</li>
+<li>Type your Apple ID and password. Wait for the message that AltStore is installed.</li>
+</ol></details>
+
+<h2>Part 2. Tell the phone to trust it</h2>
+<ol>
+<li>On the phone open <b>Settings → General → VPN &amp; Device Management</b> (on some versions: Profiles &amp; Device Management).</li>
+<li>Tap your Apple ID under <b>Developer App</b>, then <b>Trust</b>.</li>
+<li>Open <b>Settings → Privacy &amp; Security</b>, scroll to the bottom, tap <b>Developer Mode</b> and turn it on. The phone restarts. After the restart, confirm <b>Turn On</b> and enter your passcode.</li>
+</ol>
+<p class="note">Developer Mode is Apple's safety switch for apps that do not come from the App Store. It is needed once.</p>
+
+<h2>Part 3. Install Prismix</h2>
+<ol>
+<li>On the phone open <a href="https://altstore.io/source/https://github.com/rsx-xxx/prismix/releases/latest/download/altstore.json">this link</a>. It opens AltStore and offers the <b>Prismix</b> source. Tap <b>Add</b>.<br><span class="note">If nothing opens: in AltStore tap <b>Browse</b> → <b>Sources</b> → <b>+</b> and paste<br><code style="word-break:break-all">https://github.com/rsx-xxx/prismix/releases/latest/download/altstore.json</code></span></li>
+<li>Tap <b>Prismix</b> in the list, then <b>Free</b>. Wait until it says <b>Open</b>.</li>
+<li>Open <b>Prismix</b>.</li>
+</ol>
+
+<h2>Part 4. Connect it to your computer</h2>
+<ol>
+<li>Start <b>Prismix</b> on your computer. Keep the computer and phone on the same Wi-Fi.</li>
+<li>On the phone, Prismix lists your computer. Tap it. The first time, iOS asks to <b>allow finding devices on your local network</b>: tap <b>Allow</b>.</li>
+<li>No list? Tap <b>Scan the QR code</b> and point the camera at the code in Prismix on the computer (Band button).</li>
+</ol>
+<p><b>Done.</b> On an iPad the song list stays on the left while you play.</p>
+
+<h2>Keeping it working</h2>
+<ul>
+<li>Apple lets a free Apple ID run the app for <b>7 days</b>. <b>AltStore renews it by itself</b> whenever the phone is on the same Wi-Fi as the computer and AltServer is running (the diamond icon is there).</li>
+<li>Forgot? Open AltStore → <b>My Apps</b> → <b>Refresh All</b> while the computer is on. If the app already stopped opening, do the same, it comes back with its data.</li>
+<li>A free Apple ID allows <b>3 apps</b> at a time, and AltStore itself uses one slot.</li>
+</ul>
+
+<h2>Something went wrong</h2>
+<details><summary>"Unable to Verify App" or the app will not open</summary>Do Part 2 again (Trust, and Developer Mode).</details>
+<details><summary>AltStore says it cannot find AltServer</summary>The computer must be on, AltServer open (diamond icon visible) and on the same Wi-Fi as the phone. Turn off any VPN on the phone and the computer.</details>
+<details><summary>The phone does not appear in the Install AltStore menu</summary>Unlock the phone, replug the cable and tap Trust. On Windows check that iTunes and iCloud came from apple.com, not the Microsoft Store.</details>
+<details><summary>Prismix does not find my computer</summary>Both on the same Wi-Fi (not a guest network). On the phone: Settings → Privacy &amp; Security → Local Network → turn on Prismix. Or use the QR code.</details>
+<details><summary>I have no computer at all</summary>Look at <a href="https://sidestore.io">SideStore</a>: after one computer setup it refreshes on the phone alone. It is more fragile, some iOS releases (26.4 for one) broke its refresh for a while, so AltStore is what this guide recommends.</details>
+
+<p class="note">Sources: <a href="https://faq.altstore.io/altstore-classic/how-to-install-altstore-macos">AltStore FAQ, macOS</a> · <a href="https://faq.altstore.io/altstore-classic/how-to-install-altstore-windows">AltStore FAQ, Windows</a>. Steps checked against these pages; not tested on every iOS release.</p>
+</main></body></html>

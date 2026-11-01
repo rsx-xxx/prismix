@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.46.0
+
+New step-by-step guide for installing Prismix on iPhone and iPad, written for people who have never sideloaded: what to download on a Mac or Windows PC, which switches to turn on in iOS, how to add the Prismix source, how it renews itself, and fixes for the usual snags. It is linked from the install page, the Mobile app QR dialog, the README and the release notes.
+
 ## 0.45.0
 
 Prismix now has an iPhone and iPad app. It finds your computer on the Wi-Fi (or scans its QR code), shows the phone page with lock-screen controls and background audio, and on iPad keeps the song list beside the player; the same split layout appears on Android tablets. It is free to install: add the Prismix source in AltStore or SideStore and it signs the app with your own Apple ID. Settings has a new Mobile app entry with one QR code that sends Android phones to the APK and iPhones and iPads to the AltStore install.
