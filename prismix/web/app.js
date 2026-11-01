@@ -1545,6 +1545,21 @@ $('settings-close').addEventListener('click', closeSettings);
 $('acc-sel').value = getAccidentals();
 $('acc-sel').addEventListener('change', () => { setAccidentals($('acc-sel').value); window.dispatchEvent(new Event('accidentals')); });
 $('help-btn').addEventListener('click', () => { closeSettings(); cheats.toggle(); });
+
+// Stem quality: sizes and times are computed by the server for this machine and the model picked on the home screen.
+const fmtDur = (s) => (s < 90 ? `${s} s` : `${Math.round(s / 60)} min`);
+async function loadQuality() {
+  try {
+    const q = await api(`/api/quality?model=${encodeURIComponent($('quality').value || state.defaultModel || '')}`);
+    const sel = $('q-sel');
+    sel.replaceChildren(...q.levels.map((l) => el('option', { value: l.id, textContent: `${l.label} · ~${fmtDur(l.timeSec)}`, title: l.hint, selected: l.id === q.current })));
+    const note = q.measured ? 'measured on this machine' : `estimated for ${q.device.toUpperCase()}`;
+    $('q-est').textContent = `Per ${Math.round(q.seconds / 60)}-min song: ~${Math.round(q.sizeMB)} MB at any level, ${note}. Applies to new splits.`;
+  } catch (err) { $('q-est').textContent = err.message; }
+}
+$('q-sel').addEventListener('change', () => api('/api/quality', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quality: $('q-sel').value }) }).catch((err) => notice(err.message)));
+$('settings-btn').addEventListener('click', () => { if (!settingsPanel.hidden) loadQuality(); });
+$('quality').addEventListener('change', () => { if (!settingsPanel.hidden) loadQuality(); });
 window.addEventListener('beforeunload', savePrefs);
 
 // ── boot ──

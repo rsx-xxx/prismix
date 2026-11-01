@@ -36,6 +36,7 @@ from . import (
     original,
     pipeline,
     playlists,
+    quality,
     spotify,
     tabdata,
     tabfiles,
@@ -50,6 +51,10 @@ from .jobs import JobManager
 from .prefetch import Prefetcher
 
 log = logging.getLogger(__name__)
+
+
+class QualityRequest(BaseModel):
+    quality: str
 
 
 class ProcessRequest(BaseModel):
@@ -514,6 +519,19 @@ def create_app() -> FastAPI:
                 for m in MODELS.values()
             ],
         }
+
+    @app.get("/api/quality")
+    def get_quality(model: str = DEFAULT_MODEL, seconds: int = quality.TYPICAL_SEC):
+        if model not in MODELS or model == MIX_MODEL:
+            raise HTTPException(400, "Unknown model")
+        return {"current": quality.current().id, **quality.estimates(model, max(10, min(seconds, 3600)))}
+
+    @app.put("/api/quality")
+    def put_quality(req: QualityRequest):
+        try:
+            return {"current": quality.set_current(req.quality).id}
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
 
     @app.get("/api/library")
     def list_library():

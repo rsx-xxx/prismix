@@ -25,6 +25,7 @@ from .config import (
     ffmpeg_exe,
     js_runtime,
 )
+from .quality import Quality, current, record_speed
 
 log = logging.getLogger(__name__)
 
@@ -331,7 +332,7 @@ def _load_model(name: str):
     return model
 
 
-def _run_demucs(model, wav, device: str, report: Report) -> np.ndarray:
+def _run_demucs(model, wav, device: str, report: Report, q: Quality) -> np.ndarray:
     import torch
     from demucs.apply import apply_model
 
@@ -341,17 +342,19 @@ def _run_demucs(model, wav, device: str, report: Report) -> np.ndarray:
     n_models = len(model.models) if hasattr(model, "models") else 1
     total = max(wav.shape[-1], 1)
     best = [0.0]
+    passes = max(q.shifts, 1)
 
     def cb(d: dict) -> None:
         if d.get("state") != "end":
             return
-        frac = (d["model_idx_in_bag"] + d["segment_offset"] / total) / n_models
+        inner = (d.get("shift_idx", 0) + d["segment_offset"] / total) / passes
+        frac = (d["model_idx_in_bag"] + inner) / n_models
         best[0] = max(best[0], min(frac, 1.0))
         report("separate", best[0], "Separating instruments")
 
     with torch.inference_mode():
         out = apply_model(
-            model, mix, device=device, shifts=1, split=True, overlap=0.25,
+            model, mix, device=device, shifts=q.shifts, split=True, overlap=q.overlap,
             progress=False, callback=cb,
         )[0]
     return (out * std + mean).cpu().numpy()  # (stems, 2, n)
@@ -402,12 +405,12 @@ def _load_roformer():
     return model, cfg
 
 
-def _run_roformer(model, cfg, wav, device: str, report: Report) -> tuple[list[str], np.ndarray]:
+def _run_roformer(model, cfg, wav, device: str, report: Report, q: Quality) -> tuple[list[str], np.ndarray]:
     """Overlap-add over fixed chunks with a fade window; reflect-padded edges."""
     import torch
 
     chunk = int(cfg.inference.chunk_size)
-    step = chunk // int(cfg.inference.num_overlap)
+    step = chunk // (int(cfg.inference.num_overlap) * q.roformer)
     border = chunk - step
     n = wav.shape[-1]
     x = wav
@@ -443,7 +446,7 @@ def _run_roformer(model, cfg, wav, device: str, report: Report) -> tuple[list[st
     return list(cfg.training.instruments), np.nan_to_num(res.cpu().numpy())
 
 
-def _separate_roformer(wav: np.ndarray, report: Report) -> dict[str, np.ndarray]:
+def _separate_roformer(wav: np.ndarray, report: Report, q: Quality) -> dict[str, np.ndarray]:
     import torch
 
     report("model", 0.0, "Loading model (first run downloads ~700 MB)")
@@ -455,35 +458,41 @@ def _separate_roformer(wav: np.ndarray, report: Report) -> dict[str, np.ndarray]
     device = pick_device()
     tensor = torch.from_numpy(wav)
     report("separate", 0.0, "Separating instruments")
+    started = time.monotonic()
     try:
-        names, out = _run_roformer(model, cfg, tensor, device, report)
+        names, out = _run_roformer(model, cfg, tensor, device, report, q)
     except RuntimeError as e:
         if device == "cpu":
             raise PipelineError(f"Separation failed: {e}") from e
         log.warning("separation on %s failed (%s); retrying on CPU", device, e)
-        names, out = _run_roformer(model, cfg, tensor, "cpu", report)
+        device, started = "cpu", time.monotonic()
+        names, out = _run_roformer(model, cfg, tensor, "cpu", report, q)
+    record_speed(_ROFORMER, device, q, time.monotonic() - started, wav.shape[-1] / SAMPLE_RATE)
     stems = dict(zip(names, out, strict=True))
     return {k: stems[k] for k in sorted(stems, key=_stem_rank)}
 
 
-def separate(wav: np.ndarray, model_name: str, report: Report) -> dict[str, np.ndarray]:
+def separate(wav: np.ndarray, model_name: str, report: Report, q: Quality) -> dict[str, np.ndarray]:
     import torch
 
     if model_name == _ROFORMER:
-        return _separate_roformer(wav, report)
+        return _separate_roformer(wav, report, q)
 
     report("model", 0.0, "Loading model (first run downloads weights)")
     model = _load_model(model_name)
     device = pick_device()
     tensor = torch.from_numpy(wav)
     report("separate", 0.0, "Separating instruments")
+    started = time.monotonic()
     try:
-        out = _run_demucs(model, tensor, device, report)
+        out = _run_demucs(model, tensor, device, report, q)
     except RuntimeError as e:
         if device == "cpu":
             raise PipelineError(f"Separation failed: {e}") from e
         log.warning("separation on %s failed (%s); retrying on CPU", device, e)
-        out = _run_demucs(model, tensor, "cpu", report)
+        device, started = "cpu", time.monotonic()
+        out = _run_demucs(model, tensor, "cpu", report, q)
+    record_speed(model_name, device, q, time.monotonic() - started, wav.shape[-1] / SAMPLE_RATE)
     stems = dict(zip(model.sources, out, strict=True))
     return {k: stems[k] for k in sorted(stems, key=_stem_rank)}
 
@@ -542,10 +551,11 @@ def process(video_id: str, model_name: str, report: Report, *, analyse: bool = T
     wav = decode(source)
     duration = wav.shape[1] / SAMPLE_RATE
 
+    q = current()
     if model_name == MIX_MODEL:
         stems = {MIX_MODEL: wav}
     else:
-        stems = drop_empty(separate(wav, model_name, report))
+        stems = drop_empty(separate(wav, model_name, report, q))
     del wav
 
     final = library.model_dir(video_id, model_name)
@@ -567,6 +577,7 @@ def process(video_id: str, model_name: str, report: Report, *, analyse: bool = T
         meta = {
             **info,
             "model": model_name,
+            "quality": q.id if model_name != MIX_MODEL else None,
             "duration": duration,
             "sampleRate": SAMPLE_RATE,
             "stems": entries,

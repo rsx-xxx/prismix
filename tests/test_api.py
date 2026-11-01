@@ -129,3 +129,30 @@ def test_phone_may_edit_playlists_but_nothing_else(tmp_path, monkeypatch):
         assert c.post("/api/playlists/abcdef0123/process").status_code == 403
         assert c.delete(f"/api/library/{VID}").status_code == 403
         assert c.get("/api/band").status_code == 403
+
+
+def test_quality_setting_roundtrip(tmp_path, monkeypatch):
+    from prismix import quality
+
+    monkeypatch.setattr(quality, "SETTINGS_FILE", tmp_path / "settings.json")
+    monkeypatch.setattr(quality, "device", lambda: "cpu")
+    with make_client(tmp_path, monkeypatch) as c:
+        r = c.get("/api/quality", params={"model": "htdemucs_ft"}).json()
+        assert r["current"] == "standard"
+        times = [lv["timeSec"] for lv in r["levels"]]
+        assert times == sorted(times) and times[0] < times[-1]
+        assert c.put("/api/quality", json={"quality": "high"}).json() == {"current": "high"}
+        assert c.get("/api/quality").json()["current"] == "high"
+        assert c.put("/api/quality", json={"quality": "nope"}).status_code == 400
+        assert c.get("/api/quality", params={"model": "mix"}).status_code == 400
+
+
+def test_quality_cost_and_speed(tmp_path, monkeypatch):
+    from prismix import quality
+
+    monkeypatch.setattr(quality, "SETTINGS_FILE", tmp_path / "settings.json")
+    q = quality.QUALITIES
+    assert quality.cost(q["standard"], "htdemucs_ft") == 1
+    assert quality.cost(q["high"], "htdemucs_ft") > 2
+    quality.record_speed("htdemucs_ft", "cpu", q["high"], 600, 200)
+    assert quality._rtf("htdemucs_ft", "cpu")[1] is True
