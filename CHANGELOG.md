@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.46.1
+
+The Mac and Windows app no longer freezes when a prismix:// link (a band invite or a song) is opened: macOS delivers the link on the window's own thread, and signing in there blocked it for good. Playlists are back on the phone in the app's band-cloud and offline modes: the Playlists tab was hidden there. With no host, they are kept on the phone, and can be created, renamed, filled, reordered and deleted like the host's.
+
 ## 0.46.0
 
 New step-by-step guide for installing Prismix on iPhone and iPad, written for people who have never sideloaded: what to download on a Mac or Windows PC, which switches to turn on in iOS, how to add the Prismix source, how it renews itself, and fixes for the usual snags. It is linked from the install page, the Mobile app QR dialog, the README and the release notes.
@@ -21,10 +25,6 @@ Songs can now import a Guitar Pro (.gp) or MusicXML file as their tab from the S
 ## 0.42.0
 
 New Stem quality setting (Fast, Standard, High, Max) sets how thoroughly new songs are separated: higher levels average more passes for cleaner stems with less bleed, at the cost of time. Stems are already lossless FLAC, so file size is the same at every level; the setting shows the estimated time per level and the size for this computer, and switches to measured speeds after your first splits.
-
-## 0.41.1
-
-The Mac and Windows app no longer freezes when a prismix:// link (a band invite or a song) is opened: macOS delivers the link on the window's own thread, and signing in there blocked it for good. Playlists are back on the phone in the app's band-cloud and offline modes: the Playlists tab was hidden there. With no host, they are kept on the phone, and can be created, renamed, filled, reordered and deleted like the host's.
 
 ## 0.41.0
 
