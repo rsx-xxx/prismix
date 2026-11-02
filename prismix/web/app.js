@@ -856,7 +856,6 @@ function renderModelSwitch(id, current, available) {
     b.addEventListener('click', async () => {
       if (m.id === current) return;
       if (have) { location.hash = `#/v/${id}/${m.id}`; return; }
-      location.hash = '#/';
       await startProcess(id, m.id, 'all');
     });
     return b;

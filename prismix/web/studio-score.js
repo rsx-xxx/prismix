@@ -398,8 +398,12 @@ export function createScore({ player, api, notice, onSetup }) {
     metaText = parts.join(' · ');
     $('sc-meta').replaceChildren(...parts.map((t, i) => el('span', { className: i === 0 && k ? 'pill key' : 'pill', textContent: t })))
     const src = cur.tabs;
-    if (opts.useTab && src?.url) { // say where the chord names come from, with the page itself
-      $('sc-meta').append(el('a', { className: 'pill', href: src.url, target: '_blank', rel: 'noopener', title: 'The chord sheet these chords are matched to', textContent: `Chords: ${[src.artist, src.title].filter(Boolean).join(' - ') || 'Songsterr'} ↗` }));
+    // say where the chord names come from: the online sheet, with the page itself, or the app's own detection
+    if (opts.useTab && src?.url) {
+      const site = src.source === 'soundslice' ? 'Soundslice' : 'Songsterr';
+      $('sc-meta').append(el('a', { className: 'pill', href: src.url, target: '_blank', rel: 'noopener', title: 'The chord sheet these chords are matched to', textContent: `Chords: ${[src.artist, src.title].filter(Boolean).join(' - ') || site} · ${site} ↗` }));
+    } else {
+      $('sc-meta').append(el('span', { className: 'pill', title: 'Worked out from the recording by the app, check it by ear', textContent: 'Chords: detected from the audio' }));
     }
     renderChart(body);
   }

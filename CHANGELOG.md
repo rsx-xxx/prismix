@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.50.1
+
+The fingering panel now stays when only the chords above the lyrics are shown (Chords block hidden); it can still be hidden by hand. Bars before the music starts are dimmed less, so the first bars no longer look dark. Switching a song to 6 stems keeps you in the song while it processes instead of sending you to the main page. The chords now name their source too: the online sheet and site it came from, or "detected from the audio".
+
 ## 0.50.0
 
 Running apps now notice a new release while you work: the page asks every ten minutes and the app itself checks GitHub every hour with a conditional request, so an unchanged answer costs no rate limit. Stem quality in Settings now also shows how clean each level is (four dots), what it does to the result (bleed between stems, artifacts) and the passes and overlap behind it, not just the time.
