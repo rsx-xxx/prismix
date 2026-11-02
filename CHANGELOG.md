@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.50.2
+
+Songsterr tab parts are named by their instrument ("Alto Sax") instead of the musician's name ("Jesse Rutherford"). Tabs downloaded earlier are fetched again once, so they pick up the instrument names.
+
 ## 0.50.1
 
 The fingering panel now stays when only the chords above the lyrics are shown (Chords block hidden); it can still be hidden by hand. Bars before the music starts are dimmed less, so the first bars no longer look dark. Switching a song to 6 stems keeps you in the song while it processes instead of sending you to the main page. The chords now name their source too: the online sheet and site it came from, or "detected from the audio".

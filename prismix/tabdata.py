@@ -38,7 +38,7 @@ SURE_FIT = 0.75
 SLICE_DATA = "https://www.soundslice.com/slices/{code}/scoredata/"
 SLICE_URL = re.compile(r"^(?:https?://)?(?:www\.)?soundslice\.com/slices/([A-Za-z0-9]{3,12})(?:[/?#]|$)")
 FLAGS = "tshxm"  # a note's flags: tie, slide, hammer/pull, dead, palm mute
-FORMAT = 4  # 4: drum parts ([staff line, MIDI note] per hit); 3: notes carry flags (tie, slide, hammer, dead, palm mute), beats let-ring and tempo
+FORMAT = 5  # 5: parts are named by their instrument, not the player; 4: drum parts ([staff line, MIDI note] per hit); 3: notes carry flags (tie, slide, hammer, dead, palm mute), beats let-ring and tempo
 KINDS = ("guitar", "bass", "keys", "other", "drums")
 MAX_PARTS = {"guitar": 6, "bass": 3, "keys": 4, "other": 5, "drums": 2}
 MAX_BARS, MAX_STRINGS = 1500, 12
@@ -717,7 +717,7 @@ def _download(song: dict) -> dict[str, dict]:
         if any(b["n"] for b in bars) and (tuning or kind == "drums"):
             parts[key] = {
                 "kind": kind,
-                "name": part.get("name") or meta["tracks"][idx].get("name", ""),
+                "name": " ".join((meta["tracks"][idx].get("instrument") or part.get("name") or meta["tracks"][idx].get("name") or "").split()),
                 "tuning": tuning,
                 "bars": bars,
             }
