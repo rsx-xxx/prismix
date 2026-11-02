@@ -144,6 +144,7 @@ def estimates(model: str, seconds: float = TYPICAL_SEC) -> dict:
         "sizeMB": round(size_mb, 1),
         "levels": [
             {"id": q.id, "label": q.label, "hint": q.hint,
+             "cost": round(cost(q, model), 1),
              "timeSec": round(rtf * cost(q, model) * seconds + 8)}  # + download/decode/encode overhead
             for q in QUALITIES.values()
         ],

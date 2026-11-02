@@ -121,12 +121,10 @@
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Download
         </button>
-        <button class="btn" id="share-btn" type="button" title="Copy a prismix:// link to this song">
+        <button class="btn" id="share-btn" type="button" title="Copy a link that opens this song in Prismix">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Share
         </button>
-        <button class="btn" id="share-at-btn" type="button" title="Copy a prismix:// link that opens this song at the current moment">At this moment</button>
-        
       </div>
 
       <div id="loading" class="loading" hidden>
@@ -356,6 +354,22 @@
     </form>
   </dialog>
 
+  <dialog id="share" class="wide">
+    <form id="share-form" method="dialog">
+      <h3>Share</h3>
+      <p id="share-song" class="muted"></p>
+      <fieldset>
+        <label class="radio"><input type="radio" name="share-at" value="song" checked> <span><b>The song</b><small>Opens it from the start</small></span></label>
+        <label class="radio"><input type="radio" name="share-at" value="moment"> <span><b>This moment · <span id="share-time"></span></b><small>Opens it at the point you are listening to</small></span></label>
+      </fieldset>
+      <input id="share-link" class="share-link" type="text" readonly aria-label="Link" spellcheck="false">
+      <div class="dlg-actions">
+        <button class="btn ghost" id="share-close" type="button">Close</button>
+        <button class="btn primary" id="share-copy" type="submit">Copy link</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="playlists" class="wide">
     <div class="pl-head"><h3>Playlists</h3><button class="icon-btn" id="pl-close" type="button" aria-label="Close">×</button></div>
     <div id="pl-body" class="pl-body"></div>
@@ -480,6 +494,7 @@
     <div class="pl-head"><h3>Settings</h3><button class="icon-btn" id="settings-close" type="button" aria-label="Close">×</button></div>
     <div class="set-row"><span>Notes</span><select id="acc-sel" aria-label="Flats or sharps"><option value="auto">Auto (by key)</option><option value="flat">Flats ♭</option><option value="sharp">Sharps ♯</option></select></div>
     <div class="set-row"><span title="How thoroughly stems are separated. Higher is cleaner but slower; file size stays the same">Stem quality</span><div class="q-box"><select id="q-sel" aria-label="Stem quality"></select><small class="muted" id="q-est"></small></div></div>
+    <div class="q-detail" id="q-detail" hidden><ul id="q-levels"></ul><p class="muted" id="q-hint"></p></div>
     <div class="set-row"><span>Theme</span><button class="icon-btn" id="theme-btn" type="button" aria-label="Theme"></button></div>
     <div class="set-row"><span>Keyboard shortcuts</span><button class="btn small ghost" id="help-btn" type="button">Show</button></div>
     <div class="set-row"><span title="Guitar Pro, MusicXML or MIDI files you already have; matched to your songs by name and checked against the audio">Tab files</span><button class="btn small ghost" id="tabfolder-btn" type="button">Pick a folder…</button></div>

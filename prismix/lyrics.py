@@ -24,7 +24,7 @@ API = "https://lrclib.net/api"
 HEADERS = {"User-Agent": "prismix (personal use; https://lrclib.net/docs)"}
 TIMEOUT = 25
 SCHEMA = 3
-AUDIO_REV = 3  # bumped when finding published lyrics or recognising the audio got better
+AUDIO_REV = 4 # bumped when finding published lyrics or recognising the audio got better
 MIN_TITLE_COVERAGE = 0.6
 MAX_CANDIDATES = 14
 

@@ -1334,20 +1334,29 @@ async function copyText(text) {
   ta.remove();
   return ok;
 }
-async function shareLink(atMoment, btn) {
-  if (!state.current) return;
+function shareUrl() {
   const { id, model } = state.current;
-  const at = atMoment ? `&t=${Math.floor(player.position)}` : '';
-  const link = `${SHARE_PAGE}#song/${id}?m=${model}${at}`;
-  const ok = await copyText(link);
-  if (ok) {
-    btn.classList.add('copied');
-    setTimeout(() => btn.classList.remove('copied'), 900);
-    notice(`Link copied${at ? ` (at ${fmt(player.position)})` : ''}`, 'ok');
-  } else notice(`Could not copy. The link is ${link}`);
+  const at = document.querySelector('input[name="share-at"]:checked').value === 'moment' ? `&t=${Math.floor(player.position)}` : '';
+  return `${SHARE_PAGE}#song/${id}?m=${model}${at}`;
 }
-$('share-btn').addEventListener('click', (e) => shareLink(false, e.currentTarget));
-$('share-at-btn').addEventListener('click', (e) => shareLink(true, e.currentTarget));
+function refreshShare() { $('share-link').value = shareUrl(); }
+$('share-btn').addEventListener('click', () => {
+  if (!state.current) return;
+  $('share-song').textContent = $('th-title').textContent;
+  $('share-time').textContent = fmt(player.position);
+  document.querySelector('input[name="share-at"][value="song"]').checked = true;
+  refreshShare();
+  $('share').showModal();
+});
+document.querySelectorAll('input[name="share-at"]').forEach((r) => r.addEventListener('change', refreshShare));
+$('share-link').addEventListener('focus', (e) => e.target.select());
+$('share-close').addEventListener('click', () => $('share').close());
+$('share-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const link = shareUrl();
+  if (await copyText(link)) { $('share').close(); notice('Link copied', 'ok'); }
+  else { $('share-link').select(); notice('Could not copy. Select the link and copy it by hand'); }
+});
 $('ex-cancel').addEventListener('click', () => $('export').close());
 
 $('export-form').addEventListener('submit', async (e) => {
@@ -1570,11 +1579,24 @@ async function loadQuality() {
     const q = await api(`/api/quality?model=${encodeURIComponent($('quality').value || state.defaultModel || '')}`);
     const sel = $('q-sel');
     sel.replaceChildren(...q.levels.map((l) => el('option', { value: l.id, textContent: `${l.label} · ~${fmtDur(l.timeSec)}`, title: l.hint, selected: l.id === q.current })));
+    const slowest = Math.max(...q.levels.map((l) => l.timeSec));
+    const paint = () => {
+      const cur = $('q-sel').value;
+      $('q-levels').replaceChildren(...q.levels.map((l) => el('li', { className: l.id === cur ? 'on' : '', title: l.hint },
+        el('span', { className: 'q-name', textContent: l.label }),
+        el('span', { className: 'q-bar' }, el('i', { style: `width:${Math.max(6, Math.round((l.timeSec / slowest) * 100))}%` })),
+        el('span', { className: 'q-time', textContent: `~${fmtDur(l.timeSec)}${l.cost > 1 ? ` · ${l.cost}×` : ''}` }))));
+      $('q-hint').textContent = q.levels.find((l) => l.id === cur)?.hint || '';
+    };
+    paint();
+    $('q-sel').onchange = paint;
+    $('q-detail').hidden = false;
     const note = q.measured ? 'measured on this machine' : `estimated for ${q.device.toUpperCase()}`;
     $('q-est').textContent = `Per ${Math.round(q.seconds / 60)}-min song: ~${Math.round(q.sizeMB)} MB at any level, ${note}. Applies to new splits.`;
   } catch (err) { $('q-est').textContent = err.message; }
 }
-$('q-sel').addEventListener('change', () => api('/api/quality', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quality: $('q-sel').value }) }).catch((err) => notice(err.message)));
+const putQuality = () => api('/api/quality', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quality: $('q-sel').value }) }).catch((err) => notice(err.message));
+$('q-sel').addEventListener('change', putQuality);
 $('settings-btn').addEventListener('click', () => { if (!settingsPanel.hidden) loadQuality(); });
 $('quality').addEventListener('change', () => { if (!settingsPanel.hidden) loadQuality(); });
 window.addEventListener('beforeunload', savePrefs);

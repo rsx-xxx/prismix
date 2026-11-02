@@ -123,6 +123,16 @@ def _bundle() -> Path:
     return Path(sys.executable).resolve().parents[2]
 
 
+# Right after the old process dies LaunchServices may still list it as running, so a plain `open` only "activates" the
+# dead app and nothing starts. Open a new instance and look for the process, retrying until it is really up.
+_RELAUNCH = """for i in 1 2 3 4 5 6 7 8; do
+  sleep 1
+  open -n "$2" 2>/dev/null
+  sleep 2
+  pgrep -f "$2/Contents/MacOS/" >/dev/null && break
+done"""
+
+
 def _hand_over(path: Path) -> None:
     """Start the platform installer detached; it waits for this process to exit, then swaps the app and reopens it."""
     if sys.platform == "win32":
@@ -143,7 +153,7 @@ if [ -d "$MNT/Prismix.app" ]; then
   rm -rf "$2" && mv "$2.new" "$2"
 fi
 hdiutil detach "$MNT" >/dev/null 2>&1
-open "$2"
+{_RELAUNCH}
 """)
     subprocess.Popen(["/bin/bash", str(script), str(path), str(app)], start_new_session=True, close_fds=True,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -184,7 +194,7 @@ def _brew_upgrade() -> bool:
 
 
 def _reopen_after_exit() -> None:
-    subprocess.Popen(["/bin/bash", "-c", f"while kill -0 {os.getpid()} 2>/dev/null; do sleep 0.3; done; open {_bundle()!s}"],
+    subprocess.Popen(["/bin/bash", "-c", f'while kill -0 {os.getpid()} 2>/dev/null; do sleep 0.3; done; set -- _ "$0"; {_RELAUNCH}', str(_bundle())],
                      start_new_session=True, close_fds=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 

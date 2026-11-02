@@ -884,6 +884,15 @@ body.dragging * { cursor: grabbing !important; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; border-top: 1px solid var(--line); }
 .set-row:first-of-type { border-top: 0; }
 .q-box { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 60%; text-align: right; }
+.q-detail { padding: 2px 0 10px; }
+.q-detail ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.q-detail li { display: grid; grid-template-columns: 62px 1fr auto; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
+.q-detail li.on { color: var(--text); font-weight: 600; }
+.q-bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.q-bar i { display: block; height: 100%; border-radius: 3px; background: var(--muted); opacity: .5; transition: width .2s; }
+.q-detail li.on .q-bar i { background: var(--accent); opacity: 1; }
+.q-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.q-detail p { margin: 8px 0 0; font-size: 12.5px; }
 .band-pane { margin-top: 14px; }
 .band-pane[hidden] { display: none; }
 #settings-btn { position: relative; }
@@ -1126,7 +1135,7 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
   body { padding-left: var(--side-w); }
   body .dock { left: var(--side-w); }
   body .sidebar {
-    position: fixed; z-index: 30; inset: 0 auto 0 0; width: var(--side-w); display: flex; flex-direction: column; gap: 2px; overflow: hidden; transition: width .18s ease, box-shadow .18s;
+    position: fixed; z-index: 48; inset: 0 auto 0 0; width: var(--side-w); display: flex; flex-direction: column; gap: 2px; overflow: hidden auto; scrollbar-width: none; transition: width .18s ease, box-shadow .18s;
     padding: 18px 12px 16px; background: var(--glass); backdrop-filter: blur(28px) saturate(1.5); -webkit-backdrop-filter: blur(28px) saturate(1.5);
     border-right: 1px solid var(--line);
   }
@@ -1193,8 +1202,8 @@ body:has(#tabview:not([hidden], .off, .out)) #ahead { display: none !important; 
 .upd-dlg #update-dlg-pct { grid-column: 2; }
 @keyframes upd-pulse { 50% { transform: scale(.92); opacity: .7; } }
 @media (prefers-reduced-motion: reduce) { .upd-dlg img { animation: none; } }
-#share-btn.copied, #share-at-btn.copied { background: var(--accent); color: var(--on-primary); border-color: transparent; transform: scale(.96); }
-#share-btn, #share-at-btn { transition: background .15s, color .15s, transform .15s; }
+.share-link { width: 100%; margin-bottom: 18px; font: 13px ui-monospace, monospace; color: var(--muted); }
+#share-btn { transition: background .15s, color .15s, transform .15s; }
 
 /* Covers: a quiet placeholder until the picture is decoded, then a fade-in (never the browser's broken-image glyph) */
 img.cv { opacity: 0; transition: opacity .2s ease-out; }
