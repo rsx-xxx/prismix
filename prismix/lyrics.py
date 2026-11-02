@@ -364,7 +364,7 @@ def find_by_words(video_id: str, heard_lines: list[dict]) -> dict | None:
         with httpx.Client(headers={"User-Agent": genius.UA, "Accept-Language": "en,ru;q=0.8"}, timeout=genius.TIMEOUT,
                           follow_redirects=True) as client:
             urls: list[str] = []
-            for q in (f'"{sung[0]}" lyrics genius', f'"{" ".join(sung)[:120]}" genius lyrics'):
+            for q in (sung[0], " ".join(sung)[:120]):
                 urls += [u for u in genius.search_urls(client, q) if u not in urls]
             for url in urls[:MAX_WEB_PAGES]:
                 if url in seen or not (r := genius._get(client, url)):
