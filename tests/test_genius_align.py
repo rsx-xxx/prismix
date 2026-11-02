@@ -59,7 +59,8 @@ class _Client:
 
 
 def test_api_urls_reads_songs_from_every_section():
-    hit = lambda u, t="song": {"type": t, "result": {"url": u}}
+    def hit(u, t="song"):
+        return {"type": t, "result": {"url": u}}
     payload = {"response": {"sections": [
         {"type": "top_hit", "hits": [hit("https://genius.com/a-b-lyrics")]},
         {"type": "lyric", "hits": [hit("https://genius.com/a-b-lyrics"), hit("https://genius.com/c-d-lyrics")]},

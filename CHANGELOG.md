@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.48.2
+
+Release 0.48.1 never built because a lint error in its Genius search test stopped the pipeline; the test is fixed, so the Cyrillic-artist lyrics lookup from 0.48.1 now ships in this release.
+
 ## 0.48.1
 
 Lyrics are now found for songs with Cyrillic or otherwise non-Latin artist names, such as "Марія Чайковська - Красота [feat. Би-2]". Genius slugs are Latin-only, so the guessed page address never matched and the web-search fallback is often blocked; the lookup now uses Genius's own search, by title and artist first, and by the sung lines when the title leads nowhere.
