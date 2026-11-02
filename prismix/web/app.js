@@ -803,15 +803,18 @@ function wireUpdate(u) {
   poll();
 }
 
-// Look at launch, again whenever the window comes back after a while (the laptop slept, the app sat in the background), and on demand.
-const UPDATE_EVERY = 30 * 60 * 1000;
+// Look at launch, every few minutes while the window is open (the host app keeps its own fresh copy, so this is cheap), again
+// whenever the window comes back after a while (the laptop slept, the app sat in the background), and on demand.
+const UPDATE_EVERY = 10 * 60 * 1000;
 let updateCheckedAt = Date.now();
-checkUpdates().catch(() => { /* the update notice is optional */ });
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible' || updateWired || Date.now() - updateCheckedAt < UPDATE_EVERY) return;
+const lookForUpdate = () => {
+  if (updateWired || document.visibilityState !== 'visible' || Date.now() - updateCheckedAt < UPDATE_EVERY - 1000) return;
   updateCheckedAt = Date.now();
   checkUpdates().catch(() => {});
-});
+};
+checkUpdates().catch(() => { /* the update notice is optional */ });
+setInterval(lookForUpdate, UPDATE_EVERY);
+document.addEventListener('visibilitychange', lookForUpdate);
 $('tabfolder-btn').addEventListener('click', async () => {
   const b = $('tabfolder-btn');
   const api = window.pywebview?.api;
@@ -1585,8 +1588,10 @@ async function loadQuality() {
       $('q-levels').replaceChildren(...q.levels.map((l) => el('li', { className: l.id === cur ? 'on' : '', title: l.hint },
         el('span', { className: 'q-name', textContent: l.label }),
         el('span', { className: 'q-bar' }, el('i', { style: `width:${Math.max(6, Math.round((l.timeSec / slowest) * 100))}%` })),
-        el('span', { className: 'q-time', textContent: `~${fmtDur(l.timeSec)}${l.cost > 1 ? ` · ${l.cost}×` : ''}` }))));
-      $('q-hint').textContent = q.levels.find((l) => l.id === cur)?.hint || '';
+        el('span', { className: 'q-time', textContent: `~${fmtDur(l.timeSec)}${l.cost > 1 ? ` · ${l.cost}×` : ''}` }),
+        el('span', { className: 'q-clean', title: `Stem cleanliness ${l.clean} of 4`, textContent: '●'.repeat(l.clean) + '○'.repeat(4 - l.clean) }))));
+      const lv = q.levels.find((l) => l.id === cur);
+      $('q-hint').textContent = lv ? `${lv.detail} (${lv.how})` : '';
     };
     paint();
     $('q-sel').onchange = paint;

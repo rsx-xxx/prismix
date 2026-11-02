@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.50.0
+
+Running apps now notice a new release while you work: the page asks every ten minutes and the app itself checks GitHub every hour with a conditional request, so an unchanged answer costs no rate limit. Stem quality in Settings now also shows how clean each level is (four dots), what it does to the result (bleed between stems, artifacts) and the passes and overlap behind it, not just the time.
+
 ## 0.49.0
 
 Share is now one button that opens a small window: pick the song or the current moment, see the link, and copy it, so the separate "At this moment" button is gone. Stem quality in Settings shows every level with its time next to a bar and how many times slower than Standard it is, plus what the selected level does. In the player, the side menu now opens above the playback bar, so Settings and the other buttons can be reached. After an update the app now really reopens itself on macOS instead of only quitting. Songs whose lyrics were recognised from the audio get another look at Genius, so "Красота" by Марія Чайковська now shows the published words.

@@ -26,13 +26,19 @@ class Quality:
     shifts: int       # htdemucs: random-shift passes averaged (0 = a single plain pass)
     overlap: float    # htdemucs: window overlap
     roformer: int     # BS-RoFormer: multiplier on the model's own window overlap
+    clean: int        # 1-4: how much leakage and artifacts are averaged away, for the settings panel
+    detail: str       # what that means for the result, in plain words
 
 
 QUALITIES: dict[str, Quality] = {q.id: q for q in (
-    Quality("fast", "Fast", "A single light pass: quickest, a little more bleed between stems", 0, 0.10, 1),
-    Quality("standard", "Standard", "Balanced: the default", 1, 0.25, 1),
-    Quality("high", "High", "Averages more passes: cleaner stems, about 3× the time", 2, 0.50, 2),
-    Quality("max", "Max", "Most thorough: the cleanest stems, several times slower", 3, 0.50, 4),
+    Quality("fast", "Fast", "A single light pass: quickest, a little more bleed between stems", 0, 0.10, 1,
+            1, "One pass over each window with little overlap. Fine for practice and a quick look; expect some drums in the vocal and some vocal in the bass, and faint seams where windows meet."),
+    Quality("standard", "Standard", "Balanced: the default", 1, 0.25, 1,
+            2, "One pass with a quarter of overlap. Clean for most songs; dense or loud mixes may leave a little bleed between stems."),
+    Quality("high", "High", "Averages more passes: cleaner stems, about 3× the time", 2, 0.50, 2,
+            3, "Two shifted passes averaged with half overlap. Noticeably less bleed and fewer swishy artifacts, good for making backing tracks."),
+    Quality("max", "Max", "Most thorough: the cleanest stems, several times slower", 3, 0.50, 4,
+            4, "Three shifted passes averaged with half overlap. The least bleed and the smoothest stems this model can give; worth it for a song you will keep."),
 )}
 DEFAULT_QUALITY = "standard"
 BASE = QUALITIES[DEFAULT_QUALITY]
@@ -129,6 +135,14 @@ def _flac_mb_per_min_stem(model: str) -> float:
     return total / 1e6 / (secs / 60) if secs > 120 else _FLAC_MB_PER_MIN_STEM
 
 
+def _how(q: Quality, model: str) -> str:
+    """The knobs behind a level, for the curious."""
+    if model == "bs_roformer_sw":
+        return f"Window overlap ×{q.roformer}"
+    passes = max(q.shifts, 1)
+    return f"{passes} pass{'es' if passes > 1 else ''} averaged · {round(q.overlap * 100)}% overlap"
+
+
 def estimates(model: str, seconds: float = TYPICAL_SEC) -> dict:
     """Per-quality size and time for a song of `seconds` on this machine."""
     dev = device()
@@ -144,7 +158,8 @@ def estimates(model: str, seconds: float = TYPICAL_SEC) -> dict:
         "sizeMB": round(size_mb, 1),
         "levels": [
             {"id": q.id, "label": q.label, "hint": q.hint,
-             "cost": round(cost(q, model), 1),
+             "cost": round(cost(q, model), 1), "clean": q.clean, "detail": q.detail,
+             "how": _how(q, model),
              "timeSec": round(rtf * cost(q, model) * seconds + 8)}  # + download/decode/encode overhead
             for q in QUALITIES.values()
         ],

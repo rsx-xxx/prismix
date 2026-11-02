@@ -19,14 +19,14 @@ from . import REPO, __version__, notify
 log = logging.getLogger(__name__)
 
 API = "https://api.github.com/repos/" + REPO.removeprefix("https://github.com/") + "/releases?per_page=30"
-TTL = 6 * 3600  # GitHub allows 60 unauthenticated calls an hour; one every few hours is plenty
+TTL = 3600  # re-asked with If-None-Match: an unchanged answer is a 304, which GitHub does not count against the 60 calls an hour
 RETRY = 15 * 60  # after a failed check (offline, rate limited) try again sooner
 
 # The release asset that installs on this OS; the phone app is not offered here.
 CASK = "prismix"
 _ASSET = {"win32": "Prismix-Setup.exe", "darwin": "Prismix.dmg"}
 
-_cache: dict = {"at": 0.0, "ttl": TTL, "data": None}
+_cache: dict = {"at": 0.0, "ttl": TTL, "data": None, "etag": None}
 
 
 def parse(v: str) -> tuple[int, ...] | None:
@@ -64,9 +64,14 @@ def check(*, force: bool = False, client: httpx.Client | None = None) -> dict:
         return _cache["data"]
     try:
         with client or httpx.Client(timeout=8, headers={"Accept": "application/vnd.github+json", "User-Agent": "prismix"}) as c:
-            r = c.get(API)
-            r.raise_for_status()
-            data = _summarize(_pick(r.json()))
+            held = _cache["etag"] if _cache["data"] is not None else None
+            r = c.get(API, headers={"If-None-Match": held} if held else {})
+            if r.status_code == 304 and _cache["data"] is not None:
+                data = _cache["data"]
+            else:
+                r.raise_for_status()
+                data = _summarize(_pick(r.json()))
+                _cache["etag"] = r.headers.get("etag")
         ttl = TTL
     except (httpx.HTTPError, ValueError) as e:
         log.info("update check failed: %s", e)
