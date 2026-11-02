@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
-from . import analysis, export, library, pipeline, tabdata, tagging
+from . import analysis, export, library, pipeline, playlists, tabdata, tagging
 from .config import DATA_DIR, DEFAULT_MODEL, LIBRARY_DIR, MODELS, SAMPLE_RATE
 
 CRED_FILE = DATA_DIR / "band_cloud.json"
@@ -140,6 +140,26 @@ class Cloud:
             return  # already gone
         if r.status_code not in (200, 204):
             raise CloudError(f"The cloud could not delete this song ({r.status_code})", 502)
+
+    def playlists(self) -> tuple[str, list[dict]] | None:
+        """(revision, playlists) held by the cloud; None when it does not store playlists (an older cloud)."""
+        r = self.request("GET", "/api/v1/playlists.json")
+        if r.status_code == 404:
+            return None
+        if r.status_code != 200:
+            raise CloudError(f"The cloud answered {r.status_code}", 502)
+        body = r.json()
+        items = body.get("playlists") if isinstance(body, dict) else None
+        return str(body.get("rev") or ""), items if isinstance(items, list) else []
+
+    def put_playlists(self, items: list[dict], rev: str) -> bool:
+        """Replaces the cloud's playlists if nobody changed them since `rev`; False when somebody did (412)."""
+        r = self.request("PUT", "/api/v1/playlists.json", json={"playlists": items}, headers={"If-Match": f'"{rev}"'} if rev else {})
+        if r.status_code == 412:
+            return False
+        if r.status_code != 200:
+            raise CloudError(f"The cloud could not save the playlists ({r.status_code})", 502)
+        return True
 
     def commit(self, song_id: str, body: dict) -> dict:
         r = self.request("POST", f"/api/v1/songs/{song_id}/commit", json=body)
@@ -341,6 +361,47 @@ def push_setup(video_id: str, setup: dict) -> bool:
         return False
     finally:
         cloud.close()
+
+
+def sync_playlists(cloud: Cloud) -> bool:
+    """Brings the local playlists and the cloud's together: pull, merge, write both sides. True when they now agree.
+    A concurrent writer makes the push fail; the next round merges its change in too."""
+    for _ in range(3):
+        got = cloud.playlists()
+        if got is None:
+            return False
+        rev, remote = got
+        merged = playlists.absorb(remote)
+        if merged == playlists.merge(remote, []) or cloud.put_playlists(merged, rev):
+            return True
+    return False
+
+
+def sync_playlists_quiet() -> bool:
+    """Same, for the places that must never fail because of the network: nothing happens when offline or signed out."""
+    cloud = current()
+    if not cloud:
+        return False
+    try:
+        return sync_playlists(cloud)
+    except (CloudError, httpx.HTTPError, ValueError):
+        return False
+    finally:
+        cloud.close()
+
+
+_last_sync = 0.0
+_sync_lock = threading.Lock()
+
+
+def sync_playlists_throttled(every: float = 60.0) -> bool:
+    """Quiet sync, at most once per `every` seconds: the playlist list is read often."""
+    global _last_sync
+    with _sync_lock:
+        if time.monotonic() - _last_sync < every:
+            return False
+        _last_sync = time.monotonic()
+    return sync_playlists_quiet()
 
 
 class Publisher:

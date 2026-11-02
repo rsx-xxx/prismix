@@ -390,6 +390,13 @@ public class Main extends Activity {
         @JavascriptInterface public void download(String url, String folder) { Saver.save(m.getApplicationContext(), url, folder); }
         /** A file link in the cloud player: saved through the member token, since the page's cookie does not reach a download. */
         @JavascriptInterface public void cloudDownload(String url, String name) { if (m.cloudMode) Saver.saveCloud(m.getApplicationContext(), url, name); }
+        /** Saves the page's merged playlists to the band cloud off the page's thread; the answer comes back to window.__plPut(id, status). */
+        @JavascriptInterface public void cloudPutPlaylists(final String id, final String json, final String rev) {
+            if (!m.cloudMode || id == null || !id.matches("[0-9]{1,9}") || json == null || json.length() > (1 << 20)) return;
+            final Cloud.Credential c = Cloud.load(m.prefs);
+            if (c == null) return;
+            new Thread(() -> Main.eval("window.__plPut&&window.__plPut(" + id + "," + Cloud.putPlaylists(c, json, rev) + ")")).start();
+        }
         @JavascriptInterface public void mediaStop() { m.stopService(new Intent(m, MediaService.class)); m.ui.post(() -> m.keepAwake(false)); }
         @JavascriptInterface public void switchHost() { m.ui.post(() -> m.discover()); }
         @JavascriptInterface public String offlineList() { return Offline.list(m.getApplicationContext()).toString(); }

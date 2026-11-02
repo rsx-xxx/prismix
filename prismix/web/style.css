@@ -806,7 +806,6 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .tbar .rh .rstem { position: absolute; top: 3px; height: 14px; width: 1px; background: var(--text); opacity: .75; }
 .tbar .rh .beam { position: absolute; height: 2px; background: var(--text); opacity: .75; }
 .tbar .rh .beam.stub { width: 5px; }
-.tbar .rh .dot { position: absolute; top: 14px; width: 3px; height: 3px; margin-left: 3px; border-radius: 50%; background: var(--text); opacity: .75; }
 .tbar .f { position: absolute; height: var(--row); display: grid; place-items: center; transform: translateX(-30%); padding: 0 1px; font-size: 12px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; background: var(--surface); }
 .tbar .cursor { position: absolute; top: 0; bottom: 0; left: var(--x, 0); width: 2px; border-radius: 2px; background: var(--accent); opacity: 0; }
 .tbar.now .cursor { opacity: .85; }
@@ -1198,3 +1197,42 @@ img.cv { opacity: 0; transition: opacity .2s ease-out; }
 img.cv.ok { opacity: 1; }
 img.cv.none { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { img.cv { transition: none; } }
+
+/* tab bars: header strip (bar number, section, time signature, tempo), chords, effects, staff */
+.tbar { padding: 0 6px 6px; }
+.tbar .hd { display: flex; align-items: baseline; gap: 6px; height: 15px; padding: 0 2px; overflow: hidden; white-space: nowrap; font-size: 10px; line-height: 15px; color: var(--muted); pointer-events: none; }
+.tbar .hd > * { position: static; margin: 0; flex: none; }
+.tbar .hd .n { font-size: 9px; }
+.tbar .hd .tag { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text); font-weight: 750; }
+.tbar .hd .sig { font-weight: 700; }
+.tbar .hd .tempo { color: var(--text); font-weight: 700; }
+.tbar .tch { position: relative; top: 0; left: 0; right: 0; height: 18px; margin: 0; }
+.tbar .tch span { padding-left: 0; transform: translateX(-3px); }
+.tbar .fx { height: 14px; }
+.tbar .fx .strum { transform: translateX(-50%); }
+.tbar .stf .oval { margin-left: -9px; }
+.tbar .sl { transform: translate(7px, 0) scale(.8); }
+.tbar .arc { transform: translateX(4px); }
+
+/* guitar and bass: one continuous staff per row, bars divided by barlines like printed tab */
+.trow.gt { align-items: flex-start; gap: 0; margin-bottom: 18px; }
+.trow.gt .strs { position: relative; flex: 0 0 1.3rem; margin-top: 47px; padding: 0 3px 0 0; align-content: start; height: calc(var(--strings) * var(--row)); }
+.trow.gt .strs::after, .tbar.gt .stf::after { content: ""; position: absolute; right: 0; top: calc(var(--row) / 2); bottom: calc(var(--row) / 2); width: 1px; background: var(--text); opacity: .7; }
+.tbar.gt { padding: 0; border: 0; border-radius: 0; background: none; }
+.tbar.gt:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.tbar.gt.now { background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: none; }
+.tbar.gt.weak { background: color-mix(in oklab, var(--warn, #e0a030) 8%, transparent); }
+.tbar.gt .hd { padding: 0 4px; }
+.tbar.gt .tch { margin: 0; }
+.tbar.gt .stf { background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--row) / 2 - .5px), color-mix(in srgb, var(--text) 38%, transparent) calc(var(--row) / 2 - .5px) calc(var(--row) / 2 + .5px), transparent calc(var(--row) / 2 + .5px) var(--row)); }
+.tbar.gt .f { transform: translateX(-50%); padding: 0 2px; background: var(--bg); }
+.tbar.gt .rh { height: 26px; }
+
+/* SMuFL music glyphs (Bravura, SIL OFL) for flags, rests, dots and the tempo mark; 1em = 4 staff spaces */
+@font-face { font-family: "Bravura Tab"; src: url("vendor/bravura-tab.woff2") format("woff2"); font-display: swap; }
+.tbar .smufl { font-family: "Bravura Tab", "Noto Music", serif; font-weight: 400; }
+.tbar .rh .smufl { position: absolute; display: block; height: 0; line-height: 0; font-size: 18px; color: var(--text); opacity: .75; pointer-events: none; white-space: nowrap; }
+.tbar .rh .flag { top: 17px; }
+.tbar .rh .dot { top: 15px; margin-left: 4px; font-size: 14px; }
+.tbar .rh .rest { top: 12px; font-size: 20px; opacity: .55; }
+.tbar .tempo .smufl { font-size: 15px; line-height: 1; vertical-align: -1px; }

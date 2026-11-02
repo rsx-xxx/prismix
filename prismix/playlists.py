@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import time
 import uuid
@@ -12,6 +13,7 @@ from . import library
 _lock = threading.Lock()
 MAX_NAME = 80
 MAX_ITEMS = 500
+TOMBSTONE_TTL = 90 * 86400  # a deleted playlist is remembered this long so the deletion reaches every device
 
 
 def _file():
@@ -51,13 +53,61 @@ def _name(name: str) -> str:
     return " ".join(str(name).split())[:MAX_NAME] or "Playlist"
 
 
+def _live(items: list[dict]) -> list[dict]:
+    return [p for p in items if not p.get("deleted")]
+
+
+def _find(items: list[dict], pid: str) -> dict | None:
+    return next((p for p in _live(items) if p["id"] == pid), None)
+
+
 def list_all() -> list[dict]:
     with _lock:
-        return _read()
+        return _live(_read())
 
 
 def get(pid: str) -> dict | None:
     return next((p for p in list_all() if p["id"] == pid), None)
+
+
+def _sane(p) -> dict | None:
+    """One playlist (or deletion marker) from another device, cleaned; None when it is unusable."""
+    if not isinstance(p, dict) or not re.fullmatch(r"[0-9a-f]{10}", str(p.get("id") or "")):
+        return None
+    updated = p.get("updated")
+    out = {"id": p["id"], "updated": float(updated) if isinstance(updated, (int, float)) else 0.0}
+    if p.get("deleted"):
+        return {**out, "deleted": True}
+    items = _unique([c for i in p.get("items") or [] if isinstance(i, dict) and (c := _clean(i))])
+    return {**out, "name": _name(p.get("name") or ""), "source": str(p.get("source") or "")[:400], "items": items[:MAX_ITEMS]}
+
+
+def merge(a: list[dict], b: list[dict], now: float | None = None) -> list[dict]:
+    """The union of two copies of the playlists. A playlist, or its deletion, that was changed last wins; deletion
+    markers older than the TTL are dropped. Both sides run the same rule, so they converge."""
+    now = time.time() if now is None else now
+    best: dict[str, dict] = {}
+    for p in map(_sane, [*a, *b]):
+        if p and (p["id"] not in best or p["updated"] > best[p["id"]]["updated"]):
+            best[p["id"]] = p
+    keep = [p for p in best.values() if not p.get("deleted") or now - p["updated"] < TOMBSTONE_TTL]
+    return sorted(keep, key=lambda p: (p["updated"], p["id"]))
+
+
+def snapshot() -> list[dict]:
+    """Every playlist plus deletion markers: what is exchanged with the cloud."""
+    with _lock:
+        return _read()
+
+
+def absorb(remote: list[dict]) -> list[dict]:
+    """Folds the cloud's copy into the local file and returns the merged result."""
+    with _lock:
+        mine = _read()
+        merged = merge(mine, remote)
+        if merged != mine:
+            _write(merged)
+        return merged
 
 
 def create(name: str, items: list[dict] | None = None, source: str = "") -> dict:
@@ -78,7 +128,7 @@ def update(pid: str, *, name: str | None = None, order: list[str] | None = None)
     """Rename, or reorder/trim to `order` (ids not in the playlist are ignored)."""
     with _lock:
         all_ = _read()
-        pl = next((p for p in all_ if p["id"] == pid), None)
+        pl = _find(all_, pid)
         if pl is None:
             return None
         if name is not None:
@@ -94,7 +144,7 @@ def update(pid: str, *, name: str | None = None, order: list[str] | None = None)
 def add_items(pid: str, items: list[dict]) -> dict | None:
     with _lock:
         all_ = _read()
-        pl = next((p for p in all_ if p["id"] == pid), None)
+        pl = _find(all_, pid)
         if pl is None:
             return None
         have = {i["id"] for i in pl["items"]}
@@ -111,7 +161,7 @@ def add_items(pid: str, items: list[dict]) -> dict | None:
 def remove_item(pid: str, vid: str) -> dict | None:
     with _lock:
         all_ = _read()
-        pl = next((p for p in all_ if p["id"] == pid), None)
+        pl = _find(all_, pid)
         if pl is None:
             return None
         pl["items"] = [i for i in pl["items"] if i["id"] != vid]
@@ -121,10 +171,10 @@ def remove_item(pid: str, vid: str) -> dict | None:
 
 
 def delete(pid: str) -> bool:
+    """Leaves a deletion marker, so a device that still has the playlist does not bring it back."""
     with _lock:
         all_ = _read()
-        rest = [p for p in all_ if p["id"] != pid]
-        if len(rest) == len(all_):
+        if _find(all_, pid) is None:
             return False
-        _write(rest)
+        _write([p for p in all_ if p["id"] != pid] + [{"id": pid, "deleted": True, "updated": time.time()}])
         return True

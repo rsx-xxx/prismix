@@ -1096,23 +1096,70 @@ const coverImg = (id, eager = false) => paintCover(el('img', { className: 'cover
 
 // With no host (offline or band cloud) the playlists live on the phone itself; same shapes and routes as the host's API.
 const PL_KEY = 'prismix.playlists';
-const plLocal = () => { try { return JSON.parse(localStorage.getItem(PL_KEY)) || []; } catch { return []; } };
+const plRaw = () => { try { return JSON.parse(localStorage.getItem(PL_KEY)) || []; } catch { return []; } }; // with deletion markers
+const plLocal = () => plRaw().filter((p) => !p.deleted);
+const PL_TTL = 90 * 86400; // a deletion is remembered this long so it reaches every device (same rule as playlists.py)
+/** Union of two copies: the playlist (or deletion) changed last wins. Mirrors playlists.merge on the host. */
+function plMerge(a, b) {
+  const best = new Map();
+  for (const p of [...a, ...b]) {
+    if (!p || !/^[0-9a-f]{10}$/.test(String(p.id))) continue;
+    const updated = Number(p.updated) || 0;
+    const cur = best.get(p.id);
+    if (cur && cur.updated >= updated) continue;
+    best.set(p.id, p.deleted ? { id: p.id, updated, deleted: true }
+      : { id: p.id, updated, name: String(p.name || 'Playlist').trim().slice(0, 80) || 'Playlist', source: String(p.source || '').slice(0, 400),
+        items: [...new Map((p.items || []).filter((i) => i && /^[\w-]{11}$/.test(i.id)).map((i) => [i.id, { id: i.id, title: String(i.title || '').slice(0, 200), channel: String(i.channel || '').slice(0, 120), duration: Number(i.duration) || 0 }])).values()].slice(0, 500) });
+  }
+  const now = Date.now() / 1000;
+  return [...best.values()].filter((p) => !p.deleted || now - p.updated < PL_TTL).sort((x, y) => x.updated - y.updated || (x.id < y.id ? -1 : 1));
+}
+// The band cloud keeps the playlists too, so every device sees the same ones: pull, merge, push (a concurrent writer is merged on the next round).
+const plPuts = new Map();
+let plPutSeq = 0;
+window.__plPut = (id, status) => { plPuts.get(id)?.(status); plPuts.delete(id); };
+const plPut = (list, rev) => new Promise((ok) => {
+  const id = ++plPutSeq;
+  const t = setTimeout(() => { plPuts.delete(id); ok(0); }, 30000);
+  plPuts.set(id, (st) => { clearTimeout(t); ok(st); });
+  droid.cloudPutPlaylists(String(id), JSON.stringify({ playlists: list }), rev);
+});
+let plSyncing = null;
+function plSync() {
+  if (!CLOUD || !droid?.cloudPutPlaylists) return Promise.resolve(false);
+  return plSyncing ||= (async () => {
+    try {
+      for (let i = 0; i < 3; i++) {
+        const r = await fetch('/api/cloud-playlists', { cache: 'no-store' });
+        if (!r.ok) return false; // 404: a cloud that does not store playlists yet
+        const { rev = '', playlists: remote = [] } = await r.json();
+        const merged = plMerge(plRaw(), remote);
+        localStorage.setItem(PL_KEY, JSON.stringify(merged));
+        if (JSON.stringify(plMerge(remote, [])) === JSON.stringify(merged) || await plPut(merged, rev) === 200) return true;
+      }
+    } catch { /* offline: the phone's copy is kept and synced next time */ }
+    return false;
+  })().finally(() => { plSyncing = null; });
+}
+let plSyncTimer = 0;
+const plSyncSoon = () => { clearTimeout(plSyncTimer); plSyncTimer = setTimeout(() => plSync().then((ok) => { if (ok) { lists = plLocal(); if (S.pl) S.pl = lists.find((p) => p.id === S.pl.id) || null; paintPlaylists(); } }), 1200); };
 function plLocalApi(method, url, body) {
-  const all = plLocal();
+  const all = plRaw();
+  const live = all.filter((p) => !p.deleted);
   const [, pid, sub, vid] = url.match(/^\/api\/playlists(?:\/([0-9a-f]{10}))?(?:\/(items)(?:\/([\w-]{11}))?)?$/) || [];
-  const save = (v) => { localStorage.setItem(PL_KEY, JSON.stringify(all)); return v; };
+  const save = (v) => { localStorage.setItem(PL_KEY, JSON.stringify(all)); plSyncSoon(); return v; };
   const clean = (i) => (i && /^[\w-]{11}$/.test(i.id) ? { id: i.id, title: String(i.title || '').slice(0, 200), channel: String(i.channel || '').slice(0, 120), duration: Number(i.duration) || 0 } : null);
   if (!pid) {
-    if (method === 'GET') return all;
+    if (method === 'GET') return live;
     const items = [...new Map((body.items || []).map(clean).filter(Boolean).map((i) => [i.id, i])).values()];
     const pl = { id: [...crypto.getRandomValues(new Uint8Array(5))].map((b) => b.toString(16).padStart(2, '0')).join(''),
       name: String(body.name || 'Playlist').trim().slice(0, 80) || 'Playlist', source: '', items, updated: Date.now() / 1000 };
     all.push(pl);
     return save(pl);
   }
-  const pl = all.find((p) => p.id === pid);
+  const pl = live.find((p) => p.id === pid);
   if (!pl) throw new Error('404');
-  if (method === 'DELETE' && !sub) { all.splice(all.indexOf(pl), 1); return save({ ok: true }); }
+  if (method === 'DELETE' && !sub) { all[all.indexOf(pl)] = { id: pid, deleted: true, updated: Date.now() / 1000 }; return save({ ok: true }); }
   if (method === 'PATCH') {
     if (body.name != null) pl.name = String(body.name).trim().slice(0, 80) || pl.name;
     if (body.order) { const by = new Map(pl.items.map((i) => [i.id, i])); pl.items = [...new Set(body.order)].filter((i) => by.has(i)).map((i) => by.get(i)); }
@@ -1129,6 +1176,7 @@ async function loadPlaylists() {
   if (S.pl) S.pl = lists.find((p) => p.id === S.pl.id) || null;
   paintPlaylists();
   syncPlNav();
+  if (CLOUD && await plSync()) { lists = plLocal(); if (S.pl) S.pl = lists.find((p) => p.id === S.pl.id) || null; paintPlaylists(); syncPlNav(); }
 }
 
 function setSongTab(tab) {

@@ -47,6 +47,7 @@ final class CloudApi {
                     .put("logo", c == null ? "" : c.logo()).put("offline", true).put("pin", false).toString());
             if (c == null) return status(401);
             if (path.equals("/api/playlists")) return json("[]");
+            if (path.equals("/api/cloud-playlists")) return pipe(c, "/api/v1/playlists.json", "application/json");
             if (path.equals("/api/library")) return json(library(c));
             Matcher m = LIBRARY.matcher(path);
             if (m.matches()) return json(meta(c, m.group(1), m.group(2)));

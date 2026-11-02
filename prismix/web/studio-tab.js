@@ -33,6 +33,30 @@ function segmentsOf(bars) {
   return out;
 }
 const GRID = 16; // editing slots per whole note
+const UNIT = 1.15; // rem a sixteenth note gets on a tab, wide enough for a two-digit fret
+
+// Tab bars are spaced by their notes, not by the clock: every beat gets room for its fret, a longer one a little more.
+// Returns the bar's width in units, the x (0..1) of each beat, and a map from the bar's time (0..1) to x for the playhead.
+function spread(tb) {
+  const n = tb.n;
+  if (!n.length) return { units: 4, xs: [], map: [[0, 0], [1, 1]] };
+  const lead = 0.9;
+  let at = lead;
+  const xs = n.map((b, k) => {
+    const x = at, to = n[k + 1] ? n[k + 1][0] - b[0] : b[1];
+    at += 1 + 0.9 * Math.log2(Math.max(1, to * tb.len * 16));
+    return x;
+  });
+  const units = Math.max(at, 4);
+  const fx = xs.map((x) => x / units);
+  return { units, xs: fx, map: [[0, 0], ...n.map((b, k) => [b[0], fx[k]]), [1, 1]] };
+}
+const lerpX = (map, t) => {
+  let k = 1;
+  while (k < map.length - 1 && map[k][0] <= t) k++;
+  const [p0, x0] = map[k - 1], [p1, x1] = map[k];
+  return p1 > p0 ? x0 + ((x1 - x0) * (t - p0)) / (p1 - p0) : x1;
+};
 const kindOf = (k) => k.replace(/\d+$/, '');
 const cap = (k) => k[0].toUpperCase() + k.slice(1);
 
@@ -73,8 +97,8 @@ export function createTab({ player, chordsIn = () => [] }) {
     try { localStorage.setItem('prismix.tabZoom', String(zoom)); } catch { /* ignore */ }
   };
   applyZoom();
-  $('tab-zoom-in').addEventListener('click', () => { applyZoom(0.15); queueAlign(); });
-  $('tab-zoom-out').addEventListener('click', () => { applyZoom(-0.15); queueAlign(); });
+  $('tab-zoom-in').addEventListener('click', () => { applyZoom(0.15); rerender(); });
+  $('tab-zoom-out').addEventListener('click', () => { applyZoom(-0.15); rerender(); });
   let ro = null;
   let cur = null; // { id, tab, st, secs: bar start seconds, cells: [], row: -1 }
   let part = null;
@@ -151,6 +175,14 @@ export function createTab({ player, chordsIn = () => [] }) {
       r.style.minHeight = `${h}px`;
     });
   }
+  // Bars are packed into rows by the zoomed width, so a zoom change lays them out again.
+  function rerender() {
+    if (!cur || root.hidden) return;
+    const n = cur.now;
+    render();
+    cur.now = -1;
+    if (n >= 0) frame(cur.secs[n]);
+  }
   let alignQueued = false;
   function queueAlign() { if (alignQueued) return; alignQueued = true; requestAnimationFrame(() => { alignQueued = false; alignRows(); }); }
   document.addEventListener('lyrics:data', (e) => { lyricLines = e.detail; if (cur && !root.hidden) render(); });
@@ -208,15 +240,18 @@ export function createTab({ player, chordsIn = () => [] }) {
     };
     let rowLine = -1;
     const need = (tb) => 3 + 1.5 * new Set(tb.n.map((b) => b[0])).size; // rem a bar wants: more notes, more room
-    const avail = Math.max(10, body.clientWidth / rem - 2);
+    const avail = Math.max(10, body.clientWidth / (rem * zoom) - 2.6); // the pane's children are zoomed, so fewer rem fit
     let row = null, used = 0;
+    cur.sp = [];
     p.bars.forEach((tb, i) => {
-      const w = Math.max(need(tb), 5);
+      const sp = lay || editing ? null : spread(tb);
+      cur.sp[i] = sp;
+      const w = Math.min(avail, sp ? sp.units * UNIT : Math.max(need(tb), 5));
       const line = aligned ? rowOfBar(i) : -1;
       const seg = segs?.[cur.segOf[i]];
       if (pat ? i === seg.first : !row || line !== rowLine || (used + w > avail && used > 0)) {
         rowLine = line;
-        row = el('div', { className: 'trow' }, lay ? clefColumn(lay)
+        row = el('div', { className: lay ? 'trow' : 'trow gt' }, lay ? clefColumn(lay)
           : el('div', { className: 'strs', 'aria-hidden': 'true' }, ...p.tuning.map((m) => el('span', { textContent: NOTES[m % 12] }))));
         (aligned ? arows[line] : box).append(row);
         cur.rows.push({ row, first: i, seg: cur.segOf[i] });
@@ -224,13 +259,16 @@ export function createTab({ player, chordsIn = () => [] }) {
       }
       used += w;
       const j = tab.map[i];
-      const cell = el('div', { className: 'tbar', style: `flex:${w} 1 0` }, el('span', { className: 'n', textContent: String(i + 1) }));
+      const cell = el('div', { className: lay ? 'tbar' : 'tbar gt', style: `flex:${w} 1 0` });
+      const hd = el('div', { className: 'hd' }, el('span', { className: 'n', textContent: String(i + 1) }));
+      cell._x = sp ? (t) => lerpX(sp.map, t) : null;
+      cell.append(hd);
       cell.dataset.t0 = String(starts[i]);
       cell.dataset.t1 = String(ends[i]);
       if (tb.auto) { cell.classList.add('auto'); cell.title = 'Filled in from a matching bar'; }
       if (tb.weak) { cell.classList.add('weak'); cell.title = 'This bar differs from the recording (a cover or another arrangement); trust the chords above it'; }
-      if (tb.mark) cell.append(el('span', { className: 'tag', textContent: tb.mark }));
-      if (tb.sig) cell.append(el('span', { className: 'sig', textContent: `${tb.sig[0]}/${tb.sig[1]}` }));
+      if (tb.mark) hd.append(el('span', { className: 'tag', textContent: tb.mark, title: tb.mark }));
+      if (tb.sig) hd.append(el('span', { className: 'sig', textContent: `${tb.sig[0]}/${tb.sig[1]}` }));
       const chs = el('div', { className: 'tch' });
       if (p.kind !== 'drums') {
         const heard = j != null ? chordsIn(j) : [];
@@ -238,7 +276,7 @@ export function createTab({ player, chordsIn = () => [] }) {
         const named = heard.length ? heard : (tb.ch || []).map(([f, name]) => ({ name, f }));
         let before = heard.length && j > 0 ? chordsIn(j - 1).at(-1)?.name : '';
         for (const c of named) {
-          chs.append(el('span', { className: c.name === before ? 'same' : '', textContent: c.name, style: `left:${c.f * 100}%` }));
+          chs.append(el('span', { className: c.name === before ? 'same' : '', textContent: c.name, style: `left:${(cell._x ? cell._x(c.f) : c.f) * 100}%` }));
           before = c.name;
         }
       }
@@ -265,19 +303,23 @@ export function createTab({ player, chordsIn = () => [] }) {
     if (!ro && window.ResizeObserver) { ro = new ResizeObserver(() => declutter()); ro.observe(body); }
   }
 
-  // Chord names sit at their beat position; when two would collide (or run into the bar tag), hide the later one.
+  // Chord names sit over their beat; when two would collide the later one slides right, and hides only if it would run out of the bar.
   function declutter() {
     for (const cell of cur?.cells || []) {
       if (!cell) continue;
-      const spans = [...cell.querySelectorAll('.tch span')];
-      spans.forEach((x) => { x.style.visibility = ''; });
+      const box = cell.querySelector('.tch'), spans = [...box.querySelectorAll('span')];
+      spans.forEach((x) => { x.style.visibility = ''; x.style.marginLeft = ''; });
+      const room = box.clientWidth;
       let edge = -Infinity;
-      const tag = cell.querySelector('.tag');
-      const limit = tag ? tag.offsetLeft - 4 : Infinity;
       for (const x of spans) {
-        const l = x.offsetLeft, r = l + x.offsetWidth;
-        if (l < edge || r > limit) { x.style.visibility = 'hidden'; continue; }
-        edge = r + 4;
+        let l = x.offsetLeft;
+        const w = x.offsetWidth;
+        if (l < edge) {
+          if (edge + w > room + 6) { x.style.visibility = 'hidden'; continue; }
+          x.style.marginLeft = `${edge - l}px`;
+          l = edge;
+        }
+        edge = l + w + 5;
       }
     }
   }
@@ -368,15 +410,18 @@ export function createTab({ player, chordsIn = () => [] }) {
     return base;
   };
 
-  const arc = (x1, x2, s, below) => el('span', { className: `arc${below ? ' below' : ''}`, style: `left:${x1 * 100}%;width:${Math.max(0.02, x2 - x1) * 100}%;top:calc(${s} * var(--row))` });
+  const arc = (x1, x2, s, below) => el('span', { className: `arc${below ? ' below' : ''}`, style: `left:${x1 * 100}%;width:calc(${Math.max(0.02, x2 - x1) * 100}% - 8px);top:calc(${s} * var(--row))` });
 
   function paintStaff(cell, tb) {
-    const stf = cell.querySelector('.stf'), rh = cell.querySelector('.rh'), fx = cell.querySelector('.fx');
+    const stf = cell.querySelector('.stf'), rh = cell.querySelector('.rh'), fx = cell.querySelector('.fx'), hd = cell.querySelector('.hd');
+    const X = (q) => (cell._x ? cell._x(q) : q);
     stf.replaceChildren();
     rh?.replaceChildren();
     fx.replaceChildren();
+    hd.querySelector('.tempo')?.remove();
+    const bpm = tb?.n.find((b) => b[3]?.bpm)?.[3].bpm;
+    if (bpm) hd.append(el('span', { className: 'tempo' }, el('span', { className: 'smufl', textContent: '\uECA5' }), ` = ${bpm}`));
     if (cur.lay) {
-      for (const [pos,, , extra = {}] of tb?.n ?? []) if (extra.bpm) fx.append(el('span', { className: 'tempo', textContent: `♩ = ${extra.bpm}`, style: `left:${pos * 100}%` }));
       paintScore(stf, Number(cell.dataset.tb), cur.lay);
       return;
     }
@@ -387,23 +432,22 @@ export function createTab({ player, chordsIn = () => [] }) {
         const [pos, dur, frets, extra = {}] = beat;
         for (const [s, f, flags = ''] of frets) {
           const dead = flags.includes('x'), tied = flags.includes('t');
-          stf.append(el('span', { className: `f${tied ? ' tied' : ''}`, textContent: dead ? 'x' : tied ? `(${f})` : String(f), style: `left:${pos * 100}%;top:calc(${s} * var(--row))` }));
-          if (flags.includes('s')) stf.append(el('span', { className: 'sl', style: `left:${(pos + 0.012) * 100}%;top:calc(${s} * var(--row))` }));
-          if (tied && last.has(s)) stf.append(arc(last.get(s), pos, s, true));
-          if (last.has(s) && flags.includes('h')) stf.append(arc(last.get(s), pos, s, false));
-          last.set(s, pos);
+          stf.append(el('span', { className: `f${tied ? ' tied' : ''}`, textContent: dead ? 'x' : tied ? `(${f})` : String(f), style: `left:${X(pos) * 100}%;top:calc(${s} * var(--row))` }));
+          if (flags.includes('s')) stf.append(el('span', { className: 'sl', style: `left:${X(pos) * 100}%;top:calc(${s} * var(--row))` }));
+          if (tied && last.has(s)) stf.append(arc(last.get(s), X(pos), s, true));
+          if (last.has(s) && flags.includes('h')) stf.append(arc(last.get(s), X(pos), s, false));
+          last.set(s, X(pos));
         }
-        if (extra.bpm) fx.append(el('span', { className: 'tempo', textContent: `♩ = ${extra.bpm}`, style: `left:${pos * 100}%` }));
         if (extra.st && frets.length > 1) {
-          fx.append(el('span', { className: 'strum', textContent: extra.st === 'u' ? '↑' : '↓', style: `left:${pos * 100}%` }));
+          fx.append(el('span', { className: 'strum', textContent: extra.st === 'u' ? '↑' : '↓', style: `left:${X(pos) * 100}%` }));
           const rows = frets.map((x) => x[0]);
-          stf.append(el('span', { className: 'oval', style: `left:${pos * 100}%;top:calc(${Math.min(...rows)} * var(--row));height:calc(${Math.max(...rows) - Math.min(...rows) + 1} * var(--row))` }));
+          stf.append(el('span', { className: 'oval', style: `left:${X(pos) * 100}%;top:calc(${Math.min(...rows)} * var(--row));height:calc(${Math.max(...rows) - Math.min(...rows) + 1} * var(--row))` }));
         }
-        if (extra.lr) { ring ||= { from: pos }; ring.to = Math.min(1, pos + dur); } else if (ring) { drawRing(fx, ring); ring = null; }
+        if (extra.lr) { ring ||= { from: X(pos) }; ring.to = Math.min(1, X(Math.min(1, pos + dur))); } else if (ring) { drawRing(fx, ring); ring = null; }
       });
       if (ring) drawRing(fx, ring);
-      paintPalmMute(fx, tb, Number(cell.dataset.tb));
-      paintRhythm(rh, tb);
+      paintPalmMute(fx, tb, Number(cell.dataset.tb), X);
+      paintRhythm(rh, tb, X);
     }
     if (editing && sel && tb && Number(cell.dataset.tb) === sel.i) {
       const slots = slotsOf(tb);
@@ -414,11 +458,11 @@ export function createTab({ player, chordsIn = () => [] }) {
 
   // "P.M." over a run of palm-muted beats; a run that crosses a barline carries on in the next bar without repeating its label.
   const muted = (b) => b.length > 0 && b[2].every((f) => (f[2] || '').includes('m'));
-  function paintPalmMute(fx, tb, i) {
+  function paintPalmMute(fx, tb, i, X) {
     const bars = part_().bars, prev = bars[i - 1]?.n.at(-1), next = bars[i + 1]?.n[0];
     let run = null;
     const close = (to, open) => {
-      fx.append(el('span', { className: `pm${run.cont ? ' cont' : ''}${open ? ' open' : ''}`, textContent: run.cont ? '' : 'P.M.', style: `left:${run.from * 100}%;width:${(to - run.from) * 100}%` }));
+      fx.append(el('span', { className: `pm${run.cont ? ' cont' : ''}${open ? ' open' : ''}`, textContent: run.cont ? '' : 'P.M.', style: `left:${X(run.from) * 100}%;width:${(X(to) - X(run.from)) * 100}%` }));
       run = null;
     };
     tb.n.forEach((beat, k) => {
@@ -430,22 +474,45 @@ export function createTab({ player, chordsIn = () => [] }) {
 
   const drawRing = (fx, r) => fx.append(el('span', { className: 'ring', textContent: 'let ring', style: `left:${r.from * 100}%;width:${(r.to - r.from) * 100}%` }));
 
-  // Stems under the staff, joined by beams within a quarter-note group, like printed tab.
-  function paintRhythm(rh, tb) {
+  // SMuFL (Bravura, SIL OFL) code points: down flags for 8th/16th/32nd, rests from whole to 16th, the augmentation dot.
+  const FLAG = ['', '\uE241', '\uE243', '\uE245'];
+  const REST = [[1, '\uE4E3'], [1 / 2, '\uE4E4'], [1 / 4, '\uE4E5'], [1 / 8, '\uE4E6'], [1 / 16, '\uE4E7']];
+
+  // Rests fill the silence between beats (and before the first or after the last one), longest value first.
+  function paintRests(rh, tb, X) {
+    const put = (q, v, glyph) => rh.append(el('span', { className: 'smufl rest', textContent: glyph, style: `left:${X(q) * 100}%` }));
+    const gap = (from, to) => {
+      let left = (to - from) * tb.len, q = from;
+      while (left > 1 / 16 - 1e-6) {
+        const r = REST.find(([v]) => v <= left * 1.02 + 1e-6) || REST.at(-1);
+        put(q + 0.015, r[0], r[1]);
+        q += r[0] / tb.len;
+        left -= r[0];
+      }
+    };
+    if (!tb.n.length) return;
+    gap(0, tb.n[0][0]);
+    tb.n.forEach((b, k) => gap(b[0] + b[1], tb.n[k + 1]?.[0] ?? 1));
+  }
+
+  // Stems under the staff, joined by beams within a quarter-note group; a lone short note gets a flag, like printed tab.
+  function paintRhythm(rh, tb, X) {
     const beams = (b) => { const v = valueOf(tb, b); return v <= 1 / 32 ? 3 : v <= 1 / 16 ? 2 : v <= 1 / 8 ? 1 : 0; };
     const group = (b) => Math.floor(b[0] * tb.len * 4 + 1e-6);
     const beats = tb.n;
+    paintRests(rh, tb, X);
     beats.forEach((b, k) => {
       if (valueOf(tb, b) >= 1) return;
-      const x = `${b[0] * 100}%`, nb = beams(b);
+      const x = `${X(b[0]) * 100}%`, nb = beams(b);
       rh.append(el('span', { className: 'rstem', style: `left:${x}` }));
       const dotted = b[1] * tb.len > valueOf(tb, b) * 1.25;
-      if (dotted) rh.append(el('span', { className: 'dot', style: `left:${x}` }));
+      if (dotted) rh.append(el('span', { className: 'smufl dot', textContent: '\uE1E7', style: `left:${x}` }));
       const next = beats[k + 1], prev = beats[k - 1];
       const joinNext = next && beams(next) && nb && group(next) === group(b);
       const joinPrev = prev && beams(prev) && nb && group(prev) === group(b);
+      if (nb && !joinNext && !joinPrev) { rh.append(el('span', { className: 'smufl flag', textContent: FLAG[nb], style: `left:${x}` })); return; }
       for (let n = 1; n <= nb; n++) {
-        if (joinNext && n <= Math.min(nb, beams(next))) rh.append(el('span', { className: 'beam', style: `left:${x};width:${(next[0] - b[0]) * 100}%;top:${15 - (n - 1) * 3}px` }));
+        if (joinNext && n <= Math.min(nb, beams(next))) rh.append(el('span', { className: 'beam', style: `left:${x};width:${(X(next[0]) - X(b[0])) * 100}%;top:${15 - (n - 1) * 3}px` }));
         else if (!joinPrev || n > beams(prev)) rh.append(el('span', { className: 'beam stub', style: `left:${x};top:${15 - (n - 1) * 3}px` }));
       }
     });
@@ -636,7 +703,10 @@ export function createTab({ player, chordsIn = () => [] }) {
     }
     if (cur.segs) { if (cell && j !== cur.shown) { cur.shown = j; patternTo(j); } }
     else if (cell && !lockstep.on && follow && Date.now() >= holdUntil) glideTo(pos);
-    if (cell) cell.querySelector('.cursor').style.setProperty('--x', `${Math.min(1, Math.max(0, (pos - cur.secs[j]) / Math.max(1e-6, cur.ends[j] - cur.secs[j]))) * 100}%`);
+    if (cell) {
+      const f = Math.min(1, Math.max(0, (pos - cur.secs[j]) / Math.max(1e-6, cur.ends[j] - cur.secs[j])));
+      cell.querySelector('.cursor').style.setProperty('--x', `${(cell._x ? cell._x(f) : f) * 100}%`);
+    }
   }
 
   const manual = () => { holdUntil = Date.now() + 4000; follow = false; cancelGlide(body); unaim(body); };

@@ -198,6 +198,7 @@ final class Offline {
         if (n.endsWith(".png")) return "image/png";
         if (n.endsWith(".m4a")) return "audio/mp4";
         if (n.endsWith(".flac")) return "audio/flac";
+        if (n.endsWith(".woff2")) return "font/woff2";
         if (n.endsWith(".wasm")) return "application/wasm";
         return "application/octet-stream";
     }

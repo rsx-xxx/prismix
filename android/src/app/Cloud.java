@@ -107,6 +107,30 @@ final class Cloud {
         }
     }
 
+    /** Replaces the cloud's playlists when nobody changed them since `rev`. The HTTP status, or 0 when the cloud is not answering. */
+    static int putPlaylists(Credential c, String json, String rev) {
+        HttpURLConnection h = null;
+        try {
+            h = (HttpURLConnection) new URL(c.origin + "/api/v1/playlists.json").openConnection();
+            h.setRequestMethod("PUT");
+            h.setRequestProperty("Authorization", "Bearer " + c.token);
+            if (rev != null && rev.matches("[A-Za-z0-9._-]{1,64}")) h.setRequestProperty("If-Match", "\"" + rev + "\"");
+            h.setRequestProperty("Content-Type", "application/json");
+            h.setConnectTimeout(8000);
+            h.setReadTimeout(15000);
+            h.setDoOutput(true);
+            try (OutputStream o = h.getOutputStream()) { o.write(json.getBytes(StandardCharsets.UTF_8)); }
+            int code = h.getResponseCode();
+            InputStream in = code >= 400 ? h.getErrorStream() : h.getInputStream();
+            if (in != null) in.close();
+            return code;
+        } catch (java.io.IOException e) {
+            return 0;
+        } finally {
+            if (h != null) h.disconnect();
+        }
+    }
+
     // ── what is kept ──
 
     static Credential load(SharedPreferences p) {

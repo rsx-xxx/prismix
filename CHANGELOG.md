@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.47.0
+
+Playlists are now kept in the band cloud, so the desktop app and the phone see the same ones: they sync on start and after every change, newest edit wins per playlist, and a deleted playlist stays deleted on every device. The cloud server must serve `GET`/`PUT /api/v1/playlists.json` (`{"playlists": [...], "rev": "..."}`, `If-Match` on write, 412 on a conflict, 404 on an older cloud, which is ignored quietly). Tabs are laid out more cleanly, with fewer overlapping symbols.
+
 ## 0.46.1
 
 The Mac and Windows app no longer freezes when a prismix:// link (a band invite or a song) is opened: macOS delivers the link on the window's own thread, and signing in there blocked it for good. Playlists are back on the phone in the app's band-cloud and offline modes: the Playlists tab was hidden there. With no host, they are kept on the phone, and can be created, renamed, filled, reordered and deleted like the host's.

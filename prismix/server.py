@@ -11,7 +11,16 @@ from typing import Literal
 from urllib.parse import quote, urlparse
 
 import httpx
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile, WebSocket
+from fastapi import (
+    BackgroundTasks,
+    FastAPI,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    WebSocket,
+)
 from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.background import BackgroundTask
@@ -233,6 +242,7 @@ def create_app() -> FastAPI:
         jobs.start()
         prefetcher.start()
         threading.Thread(target=pipeline.backfill_covers, name="covers", daemon=True).start()
+        threading.Thread(target=cloud.sync_playlists_quiet, name="playlists-sync", daemon=True).start()
         updates.auto(busy, lambda: os._exit(0))
         yield
         await prefetcher.stop()
@@ -390,6 +400,13 @@ def create_app() -> FastAPI:
         except cloud.CloudError as e:
             raise HTTPException(e.status, str(e)) from None
         return cloud_status(request)
+
+    @app.post("/api/cloud/playlists/sync")
+    async def cloud_playlists_sync(request: Request):
+        own_window(request)
+        if not cloud.load_credential():
+            return {"synced": False}
+        return {"synced": await asyncio.to_thread(cloud.sync_playlists_quiet)}
 
     @app.post("/api/cloud/logout")
     def cloud_logout(request: Request):
@@ -666,15 +683,18 @@ def create_app() -> FastAPI:
         return jobs.submit(video_id, model, "stems" if tasks == "stems" else "split")
 
     @app.get("/api/playlists")
-    def playlists_list():
+    def playlists_list(bg: BackgroundTasks):
+        bg.add_task(cloud.sync_playlists_throttled)  # changes made on a phone show up on the next load
         return playlists.list_all()
 
     @app.post("/api/playlists")
-    def playlists_create(req: PlaylistCreate):
-        return playlists.create(req.name, [i.model_dump() for i in req.items])
+    def playlists_create(req: PlaylistCreate, bg: BackgroundTasks):
+        pl = playlists.create(req.name, [i.model_dump() for i in req.items])
+        bg.add_task(cloud.sync_playlists_quiet)
+        return pl
 
     @app.post("/api/playlists/import")
-    async def playlists_import(req: PlaylistImport):
+    async def playlists_import(req: PlaylistImport, bg: BackgroundTasks):
         if req.model not in MODELS or req.model == MIX_MODEL:
             raise HTTPException(400, "Unknown model")
         url = req.url if "://" in req.url else f"https://{req.url}"
@@ -688,6 +708,7 @@ def create_app() -> FastAPI:
         if not data["items"]:
             raise HTTPException(404, "That playlist is empty or private")
         pl = playlists.create(data["title"] or "Playlist", data["items"], source=url)
+        bg.add_task(cloud.sync_playlists_quiet)
         for it in pl["items"]:
             _start(it["id"], req.model, req.tasks)
         return pl
@@ -716,30 +737,34 @@ def create_app() -> FastAPI:
         return {"queued": queued}
 
     @app.patch("/api/playlists/{pid}")
-    def playlists_patch(pid: str, req: PlaylistPatch):
+    def playlists_patch(pid: str, req: PlaylistPatch, bg: BackgroundTasks):
         pl = playlists.update(pid, name=req.name, order=req.order)
         if not pl:
             raise HTTPException(404, "Not found")
+        bg.add_task(cloud.sync_playlists_quiet)
         return pl
 
     @app.post("/api/playlists/{pid}/items")
-    def playlists_add(pid: str, items: list[PlaylistItem]):
+    def playlists_add(pid: str, items: list[PlaylistItem], bg: BackgroundTasks):
         pl = playlists.add_items(pid, [i.model_dump() for i in items])
         if not pl:
             raise HTTPException(404, "Not found")
+        bg.add_task(cloud.sync_playlists_quiet)
         return pl
 
     @app.delete("/api/playlists/{pid}/items/{vid}")
-    def playlists_remove(pid: str, vid: str):
+    def playlists_remove(pid: str, vid: str, bg: BackgroundTasks):
         pl = playlists.remove_item(pid, vid)
         if not pl:
             raise HTTPException(404, "Not found")
+        bg.add_task(cloud.sync_playlists_quiet)
         return pl
 
     @app.delete("/api/playlists/{pid}")
-    def playlists_delete(pid: str):
+    def playlists_delete(pid: str, bg: BackgroundTasks):
         if not playlists.delete(pid):
             raise HTTPException(404, "Not found")
+        bg.add_task(cloud.sync_playlists_quiet)
         return {"ok": True}
 
     @app.post("/api/analyze")

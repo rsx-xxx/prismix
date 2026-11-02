@@ -7,7 +7,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from prismix import cloud, export, library, server, tagging
+from prismix import cloud, export, library, playlists, server, tagging
 
 VID = "dQw4w9WgXcQ"
 TOKEN = "A" * 43
@@ -22,6 +22,8 @@ class FakeCloud:
         self.committed: dict | None = None
         self.puts: list[str] = []
         self.deleted = ""
+        self.pl: list[dict] | None = None  # None: an older cloud that has no playlist endpoint
+        self.pl_rev = 0
 
     def __call__(self, req: httpx.Request) -> httpx.Response:
         if req.headers.get("authorization") != f"Bearer {TOKEN}":
@@ -29,6 +31,16 @@ class FakeCloud:
         path = req.url.path
         if path == "/api/v1/index.json":
             return httpx.Response(200, json={"songs": [{"id": VID, "title": "T"}]})
+        if path == "/api/v1/playlists.json":
+            if self.pl is None:
+                return httpx.Response(404)
+            if req.method == "GET":
+                return httpx.Response(200, json={"playlists": self.pl, "rev": str(self.pl_rev)})
+            if req.headers.get("if-match", f'"{self.pl_rev}"') != f'"{self.pl_rev}"':
+                return httpx.Response(412)
+            self.pl = json.loads(req.content)["playlists"]
+            self.pl_rev += 1
+            return httpx.Response(200, json={"rev": str(self.pl_rev)})
         if req.method == "DELETE":
             self.deleted = path.rsplit("/", 1)[1]
             return httpx.Response(204)
@@ -322,3 +334,78 @@ def test_delete_song():
     fake = FakeCloud()
     cloud_for(fake).delete_song(VID)
     assert fake.deleted == VID
+
+
+# ── playlists travel through the cloud ──
+
+PID = "0123456789"
+
+
+def _pl(pid=PID, name="Set", updated=100.0, items=(VID,)):
+    return {"id": pid, "name": name, "source": "", "updated": updated, "items": [{"id": i, "title": "T", "channel": "", "duration": 0} for i in items]}
+
+
+@pytest.fixture
+def pl_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(library, "LIBRARY_DIR", tmp_path / "lib")
+    return tmp_path
+
+
+def test_merge_newest_wins_and_deletion_sticks():
+    old, new = _pl(updated=1, name="Old"), _pl(updated=2, name="New")
+    assert playlists.merge([old], [new])[0]["name"] == "New"
+    assert playlists.merge([new], [old])[0]["name"] == "New"
+    gone = {"id": PID, "deleted": True, "updated": 3}
+    assert playlists.merge([new], [gone], now=4) == [gone]  # a later deletion beats an earlier edit
+    assert playlists.merge([_pl(updated=4)], [gone], now=5)[0]["name"] == "Set"  # a later edit beats the deletion
+    assert playlists.merge([gone], [], now=3 + playlists.TOMBSTONE_TTL + 1) == []  # old markers are forgotten
+    assert playlists.merge([{"id": "../x"}, "junk"], []) == []
+
+
+def test_sync_pushes_local_and_pulls_remote(pl_dir):
+    fake = FakeCloud()
+    fake.pl = [_pl("aaaaaaaaaa", "From phone", 50)]
+    mine = playlists.create("From desktop", [{"id": VID}])
+    cl = cloud_for(fake)
+    assert cloud.sync_playlists(cl)
+    assert {p["name"] for p in playlists.list_all()} == {"From phone", "From desktop"}
+    assert {p["id"] for p in fake.pl} == {"aaaaaaaaaa", mine["id"]}
+    n = fake.pl_rev
+    assert cloud.sync_playlists(cl) and fake.pl_rev == n  # nothing changed: nothing sent
+
+
+def test_deleting_locally_deletes_in_the_cloud(pl_dir):
+    fake = FakeCloud()
+    fake.pl = []
+    pl = playlists.create("X", [])
+    cl = cloud_for(fake)
+    cloud.sync_playlists(cl)
+    assert playlists.delete(pl["id"])
+    cloud.sync_playlists(cl)
+    assert [p for p in fake.pl if not p.get("deleted")] == []
+    assert playlists.list_all() == []
+
+
+def test_sync_survives_a_concurrent_writer(pl_dir):
+    fake = FakeCloud()
+    fake.pl = []
+    playlists.create("Mine", [])
+    real = fake.__call__
+    raced = []
+
+    def racing(req):
+        if req.method == "PUT" and not raced:  # someone else saves first
+            raced.append(1)
+            fake.pl = [_pl("bbbbbbbbbb", "Theirs", 5)]
+            fake.pl_rev += 1
+        return real(req)
+
+    cl = cloud.Cloud("https://band.test", TOKEN, transport=httpx.MockTransport(racing))
+    assert cloud.sync_playlists(cl)
+    assert {p["name"] for p in fake.pl} == {"Mine", "Theirs"}
+
+
+def test_sync_is_quiet_without_endpoint_or_credential(pl_dir, tmp_path, monkeypatch):
+    assert not cloud.sync_playlists(cloud_for(FakeCloud()))  # older cloud: 404
+    monkeypatch.setattr(cloud, "CRED_FILE", tmp_path / "none.json")
+    assert cloud.sync_playlists_quiet() is False
