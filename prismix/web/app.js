@@ -250,6 +250,8 @@ function hidePreview() {
 $('pv-close').addEventListener('click', hidePreview);
 let previewTimer;
 let typedPreview = false; // preview opened by typing a link (vs. clicking a search result)
+// The long hint is cut off in a phone's narrow search field, so phones get the short one.
+if (matchMedia('(max-width: 760px)').matches) $('q').placeholder = $('q').dataset.short;
 $('q').addEventListener('input', () => {
   clearTimeout(previewTimer);
   previewTimer = setTimeout(() => {
@@ -977,7 +979,7 @@ function applyPrefs(p) {
   if (p.formants != null) player.setFormants(p.formants);
   for (const s of player.stems) {
     if (p.vol?.[s.name] != null) s.volume = p.vol[s.name];
-    s.muted = !!p.mute?.includes(s.name);
+    if (p.mute) s.muted = p.mute.includes(s.name); // no saved mix: keep the default (vocals muted)
     s.solo = !!p.solo?.includes(s.name);
   }
   player._applyGains();

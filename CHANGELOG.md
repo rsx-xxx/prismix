@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.50.3
+
+The vocal stem now starts muted on every device (computer, phone, band cloud and offline modes) for songs without a saved mix; a mix you saved keeps its choice. On phones the search field in the top bar is roomier, with a shorter hint and a smaller Split button, so it no longer gets squeezed.
+
 ## 0.50.2
 
 Songsterr tab parts are named by their instrument ("Alto Sax") instead of the musician's name ("Jesse Rutherford"). Tabs downloaded earlier are fetched again once, so they pick up the instrument names.

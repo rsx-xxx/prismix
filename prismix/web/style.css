@@ -1254,3 +1254,10 @@ img.cv.none { opacity: 0; }
 .tbar .cursor { width: 2px; background: var(--accent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 80%, transparent); transition: opacity .2s; }
 .tbar.now .hd .n { color: var(--accent); font-weight: 800; }
 .tbar.gt.now .hd .n::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
+
+/* phones: a roomier search field in the top bar (after the desktop top-bar rules so it wins) */
+@media (max-width: 760px) {
+  .topbar { gap: 6px; padding: 8px max(10px, env(safe-area-inset-left)); }
+  .omni { padding-left: 10px; gap: 6px; }
+  .topbar .omni .btn { height: 36px; padding: 0 12px; }
+}

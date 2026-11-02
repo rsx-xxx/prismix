@@ -946,7 +946,7 @@ document.addEventListener('pointerdown', (e) => {
 // ── stem volumes (on the host in "Follow"; on this phone in "Hear here" and "Solo") ──
 const mixer = $('mixer');
 const mix = store.mix || {};
-const mixOf = (n) => mix[n] || (mix[n] = { v: 1, m: false, s: false });
+const mixOf = (n) => mix[n] || (mix[n] = { v: 1, m: n === 'vocals', s: false });
 // Names to silence on this phone: everything but the soloed stems, else the muted ones.
 function mixMuted() {
   const names = (S.track?.meta.stems || []).map((x) => x.name);

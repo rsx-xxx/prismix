@@ -87,7 +87,7 @@ export class StemPlayer extends EventTarget {
       report();
       const gain = this.ctx.createGain();
       gain.connect(this.duck);
-      return { name: s.name, buf, node: null, gain, src: null, volume: 1, muted: false, solo: false };
+      return { name: s.name, buf, node: null, gain, src: null, volume: 1, muted: s.name === 'vocals', solo: false }; // vocals start silent: the band plays them
     }));
 
     this._latency = 0.1; // settled by the first stretch preparation
