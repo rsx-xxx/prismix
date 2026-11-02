@@ -19,9 +19,18 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
   let lists = [];
   let timer = null;
   let current = null; // id of the playlist page that is showing
+  let sync = ''; // how the cloud sync of playlists went: synced, unsupported, offline, off
+
+  const SYNC = {
+    synced: ['☁ In the band cloud', 'Saved in the band cloud: your phone and other devices see this playlist.'],
+    unsupported: ['☁ Not in the cloud', 'Your band cloud server does not store playlists yet, so this playlist stays on this computer. The cloud server needs an update.'],
+    offline: ['☁ Cloud not answering', 'The band cloud did not answer; the playlist will sync when it does.'],
+  };
+  const syncChip = () => (SYNC[sync] ? el('small', { className: `pl-sync ${sync}`, textContent: SYNC[sync][0], title: SYNC[sync][1] }) : '');
 
   async function load() {
     try { lists = await api('/api/playlists'); } catch { lists = []; }
+    try { sync = (await api('/api/cloud/playlists/status')).state; } catch { sync = ''; }
     renderCards();
     return lists;
   }
@@ -33,7 +42,7 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
       const first = p.items[0];
       const card = el('button', { type: 'button', className: 'plcard', title: p.name },
         first ? art(el('img', { alt: '' }), first.id, true) : el('div', { className: 'pl-ph' }),
-        el('b', { textContent: p.name }), el('small', { className: 'muted', textContent: `${p.items.length} song${p.items.length === 1 ? '' : 's'}` }));
+        el('b', { textContent: p.name }), el('small', { className: 'muted', textContent: `${p.items.length} song${p.items.length === 1 ? '' : 's'}` }), syncChip());
       card.addEventListener('click', () => { location.hash = `#/p/${p.id}`; });
       card.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes(SONG)) { e.preventDefault(); card.classList.add('drop'); } });
       card.addEventListener('dragleave', () => card.classList.remove('drop'));
@@ -60,7 +69,8 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
     current = id;
     $('plpage').hidden = false;
     $('pp-name').textContent = p.name;
-    $('pp-count').textContent = `${p.items.length} song${p.items.length === 1 ? '' : 's'}`;
+    $('pp-count').textContent = `${p.items.length} song${p.items.length === 1 ? '' : 's'}${SYNC[sync] ? ` · ${SYNC[sync][0]}` : ''}`;
+    $('pp-count').title = SYNC[sync]?.[1] || '';
     const rows = $('pp-list');
     rows.replaceChildren(...p.items.map((it, n) => {
       const row = el('div', { className: 'pp-row' });

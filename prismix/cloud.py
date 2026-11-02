@@ -144,7 +144,7 @@ class Cloud:
     def playlists(self) -> tuple[str, list[dict]] | None:
         """(revision, playlists) held by the cloud; None when it does not store playlists (an older cloud)."""
         r = self.request("GET", "/api/v1/playlists.json")
-        if r.status_code == 404:
+        if r.status_code in (400, 404, 405):  # a cloud server without the playlists endpoint answers 404, or 400 "bad path"
             return None
         if r.status_code != 200:
             raise CloudError(f"The cloud answered {r.status_code}", 502)
@@ -363,28 +363,39 @@ def push_setup(video_id: str, setup: dict) -> bool:
         cloud.close()
 
 
+# How the last playlist sync went, for the page: "synced", "unsupported" (the cloud server has no playlists
+# endpoint yet), "offline" (not answering) or "off" (not signed in to a cloud); "" before the first try.
+playlist_state = ""
+
+
 def sync_playlists(cloud: Cloud) -> bool:
     """Brings the local playlists and the cloud's together: pull, merge, write both sides. True when they now agree.
     A concurrent writer makes the push fail; the next round merges its change in too."""
+    global playlist_state
     for _ in range(3):
         got = cloud.playlists()
         if got is None:
+            playlist_state = "unsupported"
             return False
         rev, remote = got
         merged = playlists.absorb(remote)
         if merged == playlists.merge(remote, []) or cloud.put_playlists(merged, rev):
+            playlist_state = "synced"
             return True
     return False
 
 
 def sync_playlists_quiet() -> bool:
     """Same, for the places that must never fail because of the network: nothing happens when offline or signed out."""
+    global playlist_state
     cloud = current()
     if not cloud:
+        playlist_state = "off"
         return False
     try:
         return sync_playlists(cloud)
     except (CloudError, httpx.HTTPError, ValueError):
+        playlist_state = "offline"
         return False
     finally:
         cloud.close()

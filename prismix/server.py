@@ -401,6 +401,14 @@ def create_app() -> FastAPI:
             raise HTTPException(e.status, str(e)) from None
         return cloud_status(request)
 
+    @app.get("/api/cloud/playlists/status")
+    async def cloud_playlists_status():
+        if not cloud.load_credential():
+            return {"state": "off"}
+        if not cloud.playlist_state:
+            await asyncio.to_thread(cloud.sync_playlists_quiet)
+        return {"state": cloud.playlist_state}
+
     @app.post("/api/cloud/playlists/sync")
     async def cloud_playlists_sync(request: Request):
         own_window(request)

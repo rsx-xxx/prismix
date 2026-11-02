@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.50.4
+
+The stem quality panel now states the file format (FLAC, 16-bit, 44.1 kHz, lossless), the size per stem and in total, and why higher levels sound better (more model passes; same file size, only longer processing). Playlists show a band cloud chip on desktop: synced, offline, or "cloud too old" when the cloud server has no playlist endpoint yet, which is why a playlist does not reach the phone.
+
 ## 0.50.3
 
 The vocal stem now starts muted on every device (computer, phone, band cloud and offline modes) for songs without a saved mix; a mix you saved keeps its choice. On phones the search field in the top bar is roomier, with a shorter hint and a smaller Split button, so it no longer gets squeezed.

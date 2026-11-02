@@ -407,5 +407,6 @@ def test_sync_survives_a_concurrent_writer(pl_dir):
 
 def test_sync_is_quiet_without_endpoint_or_credential(pl_dir, tmp_path, monkeypatch):
     assert not cloud.sync_playlists(cloud_for(FakeCloud()))  # older cloud: 404
+    assert cloud.playlist_state == "unsupported"
     monkeypatch.setattr(cloud, "CRED_FILE", tmp_path / "none.json")
     assert cloud.sync_playlists_quiet() is False

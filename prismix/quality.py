@@ -156,6 +156,9 @@ def estimates(model: str, seconds: float = TYPICAL_SEC) -> dict:
         "measured": measured,
         "seconds": seconds,
         "sizeMB": round(size_mb, 1),
+        "stems": stems,
+        "stemMB": round(_flac_mb_per_min_stem(model), 2),
+        "format": "FLAC, 16-bit, 44.1 kHz, lossless",
         "levels": [
             {"id": q.id, "label": q.label, "hint": q.hint,
              "cost": round(cost(q, model), 1), "clean": q.clean, "detail": q.detail,

@@ -1599,6 +1599,7 @@ async function loadQuality() {
     $('q-detail').hidden = false;
     const note = q.measured ? 'measured on this machine' : `estimated for ${q.device.toUpperCase()}`;
     $('q-est').textContent = `Per ${Math.round(q.seconds / 60)}-min song: ~${Math.round(q.sizeMB)} MB at any level, ${note}. Applies to new splits.`;
+    $('q-facts').textContent = `Format: ${q.format}. ${q.stems} stems × ~${q.stemMB} MB per minute = ~${Math.round(q.sizeMB)} MB for a ${Math.round(q.seconds / 60)}-min song, the same at every level. Higher levels are better because the model runs more shifted passes with more overlap and averages them, which cancels leakage between stems and seams between windows. Only the time grows, not the file.`;
   } catch (err) { $('q-est').textContent = err.message; }
 }
 const putQuality = () => api('/api/quality', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quality: $('q-sel').value }) }).catch((err) => notice(err.message));

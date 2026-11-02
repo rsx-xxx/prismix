@@ -1261,3 +1261,7 @@ img.cv.none { opacity: 0; }
   .omni { padding-left: 10px; gap: 6px; }
   .topbar .omni .btn { height: 36px; padding: 0 12px; }
 }
+
+.pl-sync { font-size: 11px; color: var(--muted); }
+.pl-sync.synced { color: var(--accent); }
+.pl-sync.unsupported, .pl-sync.offline { color: #e0a14a; }
