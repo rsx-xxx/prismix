@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.48.0
+
+The tab bar being played is now a glowing playhead with a soft trail and an accent bar number, instead of a boxed highlight. Chords in instrumental breaks are shown in the lyrics when chords are placed above them, and the lyrics follow the chords through a break instead of jumping across it.
+
 ## 0.47.0
 
 Playlists are now kept in the band cloud, so the desktop app and the phone see the same ones: they sync on start and after every change, newest edit wins per playlist, and a deleted playlist stays deleted on every device. The cloud server must serve `GET`/`PUT /api/v1/playlists.json` (`{"playlists": [...], "rev": "..."}`, `If-Match` on write, 412 on a conflict, 404 on an older cloud, which is ignored quietly). Tabs are laid out more cleanly, with fewer overlapping symbols.

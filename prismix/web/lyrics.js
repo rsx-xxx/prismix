@@ -149,6 +149,7 @@ export function createLyrics({ player, api, chords = () => [] }) {
   function chip(c) {
     const b = el('b', { className: `ch chord${c.carry ? ' carry' : ''}`, textContent: c.label, title: 'Jump to this chord' });
     b.dataset.ci = String(c.ci);
+    b.dataset.at = String(c.t);
     b.style.setProperty('--h', c.h); b.style.setProperty('--l', c.l); b.style.setProperty('--c', c.c);
     b.addEventListener('click', (e) => { e.stopPropagation(); manualUntil = 0; player.seek(c.t); });
     return b;
@@ -214,10 +215,16 @@ export function createLyrics({ player, api, chords = () => [] }) {
     }
     // an instrumental stretch between two sung lines is one small ♪ row; the chords scroll on while the lyrics wait there
     cur.brks ??= new Map();
+    // the chords played over a rest are listed in its ♪ row, shown when the chords sit above the words
+    const fill = (node, t0, t1) => {
+      const list = cs.filter((c) => c.t >= t0 && c.t < t1);
+      node.classList.toggle('brk-ch', list.length > 0);
+      node.replaceChildren(...(list.length ? [el('span', { className: 'ly-instr-mark', textContent: '♪' }), ...list.map(chip)] : ['♪']));
+    };
     lines.forEach((ln, i) => {
       const tl = cur.timed[i], j = cur.timed.findIndex((x, k) => k > i && x);
       if (!tl) { // a rest the lyrics file already marks with ♪
-        if (!ln.text && ln.t != null && j >= 0) cur.brks.set(i, { n: nodes[i], own: true, t0: ln.t, t1: lines[j].t });
+        if (!ln.text && ln.t != null && j >= 0) { cur.brks.set(i, { n: nodes[i], own: true, t0: ln.t, t1: lines[j].t }); fill(nodes[i], ln.t, lines[j].t); }
         return;
       }
       const marked = lines.slice(i + 1, j < 0 ? i + 1 : j).some((x) => !x.text && x.t != null);
@@ -225,6 +232,7 @@ export function createLyrics({ player, api, chords = () => [] }) {
       let b = cur.brks.get(i);
       if (!b) { b = { n: el('div', { className: 'ly-brk', textContent: '♪' }) }; cur.brks.set(i, b); nodes[i].after(b.n); }
       b.t0 = tl.end; b.t1 = lines[j].t;
+      fill(b.n, b.t0, b.t1);
       b.n.dataset.t = String(b.t0);
     });
     const lastEnd = lastT < 0 ? null : cur.timed[lastT].end + 0.5;
@@ -242,7 +250,16 @@ export function createLyrics({ player, api, chords = () => [] }) {
       if (lines[mid].t <= pos + LEAD) { i = mid; lo = mid + 1; } else hi = mid - 1;
     }
     sing(pos);
-    for (const b of cur.brks?.values() ?? []) if (!b.own) b.n.classList.toggle('now', pos >= b.t0 && pos < b.t1 - LEAD);
+    let rest = null;
+    for (const b of cur.brks?.values() ?? []) {
+      const on = pos >= b.t0 && pos < b.t1 - LEAD;
+      if (!b.own) b.n.classList.toggle('now', on);
+      if (on) rest = b;
+    }
+    if (rest) { // an instrumental: the ♪ row takes the spot, then the chord being played
+      const chips = [...rest.n.querySelectorAll('.ch')];
+      lift(chips.findLast((c) => Number(c.dataset.at) <= pos + LEAD) ?? rest.n);
+    }
     if (i === cur.active) return;
     cur.active = i;
     cur.nodes.forEach((n, k) => {
@@ -298,8 +315,8 @@ export function createLyrics({ player, api, chords = () => [] }) {
 
   /** Teleprompter: the lit line always sits at the same spot (40% of the pane) with the next lines below it;
    *  when the next line is lit the text eases up so that line takes the spot. */
-  function center(i) {
-    const n = cur.nodes[i];
+  const center = (i) => lift(cur.nodes[i]);
+  function lift(n) {
     if (!n || lockstep.on || Date.now() < manualUntil || Date.now() < holdUntil || body.offsetParent === null) return;
     settle(body, body.scrollTop + offsetIn(body, n) + n.offsetHeight / 2 - anchorAt(body, 0.4));
   }
@@ -372,14 +389,21 @@ export function createLyrics({ player, api, chords = () => [] }) {
         const mid = (n) => offsetIn(body, n) + body.scrollTop + n.offsetHeight / 2;
         return (cur?.timed ?? []).flatMap((tl, i) => {
           const b = cur.brks?.get(i);
-          if (!tl) return b?.own ? [{ y: mid(b.n), t: b.t0 }, { y: mid(b.n), t: Math.max(b.t0, b.t1 - 1.5) }] : [];
+          if (!tl) return b?.own ? breakPoints(b, mid) : [];
           const pts = [{ y: mid(cur.nodes[i]), t: cur.data.lines[i].t }];
-          if (b) pts.push({ y: mid(b.n), t: b.t0 }, { y: mid(b.n), t: Math.max(b.t0, b.t1 - 1.5) });
+          if (b) pts.push(...breakPoints(b, mid));
           return pts;
         });
       },
     }),
   };
+
+  /** Scroll anchors of a ♪ row: its start, then each chord chip, so a side pane follows the chords through the rest. */
+  function breakPoints(b, mid) {
+    const end = Math.max(b.t0, b.t1 - 1.5), pts = [{ y: mid(b.n), t: b.t0 }];
+    for (const c of b.n.querySelectorAll('.ch')) { const t = Number(c.dataset.at); if (t > b.t0 && t <= end) pts.push({ y: mid(c), t }); }
+    return pts.concat({ y: pts.at(-1).y, t: end });
+  }
 
   function close() {
     token++;

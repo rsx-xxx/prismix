@@ -535,7 +535,11 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .ly-instr:empty { display: none; }
 .ly-brk { padding: 4px 0; font-size: 22px; line-height: 1; color: var(--muted); opacity: .5; transition: color .25s, opacity .25s; }
 .ly-brk.now { color: var(--text); opacity: 1; }
-.lyrics:not(.merged) .ly-instr .ch { display: none; }
+.lyrics:not(.merged) .ly-instr .ch, .lyrics:not(.merged) .brk-ch .ch { display: none; }
+.lyrics.merged .brk-ch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lyrics:not(.merged) .brk-ch .ly-instr-mark { margin: 0; }
+.brk-ch .ch { cursor: pointer; padding: 2px 6px; border-radius: 6px; font-weight: 700; font-size: 14px; }
+.brk-ch .ch.on { outline: 2px solid var(--text); }
 .ly-instr:not(:empty) { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 0; }
 .ly-instr-mark { color: var(--muted); margin-right: 4px; }
 .ly-instr .ch { cursor: pointer; padding: 2px 6px; border-radius: 6px; font-weight: 700; font-size: 14px; }
@@ -780,7 +784,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .tbar:hover { border-color: var(--line-strong); }
 .tbar.auto { border-style: dashed; }
 .tbar.weak { border-style: dotted; border-color: var(--warn, #e0a030); background: color-mix(in oklab, var(--warn, #e0a030) 8%, transparent); }
-.tbar.now { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.tbar.now { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); box-shadow: none; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
 .tbar .n { position: absolute; top: 3px; left: 7px; font-size: 10px; color: var(--muted); }
 .tbar .tag { position: absolute; top: 3px; right: 7px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .tbar .tch { position: absolute; top: 2px; left: 6px; right: 6px; height: 18px; pointer-events: none; }
@@ -1220,7 +1224,7 @@ img.cv.none { opacity: 0; }
 .trow.gt .strs::after, .tbar.gt .stf::after { content: ""; position: absolute; right: 0; top: calc(var(--row) / 2); bottom: calc(var(--row) / 2); width: 1px; background: var(--text); opacity: .7; }
 .tbar.gt { padding: 0; border: 0; border-radius: 0; background: none; }
 .tbar.gt:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
-.tbar.gt.now { background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: none; }
+.tbar.gt.now { background: none; border-color: transparent; }
 .tbar.gt.weak { background: color-mix(in oklab, var(--warn, #e0a030) 8%, transparent); }
 .tbar.gt .hd { padding: 0 4px; }
 .tbar.gt .tch { margin: 0; }
@@ -1236,3 +1240,10 @@ img.cv.none { opacity: 0; }
 .tbar .rh .dot { top: 15px; margin-left: 4px; font-size: 14px; }
 .tbar .rh .rest { top: 12px; font-size: 20px; opacity: .55; }
 .tbar .tempo .smufl { font-size: 15px; line-height: 1; vertical-align: -1px; }
+
+/* the bar being played: no box, a playhead with a short glow trailing behind it, and an accent bar number */
+.tbar .stf::before { content: ""; position: absolute; top: 0; bottom: 0; left: max(0px, calc(var(--x, 0%) - 72px)); width: min(var(--x, 0%), 72px); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 18%, transparent)); opacity: 0; pointer-events: none; transition: opacity .2s; }
+.tbar.now .stf::before { opacity: 1; }
+.tbar .cursor { width: 2px; background: var(--accent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 80%, transparent); transition: opacity .2s; }
+.tbar.now .hd .n { color: var(--accent); font-weight: 800; }
+.tbar.gt.now .hd .n::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }

@@ -705,7 +705,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     else if (cell && !lockstep.on && follow && Date.now() >= holdUntil) glideTo(pos);
     if (cell) {
       const f = Math.min(1, Math.max(0, (pos - cur.secs[j]) / Math.max(1e-6, cur.ends[j] - cur.secs[j])));
-      cell.querySelector('.cursor').style.setProperty('--x', `${(cell._x ? cell._x(f) : f) * 100}%`);
+      cell.querySelector('.cursor').parentElement.style.setProperty('--x', `${(cell._x ? cell._x(f) : f) * 100}%`); // on the staff: the cursor and the played-glow both read it
     }
   }
 
