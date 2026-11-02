@@ -1,3 +1,4 @@
+import httpx
 import numpy as np
 
 from prismix import align, genius
@@ -47,3 +48,22 @@ def test_place_words_into_lines():
     out = align.place(np.array([0, 5, 10, 20]), words, 3, 0.1, 5.0)
     assert out[0]["ws"] == [0.0, 1.0] and out[0]["t"] == 0.0
     assert out[1]["t"] == 2.0 and out[2] is None
+
+
+class _Client:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def get(self, url):
+        return httpx.Response(200, json=self.payload, request=httpx.Request("GET", url))
+
+
+def test_api_urls_reads_songs_from_every_section():
+    hit = lambda u, t="song": {"type": t, "result": {"url": u}}
+    payload = {"response": {"sections": [
+        {"type": "top_hit", "hits": [hit("https://genius.com/a-b-lyrics")]},
+        {"type": "lyric", "hits": [hit("https://genius.com/a-b-lyrics"), hit("https://genius.com/c-d-lyrics")]},
+        {"type": "artist", "hits": [hit("https://genius.com/artists/x", "artist")]},
+    ]}}
+    assert genius.api_urls(_Client(payload), "q") == ["https://genius.com/a-b-lyrics", "https://genius.com/c-d-lyrics"]
+    assert genius.api_urls(_Client({}), "q") == []

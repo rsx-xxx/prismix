@@ -1,7 +1,8 @@
 """Lyrics text from Genius (https://genius.com): the most accurate public text, no timings.
 
-Genius' own search endpoint sits behind a captcha, so a page is found in two cheaper ways: the URL Genius builds from
-artist and title (`Artist-title-lyrics`) is tried first, then a web search (DuckDuckGo) for `artist title genius lyrics`.
+A page is found in three ways, cheapest first: the URL Genius builds from artist and title (`Artist-title-lyrics`; only
+works for Latin names, Genius romanises its slugs), then Genius' own search API (matches titles, artists and sung lines;
+the web page of that search is captcha-gated, the JSON endpoint is not), then a web search (DuckDuckGo) as a last resort.
 Every candidate page is verified against the wanted artist and title with fuzzy matching before its text is used.
 The text is the template that lyrics.py then times against the audio (align.py) or against LRCLIB.
 """
@@ -182,9 +183,29 @@ def _get(client: httpx.Client, url: str) -> httpx.Response | None:
     return r if r.status_code == 200 else None
 
 
+def api_urls(client: httpx.Client, query: str) -> list[str]:
+    """Genius song URLs from Genius' own search, best first. The query may be a title, an artist or a line of the song."""
+    r = _get(client, f"https://genius.com/api/search/multi?q={quote(query)}")
+    try:
+        sections = r.json()["response"]["sections"] if r else []
+    except (ValueError, KeyError, TypeError):
+        return []
+    urls: list[str] = []
+    for sec in sections:
+        if sec.get("type") not in ("top_hit", "song", "lyric"):
+            continue
+        for hit in sec.get("hits") or []:
+            u = (hit.get("result") or {}).get("url") or ""
+            if hit.get("type") == "song" and u.endswith("-lyrics") and u not in urls:
+                urls.append(u)
+    return urls
+
+
 def search_urls(client: httpx.Client, query: str) -> list[str]:
-    """Genius song URLs from a web search for the query, in result order."""
-    r = _get(client, f"https://html.duckduckgo.com/html/?q={quote(query)}")
+    """Genius song URLs for a title / artist / sung line: Genius' own search first, a web search when it finds nothing."""
+    if urls := api_urls(client, query):
+        return urls
+    r = _get(client, f"https://html.duckduckgo.com/html/?q={quote(query + ' genius lyrics')}")
     if not r:
         return []
     urls: list[str] = []
@@ -221,7 +242,7 @@ def fetch(artist: str | None, title: str, *, client: httpx.Client | None = None)
         if not title:
             return None
         urls = [f"https://genius.com/{s}" for s in slugs(artist, title)]
-        queries = [f"{artist or ''} {title} genius lyrics".strip()]
+        queries = [f"{artist or ''} {title}".strip(), title] if artist else [title]
         best: dict | None = None
         tried: set[str] = set()
         stage = 0
@@ -245,9 +266,9 @@ def fetch(artist: str | None, title: str, *, client: httpx.Client | None = None)
                     best = cand
                 if score >= 0.9:
                     return best
-            if best or stage >= len(queries):
+            if (best and best["score"] >= 0.75) or stage >= len(queries):
                 return best
-            urls = search_urls(client, queries[stage])[:4]
+            urls = search_urls(client, queries[stage])[:5]
             stage += 1
     finally:
         if own:

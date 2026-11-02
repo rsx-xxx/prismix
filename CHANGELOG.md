@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.48.1
+
+Lyrics are now found for songs with Cyrillic or otherwise non-Latin artist names, such as "Марія Чайковська - Красота [feat. Би-2]". Genius slugs are Latin-only, so the guessed page address never matched and the web-search fallback is often blocked; the lookup now uses Genius's own search, by title and artist first, and by the sung lines when the title leads nowhere.
+
 ## 0.48.0
 
 The tab bar being played is now a glowing playhead with a soft trail and an accent bar number, instead of a boxed highlight. Chords in instrumental breaks are shown in the lyrics when chords are placed above them, and the lyrics follow the chords through a break instead of jumping across it.
