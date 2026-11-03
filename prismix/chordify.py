@@ -75,7 +75,7 @@ def fetch(video_id: str) -> dict | None:
     except httpx.HTTPError as e:
         log.info("chordify unreachable: %s", e)
         return None
-    if r.status_code >= 500:
+    if r.status_code >= 500 or r.status_code in (403, 429):  # a server error, a rate limit or a bot challenge: not an answer
         return None
     ref = parse(r.text) if r.status_code == 200 else None
     with contextlib.suppress(OSError):

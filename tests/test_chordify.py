@@ -21,3 +21,14 @@ def test_parse_gives_none_without_data():
     assert chordify.parse("<html></html>") is None
     assert chordify.parse(_page(chordSummary=[])) is None
     assert chordify.parse("window.__INITIAL_DATA__ = {oops") is None
+
+
+def test_blocked_page_is_not_cached_as_missing(tmp_path, monkeypatch):
+    class Resp:
+        status_code = 403
+        text = "challenge"
+
+    monkeypatch.setattr(chordify.library, "video_dir", lambda v: tmp_path)
+    monkeypatch.setattr(chordify.httpx, "get", lambda *a, **k: Resp())
+    assert chordify.fetch("abc") is None
+    assert not (tmp_path / "chordify.json").exists()
