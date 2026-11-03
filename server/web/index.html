@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Band">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Band Cloud</title>
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" href="/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="bar">
+  <h1>Band Cloud</h1>
+  <button id="refresh" class="icon" type="button" aria-label="Refresh">&#x21bb;</button>
+</header>
+
+<main>
+  <section id="login" hidden>
+    <h2>Join with your invite</h2>
+    <p id="login-msg" class="muted">This device is not signed in, or the invite was revoked. Paste the invite link you were sent.</p>
+    <form id="login-form">
+      <input id="invite" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Invite link" aria-label="Invite link">
+      <button class="primary" type="submit">Join</button>
+    </form>
+    <p id="login-err" class="muted" role="alert"></p>
+  </section>
+
+  <section id="library" hidden>
+    <input id="search" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off">
+    <p id="status" class="muted" role="status"></p>
+    <ul id="songs"></ul>
+  </section>
+</main>
+
+<div id="mini" class="mini" hidden>
+  <button id="mini-open" type="button" aria-label="Open player"><img id="mini-cover" alt=""><span><b id="mini-title"></b><small id="mini-artist"></small></span></button>
+  <button id="mini-toggle" class="icon" type="button" aria-label="Play or pause"></button>
+</div>
+
+<section id="sheet" class="sheet" hidden aria-label="Player">
+  <button id="sheet-close" class="icon close" type="button" aria-label="Close player">&#x2304;</button>
+  <img id="cover" alt="">
+  <h2 id="title"></h2>
+  <p id="artist" class="muted"></p>
+  <div class="seek">
+    <span id="pos">0:00</span>
+    <input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek">
+    <span id="dur">0:00</span>
+  </div>
+  <div class="controls">
+    <button id="prev" class="icon" type="button" aria-label="Previous song">&#x23ee;</button>
+    <button id="back10" class="icon" type="button" aria-label="Back 10 seconds">&#x21b6;10</button>
+    <button id="toggle" class="icon big" type="button" aria-label="Play or pause"></button>
+    <button id="fwd10" class="icon" type="button" aria-label="Forward 10 seconds">10&#x21b7;</button>
+    <button id="next" class="icon" type="button" aria-label="Next song">&#x23ed;</button>
+  </div>
+  <p id="error" class="muted" role="alert"></p>
+  <div id="mixer-box" hidden>
+    <label class="switch"><input id="stems-on" type="checkbox"> Play stems separately</label>
+    <ul id="mixer" hidden></ul>
+  </div>
+  <h3>Download</h3>
+  <ul id="downloads" class="downloads"></ul>
+</section>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

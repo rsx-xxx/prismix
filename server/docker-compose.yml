@@ -1,0 +1,60 @@
+name: band-cloud
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  bandauth:
+    image: python:3.12-alpine
+    container_name: band-cloud-bandauth
+    command: ["python", "-u", "/app/bandauth.py", "serve", "--host", "127.0.0.1", "--port", "8787"]
+    network_mode: host
+    user: "10001:10001"
+    environment:
+      BAND_DATA: /data
+      BAND_STATE: /state
+      BAND_PUBLIC_URL: "https://band.deltaclans.win"
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - /srv/band-cloud/app:/app:ro
+      - /srv/band-cloud/data:/data
+      - /srv/band-cloud/state:/state
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    cpus: 0.5
+    mem_limit: 256m
+    pids_limit: 128
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: band-cloud-caddy
+    network_mode: host
+    volumes:
+      - /srv/band-cloud/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/band-cloud/caddy-data:/data
+      - /srv/band-cloud/caddy-config:/config
+      - /srv/band-cloud/data:/srv/data:ro
+      - /srv/band-cloud/web:/srv/web:ro
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    cpus: 0.5
+    mem_limit: 256m
+    pids_limit: 256
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      - bandauth

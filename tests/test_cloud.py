@@ -31,6 +31,9 @@ class FakeCloud:
         path = req.url.path
         if path == "/api/v1/index.json":
             return httpx.Response(200, json={"songs": [{"id": VID, "title": "T"}]})
+        if path == "/api/v1/members" and req.method == "POST":
+            self.invited = json.loads(req.content)["label"]
+            return httpx.Response(200, json={"name": "x-1", "link": f"https://band.test/join?t={'C' * 43}"})
         if path == "/api/v1/playlists.json":
             if self.pl is None:
                 return httpx.Response(404)
@@ -233,6 +236,21 @@ def api(tmp_path, monkeypatch):
     with TestClient(server.create_app()) as c:
         c.fake = fake
         yield c
+
+
+def test_invite_issues_a_member_link(api):
+    assert api.post("/api/cloud/invite", json={"label": "Vasya"}).status_code == 401  # not signed in
+    api.post("/api/cloud/login", json={"link": LINK})
+    r = api.post("/api/cloud/invite", json={"label": "Vasya"})
+    assert r.status_code == 200 and r.json()["link"] == f"https://band.test/join?t={'C' * 43}"
+    assert api.fake.invited == "Vasya"
+    assert cloud.parse_credential(r.json()["link"])[1] == "C" * 43
+
+
+def test_invite_on_an_old_cloud_says_so():
+    cl = cloud.Cloud("https://band.test", TOKEN, transport=httpx.MockTransport(lambda req: httpx.Response(404)))
+    with pytest.raises(cloud.CloudError, match="cannot issue invites"):
+        cl.invite()
 
 
 def test_login_flow_and_proxy(api):

@@ -107,6 +107,37 @@ final class Cloud {
         }
     }
 
+    /** Asks the cloud for a fresh member link to hand to somebody else; any signed-in member may. */
+    static String invite(Credential c, String label) throws Failure {
+        HttpURLConnection h = null;
+        try {
+            h = (HttpURLConnection) new URL(c.origin + "/api/v1/members").openConnection();
+            h.setRequestMethod("POST");
+            h.setRequestProperty("Authorization", "Bearer " + c.token);
+            h.setRequestProperty("Content-Type", "application/json");
+            h.setConnectTimeout(8000);
+            h.setReadTimeout(15000);
+            h.setDoOutput(true);
+            String body = new org.json.JSONObject().put("label", label == null ? "" : label).toString();
+            try (OutputStream o = h.getOutputStream()) { o.write(body.getBytes(StandardCharsets.UTF_8)); }
+            int code = h.getResponseCode();
+            if (code == 429) throw new Failure("Too many invites, try again later");
+            if (code == 400 || code == 404 || code == 405) throw new Failure("This cloud cannot issue invites yet");
+            if (code != 200) throw new Failure("The cloud answered " + code);
+            try (InputStream in = h.getInputStream(); java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+                byte[] buf = new byte[1024];
+                for (int n; (n = in.read(buf)) > 0 && out.size() < 8192; ) out.write(buf, 0, n);
+                return new org.json.JSONObject(out.toString("UTF-8")).getString("link");
+            }
+        } catch (java.io.IOException e) {
+            throw new Failure("The cloud is not answering");
+        } catch (org.json.JSONException e) {
+            throw new Failure("The cloud sent something unexpected");
+        } finally {
+            if (h != null) h.disconnect();
+        }
+    }
+
     /** Replaces the cloud's playlists when nobody changed them since `rev`. The HTTP status, or 0 when the cloud is not answering. */
     static int putPlaylists(Credential c, String json, String rev) {
         HttpURLConnection h = null;

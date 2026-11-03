@@ -203,6 +203,8 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
   // ── sign-in ──
   function openLogin() {
     $('cloud-err').textContent = '';
+    $('cloud-invite-msg').textContent = '';
+    $('cloud-invite-label').value = '';
     $('cloud-link').value = '';
     $('cloud-signed').hidden = !state.signedIn;
     $('cloud-form').hidden = state.signedIn;
@@ -221,6 +223,17 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
       $('cloud-dialog').close();
       await refresh();
     } catch (x) { err.textContent = x.message; }
+  });
+  $('cloud-invite').addEventListener('click', async () => {
+    const msg = $('cloud-invite-msg');
+    msg.textContent = 'Making a link…';
+    try {
+      const { link } = await post('/api/cloud/invite', { label: $('cloud-invite-label').value.trim() });
+      try { await navigator.clipboard.writeText(link); msg.textContent = 'Link copied. Send it to them: it lets them play and publish.'; } catch {
+        msg.textContent = 'Copy this link and send it to them:';
+        msg.append(el('input', { readOnly: true, value: link, onfocus: (e) => e.target.select() }));
+      }
+    } catch (x) { msg.textContent = x.message; }
   });
   $('cloud-out').addEventListener('click', async () => {
     if (!confirm(`Sign out of ${state.band?.name || 'the band cloud'}? Songs already downloaded stay on this computer.`)) return;

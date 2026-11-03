@@ -774,6 +774,9 @@ public class Main extends Activity {
             Button open = button("Open " + have.title(), true);
             open.setOnClickListener(v -> openCloud(have));
             panel.addView(open);
+            Button invite = button("Invite someone", false);
+            invite.setOnClickListener(v -> inviteToCloud(have, err, invite));
+            panel.addView(invite);
             Button out = button("Sign out", false);
             out.setOnClickListener(v -> signOutCloud());
             panel.addView(out);
@@ -955,6 +958,29 @@ public class Main extends Activity {
             web.loadUrl("https://" + CloudApi.HOST + "/remote");
             ui.postDelayed(() -> { if (g == gen && connecting) { connecting = false; showCloud("The cloud is not answering"); } }, 20000);
         });
+    }
+
+    /** Makes a member link on the cloud and opens the share sheet with it; the link can play and publish, so it is sent on purpose. */
+    private void inviteToCloud(final Cloud.Credential c, final TextView err, final Button btn) {
+        btn.setEnabled(false);
+        err.setText("");
+        whenNet(() -> new Thread(() -> {
+            String link = null, bad = null;
+            try {
+                link = Cloud.invite(c, "");
+            } catch (Cloud.Failure f) {
+                bad = f.getMessage();
+            } catch (RuntimeException e) {
+                bad = "Could not make an invite";
+            }
+            final String ok = link, why = bad;
+            ui.post(() -> {
+                btn.setEnabled(true);
+                if (ok == null) { err.setText(why); return; }
+                Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, ok);
+                try { startActivity(Intent.createChooser(send, "Send the invite")); } catch (RuntimeException e) { err.setText("Nothing to share with"); }
+            });
+        }, "cloud-invite").start());
     }
 
     private void signOutCloud() {

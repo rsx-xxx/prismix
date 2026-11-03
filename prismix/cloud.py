@@ -1,7 +1,7 @@
 """Band cloud client: sign in with an invite link, publish processed songs, read the committed library.
 
-The cloud is a private store. Every invite link lets its holder play and publish; removing a song stays with the
-cloud's admin. Songs stay invisible until their commit. This module holds the credential in the user data folder,
+The cloud is a private store. Every invite link lets its holder play and publish, and anyone signed in can issue
+more of them; removing a song stays with the cloud's admin. Songs stay invisible until their commit. This module holds the credential in the user data folder,
 talks to the API with it, and proxies reads so the desktop page never needs the token.
 """
 from __future__ import annotations
@@ -116,7 +116,7 @@ class Cloud:
         if r.status_code == 403:
             raise CloudError("Only the cloud admin can do that", 403)
         if r.status_code == 429:
-            raise CloudError("Too many failed attempts, try again in a few minutes", 429)
+            raise CloudError("Too many requests, try again in a few minutes", 429)
         return r
 
     def index(self) -> list[dict]:
@@ -160,6 +160,15 @@ class Cloud:
         if r.status_code != 200:
             raise CloudError(f"The cloud could not save the playlists ({r.status_code})", 502)
         return True
+
+    def invite(self, label: str = "") -> str:
+        """A fresh member link for somebody else; any signed-in user may ask for one."""
+        r = self.request("POST", "/api/v1/members", json={"label": label})
+        if r.status_code in (400, 404, 405):
+            raise CloudError("This cloud cannot issue invites yet", 501)
+        if r.status_code != 200:
+            raise CloudError(f"The cloud could not issue an invite ({r.status_code})", 502)
+        return r.json()["link"]
 
     def commit(self, song_id: str, body: dict) -> dict:
         r = self.request("POST", f"/api/v1/songs/{song_id}/commit", json=body)

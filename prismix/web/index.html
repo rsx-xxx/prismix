@@ -413,6 +413,9 @@
     </form>
     <div id="cloud-signed" class="band-pane" hidden>
       <p>Signed in to <b id="cloud-who"></b>.</p>
+      <label class="band-row">Invite someone <input id="cloud-invite-label" maxlength="32" placeholder="Name (optional)" spellcheck="false" autocomplete="off"></label>
+      <button class="btn" id="cloud-invite" type="button">Copy a member link</button>
+      <p id="cloud-invite-msg" class="muted" role="status"></p>
       <button class="btn ghost" id="cloud-out" type="button">Sign out</button>
     </div>
   </dialog>

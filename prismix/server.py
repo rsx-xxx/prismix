@@ -190,6 +190,10 @@ class CloudLogin(BaseModel):
     link: str = Field(max_length=2000)
 
 
+class CloudInvite(BaseModel):
+    label: str = Field(default="", max_length=32)
+
+
 class CloudPublish(BaseModel):
     video_id: str = Field(alias="videoId")
     model: str
@@ -405,6 +409,14 @@ def create_app() -> FastAPI:
         except cloud.CloudError as e:
             raise HTTPException(e.status, str(e)) from None
         return cloud_status(request)
+
+    @app.post("/api/cloud/invite")
+    def cloud_invite(body: CloudInvite, request: Request):
+        cl = cloud_for(request)
+        try:
+            return {"link": cl.invite(body.label)}
+        except cloud.CloudError as e:
+            raise HTTPException(e.status, str(e)) from None
 
     @app.get("/api/cloud/playlists/status")
     async def cloud_playlists_status():

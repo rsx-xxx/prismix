@@ -1,0 +1,120 @@
+{
+	admin off
+	servers {
+		protocols h1 h2
+	}
+}
+
+(media_types) {
+	@opus path *.opus
+	header @opus Content-Type "audio/ogg;codecs=opus"
+	@m4a path *.m4a
+	header @m4a Content-Type "audio/mp4"
+	@mp3 path *.mp3
+	header @mp3 Content-Type "audio/mpeg"
+	@flac path *.flac
+	header @flac Content-Type "audio/flac"
+	@json path *.json
+	header @json Content-Type "application/json"
+	@txt path *.txt
+	header @txt Content-Type "text/plain; charset=utf-8"
+	@jpg path *.jpg
+	header @jpg Content-Type "image/jpeg"
+	@png path *.png
+	header @png Content-Type "image/png"
+}
+
+band.deltaclans.win {
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Cross-Origin-Opener-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+		X-Robots-Tag "noindex, nofollow"
+	}
+
+	request_body {
+		max_size 300MB
+	}
+
+	# Reject a declared oversize body before any bytes are proxied.
+	@too_large expression `{http.request.header.Content-Length}.size() > 0 && int({http.request.header.Content-Length}) > 314572800`
+	handle @too_large {
+		header Connection close
+		respond `{"error":"file too large"}` 413
+	}
+
+	@open path /healthz /join
+	handle @open {
+		reverse_proxy 127.0.0.1:8787
+	}
+
+	handle {
+		route {
+			forward_auth 127.0.0.1:8787 {
+				uri /_auth
+				copy_headers X-Band-User X-Band-Role
+			}
+
+			@backend method PUT POST DELETE
+			@bundle path_regexp bundle ^/api/v1/songs/[A-Za-z0-9_-]{11}/bundle\.zip$
+			@index path /api/v1/index.json
+			@playlists path /api/v1/playlists.json
+			@manifest path_regexp manifest ^/api/v1/songs/([A-Za-z0-9_-]{11})/manifest\.json$
+			@files path_regexp files ^/files/([A-Za-z0-9_-]{11}/.+)$
+
+			handle @backend {
+				reverse_proxy 127.0.0.1:8787 {
+					flush_interval -1
+				}
+			}
+			handle @bundle {
+				reverse_proxy 127.0.0.1:8787 {
+					flush_interval -1
+				}
+			}
+			handle @playlists {
+				reverse_proxy 127.0.0.1:8787
+			}
+			handle @index {
+				header Cache-Control "private, no-cache"
+				header Content-Type "application/json"
+				rewrite * /index.json
+				root * /srv/data
+				file_server
+			}
+			handle @manifest {
+				header Cache-Control "private, no-cache"
+				header Content-Type "application/json"
+				rewrite * /songs/{re.manifest.1}/manifest.json
+				root * /srv/data
+				file_server
+			}
+			handle @files {
+				import media_types
+				# Clients that append ?v=<sha256> get an immutable cache entry; plain
+				# URLs revalidate with the ETag, since a new rev may reuse a path.
+				@versioned query v=*
+				@unversioned not query v=*
+				header @versioned Cache-Control "private, max-age=31536000, immutable"
+				header @unversioned Cache-Control "private, no-cache"
+				rewrite * /songs/{re.files.1}
+				root * /srv/data
+				file_server {
+					hide .*
+				}
+			}
+			handle {
+				header Cache-Control "private, no-cache"
+				root * /srv/web
+				file_server {
+					hide .*
+				}
+			}
+		}
+	}
+}
