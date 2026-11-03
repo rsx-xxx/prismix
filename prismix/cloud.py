@@ -259,7 +259,7 @@ def download(cloud: Cloud, song_id: str, progress=lambda step, done, total: None
         (tmp / "info.json").write_text(json.dumps(info, ensure_ascii=False))
         if setup := library.clean_setup(manifest.get("setup")):
             (tmp / "setup.json").write_text(json.dumps(setup))
-        (mdir / "meta.json").write_text(json.dumps({**info, "model": model, "sampleRate": SAMPLE_RATE, "stems": entries}, ensure_ascii=False))
+        (mdir / "meta.json").write_text(json.dumps({**info, "model": model, "quality": manifest.get("quality"), "sampleRate": SAMPLE_RATE, "stems": entries}, ensure_ascii=False))
         final = library.video_dir(song_id)
         if final.exists():  # the song is already here under another model: keep what it has, add this model
             for item in tmp.iterdir():
@@ -338,6 +338,7 @@ def publish(cloud: Cloud, video_id: str, model: str, progress=lambda step, done,
         "artist": found.get("artist") or info.get("channel", ""),
         "duration": float(info.get("duration") or 0),
         "model": model,
+        "quality": meta.get("quality"),
         "stems": [s["name"] for s in meta.get("stems", [])] if len(meta.get("stems", [])) > 1 else [],
         "files": files,
         "setup": library.read_setup(video_id),
@@ -354,7 +355,7 @@ def push_setup(video_id: str, setup: dict) -> bool:
         manifest = cloud.manifest(video_id)
         if not manifest:
             return False
-        keep = ("id", "title", "artist", "duration", "model", "stems", "files")
+        keep = ("id", "title", "artist", "duration", "model", "quality", "stems", "files")
         cloud.commit(video_id, {**{k: manifest[k] for k in keep if k in manifest}, "setup": setup})
         return True
     except (CloudError, httpx.HTTPError):

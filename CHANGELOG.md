@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.57.0
+
+Songs now show the quality their stems were split at: a highlighted "★ Max" mark on the library card for Max, and a plain Fast, Standard or High mark for the rest. The band cloud upload button says whether the stems it sends are Max, and the quality is saved with the cloud copy.
+
 ## 0.56.1
 
 Updating now always goes straight to the newest release. When the Homebrew tap lags behind (or several releases shipped in a row), the app installs the release itself instead of stopping at the next version in line, and the tap updates no longer run in parallel.

@@ -88,7 +88,9 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
     const song = state.songs.find((x) => x.id === id);
     const kind = !local ? 'get' : has ? 'on' : 'up';
     const b = el('button', { className: `pub ${kind}`, type: 'button', innerHTML: ICON_CLOUD(kind === 'up' ? 'up' : kind === 'get' ? 'down' : '', kind === 'on') });
-    b.title = b.ariaLabel = kind === 'on' ? `In ${state.band.name}, click to delete it from there` : kind === 'up' ? `Upload to ${state.band.name}` : 'Download into your library';
+    const qn = local?.item?.quality?.[local.model];
+    const qs = qn === 'max' ? ' (Max quality stems)' : qn ? ` (stems at ${qn} quality, not Max)` : '';
+    b.title = b.ariaLabel = kind === 'on' ? `In ${state.band.name}, click to delete it from there` : kind === 'up' ? `Upload to ${state.band.name}${qs}` : 'Download into your library';
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       if (kind === 'up') publish(local.item, local.model, b);

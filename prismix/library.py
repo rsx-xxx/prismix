@@ -181,10 +181,12 @@ def list_library() -> list[dict]:
         info = read_info(d.name)
         if not info:
             continue
-        models = [m for m in MODELS if read_meta(d.name, m)]
-        if models:
+        metas = {m: meta for m in MODELS if (meta := read_meta(d.name, m))}
+        if metas:
+            models = list(metas)
             analyzed = models if (d / "structure.json").is_file() else []
-            items.append({**info, "models": models, "analyzed": analyzed, "tabs": tab_kinds(d.name)})
+            qualities = {m: meta["quality"] for m, meta in metas.items() if meta.get("quality")}
+            items.append({**info, "models": models, "analyzed": analyzed, "tabs": tab_kinds(d.name), "quality": qualities})
     items.sort(key=lambda i: i.get("added", 0), reverse=True)
     return items
 

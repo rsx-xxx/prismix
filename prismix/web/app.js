@@ -460,7 +460,7 @@ function renderLibrary() {
       el('div', { className: 'meta' },
         el('div', { className: 'title', textContent: it.title }),
         el('div', { className: 'sub', textContent: it.channel }),
-        el('div', { className: 'badges' }, ...it.models.map((m) => el('span', { className: 'badge', textContent: modelLabel(m) })), ...[instrumentMarks(it.tabs)].filter(Boolean))));
+        el('div', { className: 'badges' }, ...it.models.flatMap((m) => [el('span', { className: 'badge', textContent: modelLabel(m) }), qualityBadge(it.quality?.[m])].filter(Boolean)), ...[instrumentMarks(it.tabs)].filter(Boolean))));
     const del = el('button', { className: 'del', type: 'button', innerHTML: ICON.trash, title: 'Remove from library', ariaLabel: 'Remove from library' });
     del.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -499,6 +499,11 @@ function dragSong(card, id) {
   card.addEventListener('dragend', () => { card.classList.remove('lifted'); document.body.classList.remove('song-drag'); });
 }
 
+/** Which quality a stem set was split at: Max gets an accent mark, the lower levels a plain one, so nothing below Max passes for it. */
+const QUALITY_LABEL = { fast: 'Fast', standard: 'Standard', high: 'High', max: 'Max' };
+const qualityBadge = (q) => q && QUALITY_LABEL[q]
+  ? el('span', { className: `badge q-${q}`, textContent: q === 'max' ? '★ Max' : QUALITY_LABEL[q], title: q === 'max' ? 'Split at Max quality: the cleanest stems' : `Split at ${QUALITY_LABEL[q]} quality. Reprocess in Settings for Max.` })
+  : null;
 const modelLabel = (id) => state.models.find((m) => m.id === id)?.label || id;
 
 // ── router ──
