@@ -24,6 +24,7 @@ PAGE = "https://www.songsterr.com/a/wsa/x-chords-s{id}"
 UA = "Mozilla/5.0 (compatible; prismix)"
 MIN_TITLE_MATCH = 0.55
 MIN_SIMILARITY = 0.35
+MIN_ARTIST_TITLE_ONLY = 0.6  # a title-only search is trusted only when the artist still fits
 MASH_REACH = 2
 
 _ROOTS = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
@@ -95,22 +96,32 @@ def guess_query(info: dict) -> list[tuple[str, str]]:
     return [(_norm(a), _norm(t)) for a, t in out if _norm(t)]
 
 
+def main_artist(artist: str) -> str:
+    """'depeche mode feat mike shinoda' -> 'depeche mode': the sheet is filed under the lead artist only."""
+    return re.split(r"\s+(?:feat|ft|featuring)\s+", artist, maxsplit=1)[0].strip()
+
+
 def find_song(info: dict) -> dict:
     best, best_score = None, 0.0
-    for artist, title in guess_query(info):
-        url = f"{SEARCH}?{urllib.parse.urlencode({'pattern': f'{artist} {title}'.strip(), 'size': 8})}"
-        try:
-            songs = json.loads(_get(url))
-        except ValueError:
-            continue
-        for s in songs:
-            if not s.get("hasChords"):
+    for guess, title in guess_query(info):
+        artist = main_artist(guess)
+        # the full name first; then the title alone, for when the artist is credited differently on Songsterr
+        for pattern, min_artist in ((f"{artist} {title}".strip(), 0.0), (title, MIN_ARTIST_TITLE_ONLY if artist else 0.0)):
+            url = f"{SEARCH}?{urllib.parse.urlencode({'pattern': pattern, 'size': 8})}"
+            try:
+                songs = json.loads(_get(url))
+            except ValueError:
                 continue
-            t = SequenceMatcher(None, _norm(s["title"]), title).ratio()
-            a = SequenceMatcher(None, _norm(s["artist"]), artist).ratio() if artist else 0.5
-            score = t * 0.7 + a * 0.3
-            if t >= MIN_TITLE_MATCH and score > best_score:
-                best, best_score = s, score
+            for s in songs:
+                if not s.get("hasChords"):
+                    continue
+                t = SequenceMatcher(None, _norm(s["title"]), title).ratio()
+                a = SequenceMatcher(None, main_artist(_norm(s["artist"])), artist).ratio() if artist else 0.5
+                score = t * 0.7 + a * 0.3
+                if t >= MIN_TITLE_MATCH and a >= min_artist and score > best_score:
+                    best, best_score = s, score
+            if best:
+                break
     if not best:
         raise TabsError("No chord sheet found on Songsterr for this title")
     return best

@@ -40,3 +40,18 @@ def test_align_flags_differences_and_rejects_other_songs():
 def test_guess_query():
     q = tabs.guess_query({"title": "Nirvana - Come As You Are (Official Video)", "channel": "x"})
     assert q[0] == ("nirvana", "come as you are")
+
+
+def test_find_song_drops_the_featured_artist_and_falls_back_to_the_title(monkeypatch):
+    seen = []
+
+    def fake_get(url, timeout=15):
+        seen.append(url)
+        if "depeche" in url:  # the full credit finds only tabs without chords
+            return '[{"songId": 1, "artist": "Depeche Mode", "title": "Enjoy The Silence (feat. Mike Shinoda)", "hasChords": false}]'
+        return '[{"songId": 2, "artist": "Depeche Mode", "title": "Enjoy The Silence", "hasChords": true}, {"songId": 3, "artist": "Anberlin", "title": "Enjoy The Silence", "hasChords": true}]'
+
+    monkeypatch.setattr(tabs, "_get", fake_get)
+    info = {"title": "Depeche Mode Feat. Mike Shinoda - Enjoy the Silence", "channel": "x"}
+    assert tabs.find_song(info)["songId"] == 2
+    assert tabs.main_artist("depeche mode feat mike shinoda") == "depeche mode"

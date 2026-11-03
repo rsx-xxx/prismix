@@ -108,7 +108,10 @@ export function createScore({ player, api, notice, onSetup }) {
       cur.tabs = t;
       applyTabs();
       renderAll();
-    } catch { /* no chord sheet online: the detected chords stay */ }
+    } catch {
+      /* no chord sheet online: the detected chords stay, and the header says so */
+      if (cur && cur.id === id) { cur.noSheet = true; renderAll(); }
+    }
   }
 
   window.addEventListener('accidentals', () => { if (cur?.data) renderAll(); });
@@ -403,7 +406,7 @@ export function createScore({ player, api, notice, onSetup }) {
       const site = src.source === 'soundslice' ? 'Soundslice' : 'Songsterr';
       $('sc-meta').append(el('a', { className: 'pill', href: src.url, target: '_blank', rel: 'noopener', title: 'The chord sheet these chords are matched to', textContent: `Chords: ${[src.artist, src.title].filter(Boolean).join(' - ') || site} · ${site} ↗` }));
     } else {
-      $('sc-meta').append(el('span', { className: 'pill', title: 'Worked out from the recording by the app, check it by ear', textContent: 'Chords: detected from the audio' }));
+      $('sc-meta').append(el('span', { className: 'pill', title: 'Worked out from the recording by the app, check it by ear', textContent: cur.noSheet ? 'Chords: detected from the audio · no online sheet found' : 'Chords: detected from the audio' }));
     }
     renderChart(body);
   }

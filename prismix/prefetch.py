@@ -11,7 +11,7 @@ import time
 
 import httpx
 
-from . import analysis, cloud, export, library, lyrics, tabdata
+from . import analysis, cloud, export, library, lyrics, tabdata, tabs
 from .jobs import JobManager
 
 log = logging.getLogger(__name__)
@@ -20,8 +20,8 @@ RETRY_AFTER = 24 * 3600  # a step that found nothing (no lyrics published, no ta
 # the attempt is written beside the song so a restart of the app does not start the same work over
 IDLE_SCAN = 20  # seconds between looks at the library while nothing is missing
 
-STEPS = ("chords", "lyrics", "tabs")
-SCHEMAS = {"chords": ("structure", analysis.SCHEMA), "lyrics": ("lyrics", lyrics.SCHEMA), "tabs": ("tabs", tabdata.FORMAT)}  # step: (stage in info.json, current schema)
+STEPS = ("chords", "lyrics", "tabs", "sheet")
+SCHEMAS = {"chords": ("structure", analysis.SCHEMA), "lyrics": ("lyrics", lyrics.SCHEMA), "tabs": ("tabs", tabdata.FORMAT), "sheet": ("sheet", 1)}  # step: (stage in info.json, current schema)
 
 
 def _marker(video_id: str):
@@ -61,6 +61,8 @@ def missing(video_id: str) -> list[str]:
         out.append("lyrics")
     if tabdata.read(video_id) is None or tabdata.outdated(video_id):
         out.append("tabs")
+    if tabs.read(video_id) is None:  # the online chord sheet, matched to the detected chords
+        out.append("sheet")
     return out
 
 
@@ -169,3 +171,7 @@ class Prefetcher:
             if analysis.read_structure(vid) is None:
                 raise RuntimeError("chords are not ready")  # retried after RETRY_AFTER, or on the next start
             await loop.run_in_executor(None, tabdata.lookup, vid)
+        elif step == "sheet":
+            if analysis.read_structure(vid) is None:
+                raise RuntimeError("chords are not ready")
+            await loop.run_in_executor(None, tabs.lookup, vid, None)

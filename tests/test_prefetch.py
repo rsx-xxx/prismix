@@ -2,7 +2,7 @@ import json
 
 from fastapi.testclient import TestClient
 
-from prismix import analysis, library, lyrics, prefetch, server, tabdata
+from prismix import analysis, library, lyrics, prefetch, server, tabdata, tabs
 
 
 def _song(tmp_path, monkeypatch, vid="abcdefghijk"):
@@ -14,13 +14,14 @@ def _song(tmp_path, monkeypatch, vid="abcdefghijk"):
 
 
 def test_missing_lists_everything_for_a_bare_song(tmp_path, monkeypatch):
-    assert prefetch.missing(_song(tmp_path, monkeypatch)) == ["chords", "lyrics", "tabs"]
+    assert prefetch.missing(_song(tmp_path, monkeypatch)) == ["chords", "lyrics", "tabs", "sheet"]
 
 
 def test_missing_skips_what_is_cached(tmp_path, monkeypatch):
     vid = _song(tmp_path, monkeypatch)
     monkeypatch.setattr(analysis, "read_structure", lambda v: {"version": analysis.SCHEMA})
     monkeypatch.setattr(tabdata, "read", lambda v: {"found": False})
+    monkeypatch.setattr(tabs, "read", lambda v: {"marks": []})
     (library.video_dir(vid) / "lyrics.json").write_text(json.dumps({"version": lyrics.SCHEMA}))
     assert prefetch.missing(vid) == []
 
@@ -63,6 +64,7 @@ def test_outdated_tab_is_missing_again(tmp_path, monkeypatch):
     (library.video_dir(vid) / "lyrics.json").write_text(json.dumps({"version": lyrics.SCHEMA}))
     tab = {"found": True, "source": "songsterr", "v": tabdata.FORMAT - 1, "tracks": {}}
     monkeypatch.setattr(tabdata, "_raw", lambda v: dict(tab))
+    monkeypatch.setattr(tabs, "read", lambda v: {"marks": []})
     assert prefetch.missing(vid) == ["tabs"]
     tab["source"] = "file"
     assert prefetch.missing(vid) == []

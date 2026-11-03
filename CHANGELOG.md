@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.58.0
+
+Max quality is now a ★ in front of the stems label on a library card instead of a separate badge for every stem set. Online chord sheets are looked up much more reliably: a "feat." credit no longer hides the song, a title-only search is tried when the artist is credited differently, and sheets are fetched in the background for every song, not only when you open it. When no sheet exists, the chords header now says "detected from the audio · no online sheet found". Most Russian-language songs have no sheet on Songsterr, so they still use detected chords.
+
 ## 0.57.0
 
 Songs now show the quality their stems were split at: a highlighted "★ Max" mark on the library card for Max, and a plain Fast, Standard or High mark for the rest. The band cloud upload button says whether the stems it sends are Max, and the quality is saved with the cloud copy.
