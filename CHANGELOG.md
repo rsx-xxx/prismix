@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.51.1
+
+The build of 0.51.0 stopped on a code style check, so it was never published; this release carries everything from 0.51.0 (Reprocess all, the playlist cloud button, the collapsed quality details).
+
 ## 0.51.0
 
 Settings has a "Reprocess all" button that splits every song in your library again at Max quality (songs already at Max are skipped; it shows the total time first and queues the work). The quality levels and file size details now sit in a collapsed block. Playlists get a cloud button: it uploads the songs of the playlist that the band cloud lacks, and once all of them are there the playlist says so. The playlist list itself reaches the phone only when the cloud server can store playlists; until then the chip says "Songs in the cloud".

@@ -542,9 +542,9 @@ def process(video_id: str, model_name: str, report: Report, *, analyse: bool = T
     `redo` splits an already processed song again at that quality; a song already made at it stays as it is."""
     if model_name not in MODELS:
         raise PipelineError("Unknown model")
-    if meta := library.read_meta(video_id, model_name):
-        if not redo or meta.get("quality") == redo.id:
-            return meta
+    meta = library.read_meta(video_id, model_name)
+    if meta and (not redo or meta.get("quality") == redo.id):
+        return meta
 
     info = download(video_id, report)
 
