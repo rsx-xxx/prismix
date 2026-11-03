@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.51.2
+
+The "Reprocess all" button moved into the collapsed "Levels and file size" block in Settings, so the quality section stays short.
+
 ## 0.51.1
 
 The build of 0.51.0 stopped on a code style check, so it was never published; this release carries everything from 0.51.0 (Reprocess all, the playlist cloud button, the collapsed quality details).

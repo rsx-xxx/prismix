@@ -1271,3 +1271,4 @@ img.cv.none { opacity: 0; }
 .pl-up { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text); cursor: pointer; }
 .pl-up:hover { border-color: var(--accent); color: var(--accent); }
 .pl-up:disabled { opacity: .6; cursor: default; }
+.q-all { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
