@@ -212,8 +212,9 @@ struct PlayerView: UIViewRepresentable {
         cfg.mediaTypesRequiringUserActionForPlayback = []
         cfg.allowsAirPlayForMediaPlayback = true
         let name = UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
+        let version = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? ""
         let js = """
-        window.PrismixShell = { deviceName: () => '\(name)', tap: () => webkit.messageHandlers.prismix.postMessage('tap'),
+        window.PrismixShell = { deviceName: () => '\(name)', appVersion: () => '\(version)', tap: () => webkit.messageHandlers.prismix.postMessage('tap'),
           switchHost: () => webkit.messageHandlers.prismix.postMessage('switch'), setBars: () => {} };
         document.documentElement.dataset.platform = '\(name == "iPad" ? "ipad" : "ios")';
         """

@@ -37,6 +37,10 @@ const el = (tag, props = {}, ...kids) => {
   return n;
 };
 const droid = window.PrismixShell || window.Android; // bridge from the native shell (Android or iOS), absent in a plain browser
+{
+  const v = String(droid?.appVersion?.() || '');
+  if (v) { $('app-ver').textContent = v; $('app-ver-row').hidden = false; }
+}
 
 function floorIndex(arr, x) {
   let lo = 0, hi = arr.length - 1, r = -1;

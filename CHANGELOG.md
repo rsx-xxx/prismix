@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.56.0
+
+The app version now shows under "This device" in the phone's Controls sheet, on both Android and iOS. It is read from the installed app, so it always matches the build you are running.
+
 ## 0.55.0
 
 The phone no longer has a Delete button inside a playlist; playlists are deleted on the desktop app. The back button in a playlist is now just an arrow, without the word "Playlists".

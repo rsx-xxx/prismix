@@ -371,6 +371,9 @@ public class Main extends Activity {
         private final Main m;
         Bridge(Main m) { this.m = m; }
         @JavascriptInterface public String deviceName() { return Build.MODEL == null ? "" : Build.MODEL; }
+        @JavascriptInterface public String appVersion() {
+            try { return m.getPackageManager().getPackageInfo(m.getPackageName(), 0).versionName; } catch (Exception e) { return ""; }
+        }
         @JavascriptInterface public void setBars(final String bg, final boolean darkIcons) {
             m.ui.post(() -> { try { m.bars(bg, darkIcons); m.web.setBackgroundColor(Color.parseColor(bg)); } catch (RuntimeException e) { /* bad colour */ } });
         }
