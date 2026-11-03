@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.52.0
+
+The split settings moved out of the top bar into a popup that opens when you press Split: what to prepare (stems and chords, stems only, chords only), the number of stems and the quality level with its size details. Settings now holds just "Reprocess all", and the button shows exactly how many songs are below Max.
+
 ## 0.51.3
 
 Playlists on the phone now fit any screen width: the header buttons and the song rows wrap and shrink instead of running off the edge.

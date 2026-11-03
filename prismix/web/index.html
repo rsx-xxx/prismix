@@ -33,8 +33,6 @@
     <form id="omni" class="omni" autocomplete="off">
       <svg class="omni-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <input id="q" type="text" placeholder="Paste a YouTube or Spotify link, or search for a song" data-short="Link or song" aria-label="YouTube or Spotify link, or search" spellcheck="false" enterkeyhint="go">
-      <select id="task" aria-label="What to do" title="What to prepare"><option value="all">Stems + chords</option><option value="stems">Stems only</option><option value="chords">Chords only</option></select>
-      <select id="quality" aria-label="Separation quality"></select>
       <button class="btn primary" type="submit" data-ico="split">Split</button>
     </form>
     <button class="btn ghost" id="up-btn" type="button" data-ico="upload" title="Upload an audio or video file from this computer">Upload</button>
@@ -419,6 +417,18 @@
     </div>
   </dialog>
 
+  <dialog id="split-dlg" class="split-dlg" aria-label="Split options">
+    <div class="pl-head"><h3>Split options</h3><button class="icon-btn" id="split-close" type="button" aria-label="Close">×</button></div>
+    <p class="muted" id="split-what"></p>
+    <div class="set-row"><span>What to prepare</span><select id="task" aria-label="What to do" title="What to prepare"><option value="all">Stems + chords</option><option value="stems">Stems only</option><option value="chords">Chords only</option></select></div>
+    <div id="split-stems">
+      <div class="set-row"><span title="How many parts the song is split into">Stems</span><select id="quality" aria-label="Number of stems"></select></div>
+      <div class="set-row"><span title="How thoroughly stems are separated. Higher is cleaner but slower; file size stays the same">Quality</span><div class="q-box"><select id="q-sel" aria-label="Stem quality"></select><small class="muted" id="q-est"></small></div></div>
+      <details class="q-detail" id="q-detail" hidden><summary>Levels and file size</summary><ul id="q-levels"></ul><p class="muted" id="q-hint"></p><p class="muted" id="q-facts"></p></details>
+    </div>
+    <div class="dlg-actions"><button class="btn ghost" id="split-cancel" type="button">Cancel</button><button class="btn primary" id="split-go" type="button" data-ico="split">Split</button></div>
+  </dialog>
+
   <dialog id="getapp">
     <div class="pl-head"><h3>Install on a phone or tablet</h3><button class="icon-btn" id="getapp-close" type="button" aria-label="Close">×</button></div>
     <p class="muted">Scan with the phone's camera. Android gets the app file, iPhone and iPad get the free install through AltStore or SideStore. One code works for both.</p>
@@ -493,9 +503,7 @@
   <div id="settings" class="pop" hidden>
     <div class="pl-head"><h3>Settings</h3><button class="icon-btn" id="settings-close" type="button" aria-label="Close">×</button></div>
     <div class="set-row"><span>Notes</span><select id="acc-sel" aria-label="Flats or sharps"><option value="auto">Auto (by key)</option><option value="flat">Flats ♭</option><option value="sharp">Sharps ♯</option></select></div>
-    <div class="set-row"><span title="How thoroughly stems are separated. Higher is cleaner but slower; file size stays the same">Stem quality</span><div class="q-box"><select id="q-sel" aria-label="Stem quality"></select><small class="muted" id="q-est"></small></div></div>
-    <details class="q-detail" id="q-detail" hidden><summary>Levels and file size</summary><ul id="q-levels"></ul><p class="muted" id="q-hint"></p><p class="muted" id="q-facts"></p>
-      <div class="q-all"><button class="btn small ghost" id="q-all" type="button" title="Splits every song in your library again at Max quality. Songs already made at it are skipped">Reprocess all at Max…</button><small class="muted" id="q-all-note"></small></div></details>
+    <div class="set-row"><span title="Splits every song in your library again at Max quality. Songs already made at it are skipped">Stem quality</span><div class="q-box"><button class="btn small ghost" id="q-all" type="button">Reprocess all at Max…</button><small class="muted" id="q-all-note"></small></div></div>
     <div class="set-row"><span>Theme</span><button class="icon-btn" id="theme-btn" type="button" aria-label="Theme"></button></div>
     <div class="set-row"><span>Keyboard shortcuts</span><button class="btn small ghost" id="help-btn" type="button">Show</button></div>
     <div class="set-row"><span title="Guitar Pro, MusicXML or MIDI files you already have; matched to your songs by name and checked against the audio">Tab files</span><button class="btn small ghost" id="tabfolder-btn" type="button">Pick a folder…</button></div>

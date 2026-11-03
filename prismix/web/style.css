@@ -1272,3 +1272,10 @@ img.cv.none { opacity: 0; }
 .pl-up:hover { border-color: var(--accent); color: var(--accent); }
 .pl-up:disabled { opacity: .6; cursor: default; }
 .q-all { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+
+/* Split options popup */
+.split-dlg { width: min(420px, calc(100vw - 32px)); }
+.split-dlg #split-what { margin: 6px 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.split-dlg .set-row:first-of-type { border-top: 1px solid var(--line); }
+.split-dlg .dlg-actions { margin-top: 14px; }
+.split-dlg select { max-width: 60%; }

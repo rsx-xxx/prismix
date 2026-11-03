@@ -126,8 +126,22 @@ function notice(msg, kind = 'error') {
   if (msg && kind !== 'error') noticeTimer = setTimeout(() => { n.hidden = true; }, 5000);
 }
 
+// ── split options popup: what to prepare, how many stems, quality ──
+const splitDlg = $('split-dlg');
+let splitRun = null;
+function askSplit(what, run) {
+  splitRun = run;
+  $('split-what').textContent = what;
+  syncTask();
+  splitDlg.showModal();
+  loadQuality();
+}
+$('split-go').addEventListener('click', () => { const run = splitRun; splitRun = null; splitDlg.close(); if (run) run(); });
+for (const id of ['split-close', 'split-cancel']) $(id).addEventListener('click', () => { splitRun = null; splitDlg.close(); });
+
 // ── omnibox ──
-$('task').addEventListener('change', () => { $('quality').hidden = $('task').value === 'chords'; try { localStorage.setItem('stems:task', $('task').value); } catch { /* ignore */ } });
+const syncTask = () => { $('split-stems').hidden = $('task').value === 'chords'; };
+$('task').addEventListener('change', () => { syncTask(); try { localStorage.setItem('stems:task', $('task').value); } catch { /* ignore */ } });
 $('omni').addEventListener('submit', async (e) => {
   e.preventDefault();
   const text = $('q').value.trim();
@@ -141,7 +155,7 @@ $('omni').addEventListener('submit', async (e) => {
   } else if (/^(https?:\/\/|www\.|(m\.|music\.)?youtu|spotify:)/i.test(text) || /^[\w-]{11}$/.test(text)) {
     $('results').hidden = true;
     hidePreview();
-    await startProcess(text, $('quality').value);
+    askSplit(text, () => startProcess(text, $('quality').value));
   } else {
     await runSearch(text);
   }
@@ -159,7 +173,10 @@ function resultRow(it, box) {
   const row = el('div', { className: 'result' }, pic, info, go);
   pic.addEventListener('click', () => showPreview(it, true));
   info.addEventListener('click', () => showPreview(it, true));
-  go.addEventListener('click', () => { box.hidden = true; hidePreview(); startProcess(it.id, $('quality').value); });
+  go.addEventListener('click', () => {
+    const run = () => { box.hidden = true; hidePreview(); startProcess(it.id, $('quality').value); };
+    if (inLibrary(it.id)) run(); else askSplit(it.title, run);
+  });
   return row;
 }
 
@@ -233,7 +250,10 @@ function showPreview(it, autoplay) {
   $('pv-sub').textContent = it.channel ? `${it.channel}${it.duration ? ' · ' + fmt(it.duration) : ''}` : '';
   const split = $('pv-split');
   split.textContent = inLibrary(it.id) ? 'Open in studio' : 'Split into stems';
-  split.onclick = () => { hidePreview(); $('results').hidden = true; startProcess(it.id, $('quality').value); };
+  split.onclick = () => {
+    const run = () => { hidePreview(); $('results').hidden = true; startProcess(it.id, $('quality').value); };
+    if (inLibrary(it.id)) run(); else askSplit(it.title, run);
+  };
   $('preview').hidden = false;
 }
 
@@ -304,7 +324,7 @@ function showUploadPreview(it) {
   $('pv-sub').textContent = `${it.channel}${it.duration ? ' · ' + fmt(it.duration) : ''}`;
   const split = $('pv-split');
   split.textContent = 'Split into stems';
-  split.onclick = () => { hidePreview(); startProcess(it.id, $('quality').value); };
+  split.onclick = () => askSplit(it.title, () => { hidePreview(); startProcess(it.id, $('quality').value); });
   $('preview').hidden = false;
 }
 
@@ -1526,7 +1546,7 @@ window.addEventListener('keydown', (e) => {
   const tag = e.target.tagName;
   if (tag === 'INPUT' && e.target.type === 'text') return;
   if (tag === 'SELECT' || tag === 'TEXTAREA') return;
-  if ($('export').open) return;
+  if ($('export').open || $('split-dlg').open) return;
   if (e.key === '?') { cheats.toggle(); return; }
   dispatch(e);
 });
@@ -1605,9 +1625,20 @@ async function loadQuality() {
     $('q-facts').textContent = `${q.format}: ${q.stems} stems × ~${q.stemMB} MB/min, the same size at every level. Higher levels average more shifted passes, which cancels bleed between stems and seams between windows, so only the time grows.`;
   } catch (err) { $('q-est').textContent = err.message; }
 }
+const reprocessCall = (dryRun) => api('/api/library/reprocess', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quality: 'max', dryRun }) });
+/** Shows how many songs are below Max, so the button says exactly what it will do. */
+async function countReprocess() {
+  const btn = $('q-all');
+  try {
+    const plan = await reprocessCall(true);
+    btn.textContent = plan.songs ? `Reprocess ${plan.songs} song${plan.songs > 1 ? 's' : ''} at Max…` : 'Reprocess all at Max…';
+    btn.disabled = !plan.songs;
+    $('q-all-note').textContent = plan.songs ? `About ${fmtDur(plan.seconds)} in total` : 'Every song is already at Max';
+  } catch (err) { $('q-all-note').textContent = err.message; }
+}
 $('q-all').addEventListener('click', async () => {
   const note = $('q-all-note');
-  const call = (dryRun) => api('/api/library/reprocess', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quality: 'max', dryRun }) });
+  const call = reprocessCall;
   try {
     const plan = await call(true);
     if (!plan.songs) { note.textContent = 'Every song is already at Max'; return; }
@@ -1615,12 +1646,13 @@ $('q-all').addEventListener('click', async () => {
     await call(false);
     note.textContent = `${plan.songs} queued, see the queue`;
     queue.refresh();
+    countReprocess();
   } catch (err) { note.textContent = err.message; }
 });
 const putQuality = () => api('/api/quality', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quality: $('q-sel').value }) }).catch((err) => notice(err.message));
 $('q-sel').addEventListener('change', putQuality);
-$('settings-btn').addEventListener('click', () => { if (!settingsPanel.hidden) loadQuality(); });
-$('quality').addEventListener('change', () => { if (!settingsPanel.hidden) loadQuality(); });
+$('settings-btn').addEventListener('click', () => { if (!settingsPanel.hidden) countReprocess(); });
+$('quality').addEventListener('change', () => { if (splitDlg.open) loadQuality(); });
 window.addEventListener('beforeunload', savePrefs);
 
 // ── boot ──
@@ -1629,7 +1661,7 @@ window.addEventListener('beforeunload', savePrefs);
     const m = await api('/api/models');
     state.models = m.models;
     try { $('task').value = localStorage.getItem('stems:task') || 'all'; } catch { /* ignore */ }
-    $('quality').hidden = $('task').value === 'chords';
+    syncTask();
     state.defaultModel = m.default;
     $('quality').replaceChildren(...m.models.filter((x) => x.id !== 'mix' && !x.legacy).map((x) => el('option', { value: x.id, textContent: x.label, title: x.hint, selected: x.id === m.default })));
   } catch (err) {
