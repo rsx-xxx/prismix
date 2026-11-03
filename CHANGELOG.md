@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.51.0
+
+Settings has a "Reprocess all" button that splits every song in your library again at Max quality (songs already at Max are skipped; it shows the total time first and queues the work). The quality levels and file size details now sit in a collapsed block. Playlists get a cloud button: it uploads the songs of the playlist that the band cloud lacks, and once all of them are there the playlist says so. The playlist list itself reaches the phone only when the cloud server can store playlists; until then the chip says "Songs in the cloud".
+
 ## 0.50.4
 
 The stem quality panel now states the file format (FLAC, 16-bit, 44.1 kHz, lossless), the size per stem and in total, and why higher levels sound better (more model passes; same file size, only longer processing). Playlists show a band cloud chip on desktop: synced, offline, or "cloud too old" when the cloud server has no playlist endpoint yet, which is why a playlist does not reach the phone.

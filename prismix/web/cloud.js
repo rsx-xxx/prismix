@@ -236,5 +236,17 @@ export function createCloud({ $, el, api, notice, fmt, onChange, onDownloaded, l
     return true;
   }
 
-  return { refresh, publish, badge, mark, setLocal, fetchSong, get signedIn() { return state.signedIn; } };
+  /** Uploads these library songs that the cloud lacks, one after another; resolves with how many went up. */
+  async function publishMany(ids) {
+    let sent = 0;
+    for (const id of ids) {
+      const l = lookup?.(id);
+      if (!l || inCloud.has(id)) continue;
+      try { await runJob('/api/cloud/publish', { videoId: id, model: l.model }, () => {}, 700); sent++; } catch (e) { if (e.message !== 'Cancelled') notice(`${l.item.title}: ${e.message}`); }
+    }
+    await refresh();
+    return sent;
+  }
+
+  return { refresh, publish, publishMany, badge, mark, setLocal, fetchSong, has: (id) => inCloud.has(id), get signedIn() { return state.signedIn; } };
 }

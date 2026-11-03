@@ -15,7 +15,7 @@ const SONG = 'application/x-prismix-song';
 const itemOf = (s) => ({ id: s.id, title: s.title, channel: s.channel, duration: s.duration });
 const art = (img, id, eager = false) => paintCover(img, id, { eager });
 
-export function createPlaylistView({ api, library, open, notice, quality, cloudMark }) {
+export function createPlaylistView({ api, library, open, notice, quality, cloudMark, cloudUp, cloudHas, cloudOn }) {
   let lists = [];
   let timer = null;
   let current = null; // id of the playlist page that is showing
@@ -23,10 +23,46 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
 
   const SYNC = {
     synced: ['☁ In the band cloud', 'Saved in the band cloud: your phone and other devices see this playlist.'],
-    unsupported: ['☁ Not in the cloud', 'Your band cloud server does not store playlists yet, so this playlist stays on this computer. The cloud server needs an update.'],
+    unsupported: ['☁ Songs in the cloud', 'All songs are in the band cloud, but the cloud server cannot store playlists yet, so the list itself stays on this computer until the server is updated.'],
     offline: ['☁ Cloud not answering', 'The band cloud did not answer; the playlist will sync when it does.'],
   };
-  const syncChip = () => (SYNC[sync] ? el('small', { className: `pl-sync ${sync}`, textContent: SYNC[sync][0], title: SYNC[sync][1] }) : '');
+  const busy = new Set(); // playlists whose songs are going up right now
+  const missing = (p) => p.items.filter((i) => !cloudHas?.(i.id));
+  const uploadable = (p) => missing(p).filter((i) => lib(i.id)).map((i) => i.id);
+
+  async function upload(p) {
+    const ids = uploadable(p);
+    busy.add(p.id);
+    renderCards(); if (current === p.id) paintCloud(p);
+    try {
+      const sent = await cloudUp(ids);
+      await api('/api/cloud/playlists/sync', { method: 'POST' }).catch(() => {});
+      await load();
+      notice(sent ? `${sent} song${sent > 1 ? 's' : ''} uploaded` : 'Nothing was uploaded', sent ? 'ok' : 'info');
+    } finally { busy.delete(p.id); renderCards(); if (current === p.id) paintCloud(p); }
+  }
+
+  /** The cloud chip of one playlist: an upload button while songs are missing from the cloud, else where its list stands. */
+  const cloudChip = (p) => {
+    if (!cloudOn?.()) return '';
+    const up = uploadable(p);
+    const gone = missing(p).length;
+    if (busy.has(p.id)) return el('span', { className: 'pl-sync', textContent: '☁ Uploading…' });
+    if (up.length) {
+      const b = el('span', { className: 'pl-up', role: 'button', tabIndex: 0, textContent: `☁↑ Upload ${up.length}`, title: `Upload the ${up.length} song${up.length > 1 ? 's' : ''} that are not in the band cloud yet` });
+      const go = (e) => { e.stopPropagation(); e.preventDefault(); upload(p); };
+      b.addEventListener('click', go);
+      b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') go(e); });
+      return b;
+    }
+    if (gone) return el('span', { className: 'pl-sync offline', textContent: `☁ ${gone} not split yet`, title: 'Split these songs first; then they can go to the band cloud.' });
+    return SYNC[sync] ? el('span', { className: `pl-sync ${sync}`, textContent: SYNC[sync][0], title: SYNC[sync][1] }) : '';
+  };
+  const paintCloud = (p) => {
+    let box = $('pp-cloud');
+    if (!box) { box = el('span', { id: 'pp-cloud' }); $('pp-count').after(box); }
+    box.replaceChildren(...[cloudChip(p)].filter(Boolean));
+  };
 
   async function load() {
     try { lists = await api('/api/playlists'); } catch { lists = []; }
@@ -42,7 +78,7 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
       const first = p.items[0];
       const card = el('button', { type: 'button', className: 'plcard', title: p.name },
         first ? art(el('img', { alt: '' }), first.id, true) : el('div', { className: 'pl-ph' }),
-        el('b', { textContent: p.name }), el('small', { className: 'muted', textContent: `${p.items.length} song${p.items.length === 1 ? '' : 's'}` }), syncChip());
+        el('b', { textContent: p.name }), el('small', { className: 'muted', textContent: `${p.items.length} song${p.items.length === 1 ? '' : 's'}` }), ...[cloudChip(p)].filter(Boolean));
       card.addEventListener('click', () => { location.hash = `#/p/${p.id}`; });
       card.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes(SONG)) { e.preventDefault(); card.classList.add('drop'); } });
       card.addEventListener('dragleave', () => card.classList.remove('drop'));
@@ -69,8 +105,8 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
     current = id;
     $('plpage').hidden = false;
     $('pp-name').textContent = p.name;
-    $('pp-count').textContent = `${p.items.length} song${p.items.length === 1 ? '' : 's'}${SYNC[sync] ? ` · ${SYNC[sync][0]}` : ''}`;
-    $('pp-count').title = SYNC[sync]?.[1] || '';
+    $('pp-count').textContent = `${p.items.length} song${p.items.length === 1 ? '' : 's'}`;
+    paintCloud(p);
     const rows = $('pp-list');
     rows.replaceChildren(...p.items.map((it, n) => {
       const row = el('div', { className: 'pp-row' });
@@ -295,7 +331,7 @@ export function createPlaylistView({ api, library, open, notice, quality, cloudM
     return pl;
   }
 
-  const rerender = () => { if (current && !$('plpage').hidden) show(current); };
+  const rerender = () => { renderCards(); if (current && !$('plpage').hidden) show(current); };
 
   return { rerender, refresh: () => { clearTimeout(timer); poll(); }, load, show, stop, pick, save, importUrl, find, all: () => lists, lib };
 }

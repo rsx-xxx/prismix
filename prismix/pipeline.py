@@ -537,12 +537,14 @@ def prune(video_id: str, model_name: str) -> list[str]:
 
 # ───────────────────────── orchestration ─────────────────────────
 
-def process(video_id: str, model_name: str, report: Report, *, analyse: bool = True) -> dict:
-    """Run the whole pipeline (idempotent: cached results are returned untouched)."""
+def process(video_id: str, model_name: str, report: Report, *, analyse: bool = True, redo: Quality | None = None) -> dict:
+    """Run the whole pipeline (idempotent: cached results are returned untouched).
+    `redo` splits an already processed song again at that quality; a song already made at it stays as it is."""
     if model_name not in MODELS:
         raise PipelineError("Unknown model")
     if meta := library.read_meta(video_id, model_name):
-        return meta
+        if not redo or meta.get("quality") == redo.id:
+            return meta
 
     info = download(video_id, report)
 
@@ -551,7 +553,7 @@ def process(video_id: str, model_name: str, report: Report, *, analyse: bool = T
     wav = decode(source)
     duration = wav.shape[1] / SAMPLE_RATE
 
-    q = current()
+    q = redo or current()
     if model_name == MIX_MODEL:
         stems = {MIX_MODEL: wav}
     else:
@@ -583,6 +585,9 @@ def process(video_id: str, model_name: str, report: Report, *, analyse: bool = T
             "stems": entries,
         }
         (tmp / "meta.json").write_text(json.dumps(meta, ensure_ascii=False))
+        for extra in final.glob("*") if final.is_dir() else ():  # files other features keep beside the stems
+            if extra.suffix != ".flac" and extra.name != "meta.json" and extra.is_file():
+                shutil.copy2(extra, tmp / extra.name)
         shutil.rmtree(final, ignore_errors=True)
         tmp.rename(final)
     except BaseException:

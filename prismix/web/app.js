@@ -98,6 +98,9 @@ const plview = createPlaylistView({
   api, library: () => state.library, notice: (m, k) => notice(m, k), quality: () => $('quality').value,
   open: (id, plId) => openFrom(id, plId),
   cloudMark: (id) => cloud.mark(id),
+  cloudUp: (ids) => cloud.publishMany(ids),
+  cloudHas: (id) => cloud.has(id),
+  cloudOn: () => cloud.signedIn,
 });
 function openFrom(id, plId) {
   const it = state.library.find((i) => i.id === id);
@@ -1599,9 +1602,21 @@ async function loadQuality() {
     $('q-detail').hidden = false;
     const note = q.measured ? 'measured on this machine' : `estimated for ${q.device.toUpperCase()}`;
     $('q-est').textContent = `Per ${Math.round(q.seconds / 60)}-min song: ~${Math.round(q.sizeMB)} MB at any level, ${note}. Applies to new splits.`;
-    $('q-facts').textContent = `Format: ${q.format}. ${q.stems} stems × ~${q.stemMB} MB per minute = ~${Math.round(q.sizeMB)} MB for a ${Math.round(q.seconds / 60)}-min song, the same at every level. Higher levels are better because the model runs more shifted passes with more overlap and averages them, which cancels leakage between stems and seams between windows. Only the time grows, not the file.`;
+    $('q-facts').textContent = `${q.format}: ${q.stems} stems × ~${q.stemMB} MB/min, the same size at every level. Higher levels average more shifted passes, which cancels bleed between stems and seams between windows, so only the time grows.`;
   } catch (err) { $('q-est').textContent = err.message; }
 }
+$('q-all').addEventListener('click', async () => {
+  const note = $('q-all-note');
+  const call = (dryRun) => api('/api/library/reprocess', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quality: 'max', dryRun }) });
+  try {
+    const plan = await call(true);
+    if (!plan.songs) { note.textContent = 'Every song is already at Max'; return; }
+    if (!confirm(`Split ${plan.songs} song${plan.songs > 1 ? 's' : ''} again at Max quality? It takes about ${fmtDur(plan.seconds)} in total on this computer. Songs stay playable meanwhile; copies already in the band cloud keep the old stems until you upload them again.`)) return;
+    await call(false);
+    note.textContent = `${plan.songs} queued, see the queue`;
+    queue.refresh();
+  } catch (err) { note.textContent = err.message; }
+});
 const putQuality = () => api('/api/quality', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quality: $('q-sel').value }) }).catch((err) => notice(err.message));
 $('q-sel').addEventListener('change', putQuality);
 $('settings-btn').addEventListener('click', () => { if (!settingsPanel.hidden) loadQuality(); });

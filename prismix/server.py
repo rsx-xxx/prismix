@@ -66,6 +66,11 @@ class QualityRequest(BaseModel):
     quality: str
 
 
+class ReprocessRequest(BaseModel):
+    quality: str = "max"
+    dry_run: bool = Field(default=False, alias="dryRun")
+
+
 class ProcessRequest(BaseModel):
     url: str
     model: str = DEFAULT_MODEL
@@ -565,6 +570,27 @@ def create_app() -> FastAPI:
             return {"current": quality.set_current(req.quality).id}
         except ValueError as e:
             raise HTTPException(400, str(e)) from e
+
+    @app.post("/api/library/reprocess")
+    def reprocess(req: ReprocessRequest, request: Request):
+        """Split every stem set again at one quality (the best by default); sets already made at it are left alone.
+        A dry run only counts the work."""
+        own_window(request)
+        if req.quality not in quality.QUALITIES:
+            raise HTTPException(400, "Unknown quality")
+        todo = []
+        for item in library.list_library():
+            for m in item["models"]:
+                if m == MIX_MODEL:
+                    continue
+                meta = library.read_meta(item["id"], m)
+                if meta and meta.get("quality") != req.quality:
+                    todo.append((item["id"], m, float(meta.get("duration") or quality.TYPICAL_SEC)))
+        seconds = sum(next(lv["timeSec"] for lv in quality.estimates(m, d)["levels"] if lv["id"] == req.quality) for _, m, d in todo)
+        if not req.dry_run:
+            for vid, m, _ in todo:
+                jobs.submit(vid, m, "resplit", quality=req.quality)
+        return {"songs": len(todo), "seconds": round(seconds)}
 
     @app.get("/api/library")
     def list_library():

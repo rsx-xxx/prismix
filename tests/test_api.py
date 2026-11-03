@@ -156,3 +156,29 @@ def test_quality_cost_and_speed(tmp_path, monkeypatch):
     assert quality.cost(q["high"], "htdemucs_ft") > 2
     quality.record_speed("htdemucs_ft", "cpu", q["high"], 600, 200)
     assert quality._rtf("htdemucs_ft", "cpu")[1] is True
+
+
+def test_reprocess_queues_songs_not_made_at_the_quality(tmp_path, monkeypatch):
+    from prismix import band
+
+    monkeypatch.setattr(band, "is_loopback", lambda h: True)
+    seed(tmp_path)
+    with make_client(tmp_path, monkeypatch) as c:
+        h = {"host": "testserver"}
+        assert c.post("/api/library/reprocess", json={"quality": "nope"}, headers=h).status_code == 400
+        plan = c.post("/api/library/reprocess", json={"dryRun": True}, headers=h).json()
+        assert plan["songs"] == 1 and plan["seconds"] > 0
+        assert c.get("/api/jobs").json() == []  # a dry run queues nothing
+        assert c.post("/api/library/reprocess", json={}, headers=h).json()["songs"] == 1
+        assert [j["kind"] for j in c.get("/api/jobs").json()] == ["resplit"]
+
+
+def test_reprocess_skips_songs_already_at_the_quality(tmp_path, monkeypatch):
+    from prismix import band
+
+    monkeypatch.setattr(band, "is_loopback", lambda h: True)
+    seed(tmp_path)
+    meta = tmp_path / VID / "htdemucs_6s" / "meta.json"
+    meta.write_text(json.dumps({"id": VID, "quality": "max", "stems": [{"file": "a.flac"}]}))
+    with make_client(tmp_path, monkeypatch) as c:
+        assert c.post("/api/library/reprocess", json={}, headers={"host": "testserver"}).json()["songs"] == 0

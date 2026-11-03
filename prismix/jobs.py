@@ -8,6 +8,7 @@ import uuid
 from dataclasses import dataclass, field
 
 from . import align, analysis, pipeline, transcribe
+from .quality import QUALITIES
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +37,8 @@ class Cancelled(BaseException):
 class Job:
     video_id: str
     model: str
-    kind: str = "split"  # "split" (separate + analyse), "stems" (separate only) "analyze" or "reanalyze" (existing track)
+    kind: str = "split"  # "split" (separate + analyse), "stems" (separate only), "resplit" (separate an existing track again), "analyze" or "reanalyze" (existing track)
+    quality: str | None = None  # the quality a "resplit" runs at
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     stage: str = "queued"
     progress: float = 0.0
@@ -98,11 +100,11 @@ class JobManager:
     def active(self, video_id: str) -> Job | None:
         return next((j for j in self._jobs.values() if j.video_id == video_id and not j.finished), None)
 
-    def submit(self, video_id: str, model: str, kind: str = "split", urgent: bool = False) -> Job:
+    def submit(self, video_id: str, model: str, kind: str = "split", urgent: bool = False, quality: str | None = None) -> Job:
         job = next((j for j in self._jobs.values()
                     if (j.video_id, j.model) == (video_id, model) and not j.finished), None)
         if not job:
-            job = Job(video_id, model, kind)
+            job = Job(video_id, model, kind, quality=quality)
             self._jobs[job.id] = job
             self._prune()
             self._pending.append(job)
@@ -200,5 +202,6 @@ class JobManager:
         if job.kind in ("analyze", "reanalyze"):
             analysis.analyze(job.video_id, job.model, job.update, force=job.kind == "reanalyze")
         else:
-            pipeline.process(job.video_id, job.model, job.update, analyse=job.kind != "stems")
+            redo = QUALITIES[job.quality] if job.kind == "resplit" else None
+            pipeline.process(job.video_id, job.model, job.update, analyse=job.kind == "split", redo=redo)
         job.update("done", 1.0, "Ready")
