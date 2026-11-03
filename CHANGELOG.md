@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.51.3
+
+Playlists on the phone now fit any screen width: the header buttons and the song rows wrap and shrink instead of running off the edge.
+
 ## 0.51.2
 
 The "Reprocess all" button moved into the collapsed "Levels and file size" block in Settings, so the quality section stays short.
