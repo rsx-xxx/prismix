@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.59.1
+
+Re-release of 0.59.0, whose build stopped at a lint error in the new cloud server code. Nothing else changed: member links can be issued from the desktop and Android apps.
+
 ## 0.59.0
 
 Anyone signed in to the band cloud can now make a member link for somebody else: "Copy a member link" in the desktop cloud dialog, "Invite someone" on the Android cloud screen. Links give play and publish rights, never delete, and issuing is limited per person per hour. Opening the admin token as a join link now says so instead of failing silently. The cloud server's code now lives in the `server/` folder (no tokens or data).

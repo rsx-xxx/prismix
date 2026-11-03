@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import html
 import hmac
+import html
 import http.server
 import json
 import logging
