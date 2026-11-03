@@ -1221,19 +1221,12 @@ function plUpdated(pl) {
   paintPlaylists();
   syncPlNav();
 }
-let plArm = null, plArmTimer = 0, plAdding = false;
+let plAdding = false;
 const plIcon = (label, text, onclick, extra = {}) => {
   const b = el('button', { type: 'button', className: 'pl-act', ariaLabel: label, title: label, textContent: text, ...extra });
   b.onclick = (e) => { e.stopPropagation(); onclick(); };
   return b;
 };
-function plConfirm(key, run) { // confirm() does not work in the WebView: the first tap arms, the second does it
-  if (plArm === key) { clearTimeout(plArmTimer); plArm = null; run(); return; }
-  plArm = key;
-  clearTimeout(plArmTimer);
-  plArmTimer = setTimeout(() => { plArm = null; paintPlaylists(); }, 3000);
-  paintPlaylists();
-}
 async function plCreate(name) {
   const pl = await plApi('POST', '/api/playlists', { name: name || 'Playlist', items: [] });
   if (pl) { plView = pl.id; plAdding = true; plUpdated(pl); }
@@ -1259,7 +1252,7 @@ function paintPlaylists() {
       }))] : [el('p', { className: 'note', textContent: 'No playlists yet. Name one above.' })]));
     return;
   }
-  const back = el('button', { className: 'btn-line', type: 'button', textContent: '‹ Playlists' });
+  const back = el('button', { className: 'btn-line', type: 'button', textContent: '‹', ariaLabel: 'Back to playlists', title: 'Back to playlists' });
   back.onclick = () => { plView = null; paintPlaylists(); };
   const all = el('button', { className: 'btn-line', type: 'button', textContent: 'Save all' });
   all.onclick = () => pl.items.forEach((it) => { const m = modelOf(it.id); if (m && !off.have.has(it.id)) keep(it.id, m); });
@@ -1270,21 +1263,12 @@ function paintPlaylists() {
       else e.target.value = pl.name;
     } })
     : el('b', { textContent: pl.name });
-  const del = el('button', { className: `btn-line${plArm === `del:${pl.id}` ? ' arm' : ''}`, type: 'button', textContent: plArm === `del:${pl.id}` ? 'Delete?' : 'Delete' });
-  del.onclick = () => plConfirm(`del:${pl.id}`, async () => {
-    if (!await plApi('DELETE', `/api/playlists/${pl.id}`)) return;
-    lists = lists.filter((p) => p.id !== pl.id);
-    if (S.pl?.id === pl.id) S.pl = null;
-    plView = null;
-    paintPlaylists();
-    syncPlNav();
-  });
   const addToggle = el('button', { className: 'btn-line', type: 'button', textContent: plAdding ? 'Done' : 'Add songs' });
   addToggle.onclick = () => { plAdding = !plAdding; paintPlaylists(); };
   const have = new Set(pl.items.map((i) => i.id));
   const candidates = plAdding ? sortedLibrary().filter((s) => !have.has(s.id)) : [];
   box.replaceChildren(
-    el('div', { className: 'pl-top' }, back, title, ...(droid?.offlineSave && !OFFLINE ? [all] : []), ...(editable ? [del] : [])),
+    el('div', { className: 'pl-top' }, back, title, ...(droid?.offlineSave && !OFFLINE ? [all] : [])),
     ...(editable ? [el('div', { className: 'pl-top' }, addToggle)] : []),
     ...(plAdding ? [el('ul', { className: 'lib' }, ...(candidates.length ? candidates.map((s) => {
       const li = el('li', {}, coverImg(s.id), el('span', { className: 'meta' }, el('b', { textContent: s.title || s.id }),
