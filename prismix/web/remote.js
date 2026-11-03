@@ -920,6 +920,14 @@ $('who')?.addEventListener('click', openSongs);
 $('songs-close').onclick = () => songs.close();
 songs.addEventListener('click', (e) => { if (e.target === songs) songs.close(); });
 $('song-q').oninput = () => paintLibrary();
+const SORT_KEY = 'prismix.songSort';
+let songSort = localStorage.getItem(SORT_KEY) === 'added' ? 'added' : 'alpha';
+$('song-sort').value = songSort;
+$('song-sort').onchange = (e) => { songSort = e.target.value; localStorage.setItem(SORT_KEY, songSort); paintLibrary(); paintPlaylists(); };
+/** Library in the picked order: alphabetical by title (default) or newest first. */
+const sortedLibrary = () => [...library].sort(songSort === 'added'
+  ? (a, b) => (b.added || 0) - (a.added || 0)
+  : (a, b) => (a.title || a.id).localeCompare(b.title || b.id, undefined, { sensitivity: 'base', numeric: true }));
 // ── press feedback: a ripple and a short tick on every tap ──
 let toastTimer;
 function notice(text) {
@@ -1089,7 +1097,7 @@ async function loadLibrary() {
 // ── playlists: the host keeps them; the phone reads them and switches songs inside one ──
 let lists = [];
 let plView = null; // id of the playlist whose tracks are showing in the Songs sheet
-let plTab = 'songs';
+let plTab = 'lists';
 const withPin = (u) => (store.pin ? `${u}?k=${encodeURIComponent(store.pin)}` : u);
 /** Cover <img>: placeholder, fade-in, one retry, then the YouTube thumbnail (see cover.js). `eager` for what is on the first screen. */
 const coverImg = (id, eager = false) => paintCover(el('img', { className: 'cover', alt: '' }), id, { eager, local: withPin(`/media/${id}/thumb.jpg`) });
@@ -1182,7 +1190,7 @@ async function loadPlaylists() {
 function setSongTab(tab) {
   plTab = tab;
   document.querySelectorAll('#song-tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
-  $('lib').hidden = $('song-q').hidden = tab !== 'songs';
+  $('lib').hidden = $('song-tools').hidden = tab !== 'songs';
   $('pls').hidden = tab !== 'lists';
   if (tab === 'lists') plView = null;
   paintPlaylists();
@@ -1274,7 +1282,7 @@ function paintPlaylists() {
   const addToggle = el('button', { className: 'btn-line', type: 'button', textContent: plAdding ? 'Done' : 'Add songs' });
   addToggle.onclick = () => { plAdding = !plAdding; paintPlaylists(); };
   const have = new Set(pl.items.map((i) => i.id));
-  const candidates = plAdding ? library.filter((s) => !have.has(s.id)) : [];
+  const candidates = plAdding ? sortedLibrary().filter((s) => !have.has(s.id)) : [];
   box.replaceChildren(
     el('div', { className: 'pl-top' }, back, title, ...(droid?.offlineSave && !OFFLINE ? [all] : []), ...(editable ? [del] : [])),
     ...(editable ? [el('div', { className: 'pl-top' }, addToggle)] : []),
@@ -1394,7 +1402,7 @@ function offlineStart() {
 
 function paintLibrary() {
   const q = $('song-q').value.trim().toLowerCase();
-  const items = library.filter((it) => !q || `${it.title} ${it.channel || ''}`.toLowerCase().includes(q));
+  const items = sortedLibrary().filter((it) => !q || `${it.title} ${it.channel || ''}`.toLowerCase().includes(q));
   $('lib').replaceChildren(...items.map((it, n) => {
     const model = it.models?.[0];
     const img = coverImg(it.id, n < 12);

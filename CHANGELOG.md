@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.54.0
+
+The phone now opens the Playlists tab first, with Songs second. Songs are sorted A to Z by default, and a selector next to the search box switches to Last added; the choice is remembered.
+
 ## 0.53.0
 
 The phone no longer has buttons to remove songs from a playlist or move them up and down, which freed space in the song rows. Playlist contents and order are set on the desktop app only.

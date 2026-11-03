@@ -266,6 +266,7 @@ button:active, .lib li:active, [role=tab]:active, [role=radio]:active { filter: 
 .tw.done { color: var(--ink); }
 .pl-name { flex: 1; min-width: 0; min-height: 36px; padding: 0 .7rem; border: 0; border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 650; }
 .pl-top .search { flex: 1; }
+#song-sort { flex: 0 0 auto; width: auto; }
 .pl-top .btn-line:last-child:not(:first-child) { margin-left: 0; }
 .btn-line.arm { background: var(--accent); color: var(--surface-2); }
 .lib .pl-act { flex: none; width: 2rem; min-height: 2rem; border-radius: 8px; background: transparent; color: var(--ink-2); font: inherit; font-size: 1rem; }

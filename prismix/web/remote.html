@@ -109,10 +109,13 @@
   <dialog id="songs">
     <div class="sheet-bar"><h2>Songs</h2><button id="songs-close" class="icon" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button></div>
     <div class="sheet-body">
-      <div class="seg wide" id="song-tabs" role="tablist"><button role="tab" data-tab="songs" aria-selected="true">Songs</button><button role="tab" data-tab="lists" aria-selected="false">Playlists</button></div>
-      <input id="song-q" class="search" type="search" placeholder="Search songs" autocomplete="off" aria-label="Search songs">
-      <ul id="lib" class="lib"></ul>
-      <div id="pls" class="pls" hidden></div>
+      <div class="seg wide" id="song-tabs" role="tablist"><button role="tab" data-tab="lists" aria-selected="true">Playlists</button><button role="tab" data-tab="songs" aria-selected="false">Songs</button></div>
+      <div id="song-tools" class="pl-top" hidden>
+        <input id="song-q" class="search" type="search" placeholder="Search songs" autocomplete="off" aria-label="Search songs">
+        <select id="song-sort" class="search" aria-label="Sort songs"><option value="alpha">A–Z</option><option value="added">Last added</option></select>
+      </div>
+      <ul id="lib" class="lib" hidden></ul>
+      <div id="pls" class="pls"></div>
     </div>
   </dialog>
 
