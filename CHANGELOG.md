@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.53.0
+
+The phone no longer has buttons to remove songs from a playlist or move them up and down, which freed space in the song rows. Playlist contents and order are set on the desktop app only.
+
 ## 0.52.0
 
 The split settings moved out of the top bar into a popup that opens when you press Split: what to prepare (stems and chords, stems only, chords only), the number of stems and the quality level with its size details. Settings now holds just "Reprocess all", and the button shows exactly how many songs are below Max.

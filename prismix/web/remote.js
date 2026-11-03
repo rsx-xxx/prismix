@@ -1230,11 +1230,6 @@ async function plCreate(name) {
   const pl = await plApi('POST', '/api/playlists', { name: name || 'Playlist', items: [] });
   if (pl) { plView = pl.id; plAdding = true; plUpdated(pl); }
 }
-const plMove = (pl, n, d) => {
-  const order = pl.items.map((i) => i.id);
-  [order[n], order[n + d]] = [order[n + d], order[n]];
-  plApi('PATCH', `/api/playlists/${pl.id}`, { order }).then(plUpdated);
-};
 
 function paintPlaylists() {
   const box = $('pls');
@@ -1298,11 +1293,6 @@ function paintPlaylists() {
           el('small', { textContent: model ? `${it.channel || ''}${it.channel ? ' · ' : ''}${fmt(it.duration)}` : 'Not ready on the host yet' })));
       if (model) li.onclick = () => playSong(it.id, model, pl);
       li.append(...[keepBtn(it.id, model)].filter(Boolean));
-      if (editable) {
-        li.append(plIcon('Move up', '↑', () => plMove(pl, n, -1), { disabled: n === 0 }),
-          plIcon('Move down', '↓', () => plMove(pl, n, 1), { disabled: n === pl.items.length - 1 }),
-          plIcon('Remove from playlist', '✕', () => plApi('DELETE', `/api/playlists/${pl.id}/items/${it.id}`).then(plUpdated)));
-      }
       return li;
     })));
 }
