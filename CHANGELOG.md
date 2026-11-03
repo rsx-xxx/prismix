@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.56.1
+
+Updating now always goes straight to the newest release. When the Homebrew tap lags behind (or several releases shipped in a row), the app installs the release itself instead of stopping at the next version in line, and the tap updates no longer run in parallel.
+
 ## 0.56.0
 
 The app version now shows under "This device" in the phone's Controls sheet, on both Android and iOS. It is read from the installed app, so it always matches the build you are running.

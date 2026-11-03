@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import os
 import re
@@ -177,8 +178,20 @@ def brew_managed() -> bool:
     return bool(brew and sys.platform == "darwin" and any((Path(brew).parents[1] / "Caskroom" / CASK).glob("*")))
 
 
-def _brew_upgrade() -> bool:
-    """`brew update` then upgrade this one cask (never other packages). One retry when another brew holds the lock."""
+def _tap_version(env: dict) -> str | None:
+    """The cask version the tap offers right now (after `brew update`), None when brew cannot say."""
+    r = subprocess.run([_brew(), "info", "--cask", "--json=v2", CASK], env=env, capture_output=True, text=True, timeout=120)
+    try:
+        return json.loads(r.stdout)["casks"][0]["version"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return None
+
+
+def _brew_upgrade(want: str | None = None) -> bool:
+    """`brew update` then upgrade this one cask (never other packages). One retry when another brew holds the lock.
+
+    False when the tap is behind `want` (the newest release): brew would stop at an older version, so the caller installs the release itself.
+    """
     env = {**os.environ, "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", "HOMEBREW_NO_ENV_HINTS": "1", "HOMEBREW_NO_INSTALL_CLEANUP": "1"}
     for attempt in (1, 2):
         out = ""
@@ -188,6 +201,9 @@ def _brew_upgrade() -> bool:
             out = r.stdout + r.stderr
             if r.returncode != 0:
                 break
+            if cmd[0] == "update" and want and (tap := _tap_version(env)) and parse(tap) != parse(want):
+                log.warning("tap offers %s but %s is released", tap, want)
+                return False
         else:
             return True
         log.warning("brew attempt %d failed: %s", attempt, out[-400:])
@@ -203,11 +219,11 @@ def _reopen_after_exit() -> None:
                      start_new_session=True, close_fds=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def _run(url: str, quit_app) -> None:
+def _run(url: str, quit_app, want: str | None = None) -> None:
     try:
         if brew_managed():
             _step(0.1, "Starting Homebrew", state="installing", progress=1.0, error=None)
-            if _brew_upgrade():
+            if _brew_upgrade(want):
                 _step(0.95, "Restarting Prismix", state="restarting", progress=1.0)
                 _reopen_after_exit()
                 time.sleep(1.5)
@@ -247,7 +263,7 @@ def install(quit_app, busy=lambda: None) -> dict:
     url = info.get("download")
     if not info.get("available") or not url or not url.startswith(_ALLOWED):
         raise RuntimeError("No newer release to install")
-    threading.Thread(target=_run, args=(url, quit_app), daemon=True).start()
+    threading.Thread(target=_run, args=(url, quit_app, info.get("latest")), daemon=True).start()
     _step(0.0, "Starting", state="downloading", progress=0.0, error=None)
     return status()
 
@@ -291,10 +307,11 @@ def restart(quit_app, busy=lambda: None) -> dict:
 def _apply(quit_app) -> None:
     try:
         if _staged["path"] == "brew":
-            if _brew_upgrade():
+            info = check(force=True)
+            if _brew_upgrade(info.get("latest")):
                 _reopen_after_exit()
-            else:  # brew can fail (locked, offline, app replaced by hand): install the release itself instead
-                url = check(force=True).get("download")
+            else:  # brew can fail (locked, offline, tap behind the newest release): install the release itself instead
+                url = info.get("download")
                 if not url or not url.startswith(_ALLOWED):
                     raise RuntimeError("Homebrew could not update Prismix")
                 _step(0.3, "Homebrew failed, downloading the release", state="downloading", progress=0.0)

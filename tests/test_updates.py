@@ -129,3 +129,20 @@ def test_restart_needs_a_staged_update(monkeypatch):
         assert "ready" in str(e)
     else:
         raise AssertionError("restart ran without a download")
+
+
+def test_brew_upgrade_refuses_when_tap_is_behind_latest(monkeypatch):
+    calls = []
+
+    class R:
+        returncode, stderr = 0, ""
+        stdout = '{"casks": [{"version": "0.54.0"}]}'
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd[1:])
+        return R()
+
+    monkeypatch.setattr(updates, "_BREW", ("/bin/sh",))
+    monkeypatch.setattr(updates.subprocess, "run", fake_run)
+    assert not updates._brew_upgrade("0.56.0")
+    assert ["upgrade", "--cask", "prismix", "--greedy"] not in calls
