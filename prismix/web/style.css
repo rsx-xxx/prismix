@@ -428,7 +428,6 @@ kbd { font: 12px var(--font); background: var(--surface-2); border: 1px solid va
   .mixer { grid-template-columns: 1fr; }
   .lane-col { display: none; }
   .ctl-col { border-right: 0; }
-  .knob input[type=range] { display: none; }
   .dock-row { gap: 14px; }
   .job img { display: none; }
   .preview { grid-template-columns: 1fr; }
@@ -458,7 +457,7 @@ kbd { font: 12px var(--font); background: var(--surface-2); border: 1px solid va
   position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding-bottom: 6px;
   display: none; flex-direction: column; align-items: center; gap: 8px; z-index: 35;
 }
-.master:hover .master-pop, .master:focus-within .master-pop { display: flex; }
+.master:hover .master-pop, .master:focus-within .master-pop, .knob:hover .master-pop, .knob:focus-within .master-pop { display: flex; }
 .master-pop::before { content: ""; position: absolute; inset: 0 -8px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 22px rgb(0 0 0 / .16); z-index: -1; }
 .master-pop { padding: 10px 14px 12px; }
 .master-pop output { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }

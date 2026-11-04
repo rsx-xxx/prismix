@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.62.0
+
+The desktop tempo slider now opens upward as a vertical slider on hover, the same as the master volume, so the dock row is shorter.
+
 ## 0.61.1
 
 Android: while the remote page is open, the phone's volume buttons move the song's master volume (6% a step, shown in the volume popover) instead of the system volume. In Room only mode they control the host's master volume.

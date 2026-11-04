@@ -1065,6 +1065,7 @@ function syncDock() {
   $('play').setAttribute('aria-label', player.playing ? 'Pause' : 'Play');
   $('t-total').textContent = fmt(player.duration);
   $('tempo').value = Math.round(player.tempo * 100);
+  $('tempo').style.setProperty('--p', `${Math.round(player.tempo * 100) - 50}%`);
   $('tempo-out').textContent = `${Math.round(player.tempo * 100)}%`;
   $('tempo-out').classList.toggle('changed', Math.round(player.tempo * 100) !== 100);
   $('tempo-reset').hidden = Math.round(player.tempo * 100) === 100;
