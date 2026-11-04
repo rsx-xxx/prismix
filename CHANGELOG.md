@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.62.2
+
+Tempo has no slider any more, on the desktop dock and the phone remote: just −/+ and the percentage. The desktop "Tempo" label now shows the song's current BPM, which follows the percentage as you change it.
+
 ## 0.62.1
 
 The phone remote no longer has the back 5 s and forward 5 s buttons. Tap the seek bar to jump.

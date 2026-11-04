@@ -256,14 +256,13 @@
       </div>
 
       <div class="group knob">
-        <label for="tempo">Tempo</label>
+        <label id="tempo-l" for="tempo-out">Tempo</label>
         <button class="reset" id="tempo-reset" type="button" aria-label="Reset tempo to 100%" title="Reset tempo (R)" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <div class="stepper">
           <button id="tempo-down" aria-label="Slower" title="Slower ([)">−</button>
-          <output id="tempo-out" for="tempo">100%</output>
+          <output id="tempo-out">100%</output>
           <button id="tempo-up" aria-label="Faster" title="Faster (])">+</button>
         </div>
-        <div class="master-pop"><input id="tempo" type="range" min="50" max="150" step="1" value="100" aria-label="Tempo" aria-orientation="vertical"></div>
       </div>
 
       <div class="group knob">

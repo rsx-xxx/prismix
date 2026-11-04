@@ -752,7 +752,7 @@ function update() {
     $('tune-v').textContent = `${tp}% · ${sm > 0 ? '+' : ''}${sm}`;
     $('tune-v').classList.toggle('changed', tp !== 100 || sm !== 0);
     $('tune-l').textContent = bpm ? `${bpm} BPM · Key` : 'Tempo · Key';
-    $('t-out').textContent = bpm ? `${tp}% · ${bpm} BPM` : `${tp}%`; $('t-range').value = String(tp); $('t-range').style.setProperty('--fill', `${tp - 50}%`);
+    $('t-out').textContent = bpm ? `${tp}% · ${bpm} BPM` : `${tp}%`;
     const cs = cl ? sm : ck;
     $('c-out').textContent = `${cl ? 'follows key' : `${cs > 0 ? '+' : ''}${cs}`}${st0?.key ? ` · ${keyName(st0.key, cs)}` : ''}`;
     $('c-lock').setAttribute('aria-pressed', String(cl)); $('c-lock').title = cl ? 'Chords follow the key. Tap to unlock' : 'Chords set on their own. Tap to follow the key';
@@ -865,8 +865,6 @@ $('play').onclick = () => act.toggle();
 $('t-down').onclick = () => act.tempo(tempo() - 0.05);
 $('t-up').onclick = () => act.tempo(tempo() + 0.05);
 $('t-reset').onclick = () => act.tempo(1);
-$('t-range').oninput = throttle((e) => act.tempo(e.target.value / 100), 90);
-$('t-range').onchange = (e) => act.tempo(e.target.value / 100);
 $('k-down').onclick = () => act.key(semis() - 1);
 $('k-up').onclick = () => act.key(semis() + 1);
 $('c-reset').onclick = () => act.chord(0);

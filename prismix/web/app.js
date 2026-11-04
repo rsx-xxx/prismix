@@ -711,6 +711,8 @@ async function openStudio(id, model) {
   }
   if (token !== state.token) { player.dispose(); return; }
   state.current = { id, model, meta };
+  state.baseBpm = 0;
+  fetch(`/media/${id}/structure.json`).then((r) => (r.ok ? r.json() : null)).then((s) => { if (state.current?.id === id) { state.baseBpm = s?.bpm || 0; syncDock(); } }).catch(() => {});
   $('nt-toggle').hidden = false;
   stickers.load();
   const setup = await api(`/api/library/${id}/setup`).catch(() => ({}));
@@ -1064,8 +1066,7 @@ function syncDock() {
   $('play').innerHTML = player.playing ? ICON.pause : ICON.play;
   $('play').setAttribute('aria-label', player.playing ? 'Pause' : 'Play');
   $('t-total').textContent = fmt(player.duration);
-  $('tempo').value = Math.round(player.tempo * 100);
-  $('tempo').style.setProperty('--p', `${Math.round(player.tempo * 100) - 50}%`);
+  $('tempo-l').textContent = state.baseBpm ? `${Math.round(state.baseBpm * player.tempo)} BPM` : 'Tempo';
   $('tempo-out').textContent = `${Math.round(player.tempo * 100)}%`;
   $('tempo-out').classList.toggle('changed', Math.round(player.tempo * 100) !== 100);
   $('tempo-reset').hidden = Math.round(player.tempo * 100) === 100;
@@ -1145,7 +1146,6 @@ function syncFrame() {
 $('play').addEventListener('click', () => player.toggle());
 $('rew').addEventListener('click', () => player.seek(player.position - 5));
 $('fwd').addEventListener('click', () => player.seek(player.position + 5));
-$('tempo').addEventListener('input', (e) => player.setTempo(e.target.value / 100));
 $('tempo-down').addEventListener('click', () => player.setTempo(Math.round(player.tempo * 20 - 1) / 20));
 $('tempo-up').addEventListener('click', () => player.setTempo(Math.round(player.tempo * 20 + 1) / 20));
 $('key-down').addEventListener('click', () => player.setSemitones(player.semitones - 1));
