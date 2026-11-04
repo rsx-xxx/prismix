@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.60.2
+
+The key and chord key changers no longer have a slider: just the − and + buttons, the number and reset, on the desktop dock and the phone remote. Tempo keeps its slider.
+
 ## 0.60.1
 
 The chord key and its lock moved from the player dock into the chords/tabs block, next to capo and tuning, so the dock keeps everything on one line with the master volume.

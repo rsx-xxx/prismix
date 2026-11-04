@@ -754,10 +754,10 @@ function update() {
     $('tune-l').textContent = bpm ? `${bpm} BPM · Key` : 'Tempo · Key';
     $('t-out').textContent = bpm ? `${tp}% · ${bpm} BPM` : `${tp}%`; $('t-range').value = String(tp); $('t-range').style.setProperty('--fill', `${tp - 50}%`);
     const cs = cl ? sm : ck;
-    $('c-out').textContent = `${cl ? 'follows key' : `${cs > 0 ? '+' : ''}${cs}`}${st0?.key ? ` · ${keyName(st0.key, cs)}` : ''}`; $('c-range').value = String(cs);
+    $('c-out').textContent = `${cl ? 'follows key' : `${cs > 0 ? '+' : ''}${cs}`}${st0?.key ? ` · ${keyName(st0.key, cs)}` : ''}`;
     $('c-lock').setAttribute('aria-pressed', String(cl)); $('c-lock').title = cl ? 'Chords follow the key. Tap to unlock' : 'Chords set on their own. Tap to follow the key';
-    for (const id of ['c-down', 'c-up', 'c-range', 'c-reset']) $(id).disabled = cl;
-    $('k-out').textContent = `${sm > 0 ? '+' : ''}${sm}${kn ? ` · ${kn}` : ''}`; $('k-range').value = String(sm); $('k-range').style.setProperty('--fill', `${((sm + 12) / 24) * 100}%`);
+    for (const id of ['c-down', 'c-up', 'c-reset']) $(id).disabled = cl;
+    $('k-out').textContent = `${sm > 0 ? '+' : ''}${sm}${kn ? ` · ${kn}` : ''}`;
   }
   const mv = Math.round(masterLevel() * 100);
   if (last.mv !== mv && document.activeElement !== $('m-range')) { last.mv = mv; $('m-range').value = String(mv); $('m-out').textContent = `${mv}%`; }
@@ -865,13 +865,9 @@ $('c-reset').onclick = () => act.chord(0);
 $('m-range').oninput = throttle((e) => { $('m-out').textContent = `${e.target.value}%`; act.master(e.target.value / 100); }, 60);
 $('m-range').onchange = (e) => act.master(e.target.value / 100);
 $('c-lock').onclick = () => act.chordLock(!chordLock());
-$('c-range').oninput = throttle((e) => act.chord(+e.target.value), 90);
-$('c-range').onchange = (e) => act.chord(+e.target.value);
 $('c-down').onclick = () => act.chord(chordKey() - 1);
 $('c-up').onclick = () => act.chord(chordKey() + 1);
 $('k-reset').onclick = () => act.key(0);
-$('k-range').oninput = throttle((e) => act.key(+e.target.value), 90);
-$('k-range').onchange = (e) => act.key(+e.target.value);
 // The bar follows the finger while it is down and seeks once on release; touch WebViews do not focus a range input,
 // so a drag flag (not activeElement) keeps the ticker from pulling the thumb back.
 const seekStart = () => { seekDrag = true; };

@@ -1067,7 +1067,6 @@ function syncDock() {
   $('tempo-out').textContent = `${Math.round(player.tempo * 100)}%`;
   $('tempo-out').classList.toggle('changed', Math.round(player.tempo * 100) !== 100);
   $('tempo-reset').hidden = Math.round(player.tempo * 100) === 100;
-  $('key').value = player.semitones;
   $('key-out').textContent = player.semitones > 0 ? `+${player.semitones}` : String(player.semitones);
   $('key-out').classList.toggle('changed', player.semitones !== 0);
   $('key-reset').hidden = player.semitones === 0;
@@ -1147,7 +1146,6 @@ $('fwd').addEventListener('click', () => player.seek(player.position + 5));
 $('tempo').addEventListener('input', (e) => player.setTempo(e.target.value / 100));
 $('tempo-down').addEventListener('click', () => player.setTempo(Math.round(player.tempo * 20 - 1) / 20));
 $('tempo-up').addEventListener('click', () => player.setTempo(Math.round(player.tempo * 20 + 1) / 20));
-$('key').addEventListener('input', (e) => player.setSemitones(Number(e.target.value)));
 $('key-down').addEventListener('click', () => player.setSemitones(player.semitones - 1));
 $('key-up').addEventListener('click', () => player.setSemitones(player.semitones + 1));
 $('cents').addEventListener('input', (e) => player.setCents(Number(e.target.value)));

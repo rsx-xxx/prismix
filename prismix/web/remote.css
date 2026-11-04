@@ -181,6 +181,7 @@ dialog[open]::backdrop { opacity: 1; }
 .s-head span { font-weight: 650; }
 .s-head output { flex: 1; font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 750; font-size: 1.15rem; }
 .s-ctl { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .6rem; }
+.s-ctl:not(:has(input)) { display: flex; gap: 1rem; }
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: .8rem; min-height: 44px; }
 .pair { display: flex; gap: .5rem; }
 .aa { font-weight: 750; font-size: 1.25rem; } .aa.small { font-size: .9rem; }
