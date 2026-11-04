@@ -148,7 +148,7 @@ main { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; height:
 .mvol { position: relative; }
 .mpop { position: absolute; bottom: calc(100% + .3rem); left: 50%; transform: translateX(-50%); display: none; flex-direction: column; align-items: center; gap: .5rem; padding: .7rem .6rem .8rem; background: var(--surface); border-radius: 16px; box-shadow: 0 0 0 1px var(--line), 0 10px 30px #00000026; z-index: 20; }
 .mpop::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: .4rem; }
-.mvol:hover .mpop, .mvol:focus-within .mpop { display: flex; }
+.mvol.show .mpop, .mvol:hover .mpop, .mvol:focus-within .mpop { display: flex; }
 .mpop output { font-size: .8rem; font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 700; }
 .mpop input[type=range] { writing-mode: vertical-lr; direction: rtl; width: 2rem; height: 9rem; margin: 0; }
 .lockbtn { width: 2rem; height: 2rem; min-height: 0; }

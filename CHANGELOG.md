@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.61.1
+
+Android: while the remote page is open, the phone's volume buttons move the song's master volume (6% a step, shown in the volume popover) instead of the system volume. In Room only mode they control the host's master volume.
+
 ## 0.61.0
 
 Android: the hardware volume buttons now change the media volume like in Spotify, and the tuner finds the microphone (the app now declares the audio-settings permission WebView needs for capture). The master volume slider is redesigned as a slim filled pill on desktop and phone. Tuner string tones are now a plucked-string model with natural overtones and decay instead of a plain synthesized wave; the tuning fork stays a pure tone.

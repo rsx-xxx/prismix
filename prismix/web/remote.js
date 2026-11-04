@@ -824,6 +824,16 @@ $('stage').addEventListener('click', (e) => {
 
 // ── controls ──
 // In follow modes a control asks the host; solo drives the local player.
+// the Android shell hands the phone's volume buttons over as master-volume steps; the popover pops open to show the level
+let volFlash = 0;
+window.prismixVolumeKey = (dir) => {
+  act.master(Math.min(1, Math.max(0, Math.round((masterLevel() + dir * 0.06) * 100) / 100)));
+  document.querySelector('.mvol')?.classList.add('show');
+  clearTimeout(volFlash);
+  volFlash = setTimeout(() => document.querySelector('.mvol')?.classList.remove('show'), 1600);
+};
+droid?.volumeKeys?.(true);
+
 const act = {
   toggle: () => (S.mode === 'solo' ? S.local?.toggle() : send(playing() ? 'pause' : 'play')),
   seek: (s) => {

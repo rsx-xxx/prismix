@@ -214,6 +214,17 @@ public class Main extends Activity {
 
     /** Runs `r` once the Wi-Fi binding is in place (or given up on), so the first probes already take the right route. */
     PermissionRequest micRequest;
+    volatile boolean volKeys;
+
+    /** While the remote page is up, the volume buttons move the song's master volume (like Spotify) instead of the system slider. */
+    @Override
+    public boolean onKeyDown(int key, android.view.KeyEvent e) {
+        if (volKeys && web.getVisibility() == View.VISIBLE && (key == android.view.KeyEvent.KEYCODE_VOLUME_UP || key == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            web.evaluateJavascript("window.prismixVolumeKey&&prismixVolumeKey(" + (key == android.view.KeyEvent.KEYCODE_VOLUME_UP ? 1 : -1) + ")", null);
+            return true;
+        }
+        return super.onKeyDown(key, e);
+    }
 
     @Override
     public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
@@ -388,6 +399,8 @@ public class Main extends Activity {
                 return true;
             } catch (RuntimeException e) { return false; /* started from the background: the page retries */ }
         }
+        /** The remote page asks to get the phone's volume buttons as master-volume steps. */
+        @JavascriptInterface public void volumeKeys(boolean on) { m.volKeys = on; }
         @JavascriptInterface public void tap() {
             m.ui.post(() -> m.web.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP));
         }
@@ -453,6 +466,8 @@ public class Main extends Activity {
     private static class Client extends WebViewClient {
         private final Main m;
         Client(Main m) { this.m = m; }
+        @Override
+        public void onPageStarted(WebView v, String url, android.graphics.Bitmap icon) { m.volKeys = false; }
         @Override
         public void onReceivedSslError(WebView v, SslErrorHandler h, SslError e) {
             // Self-signed on the LAN: accept only the host we chose.
