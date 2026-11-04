@@ -862,8 +862,6 @@ const act = {
 };
 const throttle = (fn, ms) => { let t = 0; return (...a) => { const n = performance.now(); if (n - t >= ms) { t = n; fn(...a); } }; };
 $('play').onclick = () => act.toggle();
-$('back').onclick = () => act.seek(pos() - 5);
-$('fwd').onclick = () => act.seek(pos() + 5);
 $('t-down').onclick = () => act.tempo(tempo() - 0.05);
 $('t-up').onclick = () => act.tempo(tempo() + 0.05);
 $('t-reset').onclick = () => act.tempo(1);

@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.62.1
+
+The phone remote no longer has the back 5 s and forward 5 s buttons. Tap the seek bar to jump.
+
 ## 0.62.0
 
 The desktop tempo slider now opens upward as a vertical slider on hover, the same as the master volume, so the dock row is shorter.
