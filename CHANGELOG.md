@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.62.3
+
+The desktop "Key" label now shows the song's exact key (for example "A minor") and follows the key changer.
+
 ## 0.62.2
 
 Tempo has no slider any more, on the desktop dock and the phone remote: just −/+ and the percentage. The desktop "Tempo" label now shows the song's current BPM, which follows the percentage as you change it.

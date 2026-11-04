@@ -11,7 +11,7 @@ import { linkScroll, linkFollow } from './scroll.js';
 import { createMarkers } from './markers.js';
 import { createSplit } from './split.js';
 import { initCheatsheet } from './cheatsheet.js';
-import { getAccidentals, setAccidentals } from './theory.js';
+import { keyName, getAccidentals, setAccidentals } from './theory.js';
 import { createBand } from './band.js';
 import { createOutput } from './output.js';
 import { setAccent, clearAccent } from './accent.js';
@@ -712,7 +712,8 @@ async function openStudio(id, model) {
   if (token !== state.token) { player.dispose(); return; }
   state.current = { id, model, meta };
   state.baseBpm = 0;
-  fetch(`/media/${id}/structure.json`).then((r) => (r.ok ? r.json() : null)).then((s) => { if (state.current?.id === id) { state.baseBpm = s?.bpm || 0; syncDock(); } }).catch(() => {});
+  state.baseKey = null;
+  fetch(`/media/${id}/structure.json`).then((r) => (r.ok ? r.json() : null)).then((s) => { if (state.current?.id === id) { state.baseBpm = s?.bpm || 0; state.baseKey = s?.key || null; syncDock(); } }).catch(() => {});
   $('nt-toggle').hidden = false;
   stickers.load();
   const setup = await api(`/api/library/${id}/setup`).catch(() => ({}));
@@ -1070,6 +1071,7 @@ function syncDock() {
   $('tempo-out').textContent = `${Math.round(player.tempo * 100)}%`;
   $('tempo-out').classList.toggle('changed', Math.round(player.tempo * 100) !== 100);
   $('tempo-reset').hidden = Math.round(player.tempo * 100) === 100;
+  $('key-l').textContent = state.baseKey ? keyName(state.baseKey, player.semitones) : 'Key';
   $('key-out').textContent = player.semitones > 0 ? `+${player.semitones}` : String(player.semitones);
   $('key-out').classList.toggle('changed', player.semitones !== 0);
   $('key-reset').hidden = player.semitones === 0;
