@@ -90,27 +90,56 @@ export function createTuner({ opener, onOpen = () => {}, guitarTuning = () => 's
     voice = null;
     for (const b of dlg.querySelectorAll('[aria-pressed=true]')) if (!b.classList.contains('lock')) b.setAttribute('aria-pressed', 'false');
   };
+  // Karplus-Strong pluck: a noise burst circulating in a damped delay line, tuned by a fractional delay so the pitch stays exact.
+  // Phone speakers cannot reproduce 82 Hz, but the rich overtones of a real string carry the pitch to the ear.
+  function pluck(ctx, hz) {
+    const sr = ctx.sampleRate, len = Math.floor(sr * 7);
+    const buf = ctx.createBuffer(1, len, sr);
+    const y = buf.getChannelData(0);
+    const L = sr / hz - 0.5, n = Math.ceil(L) + 2;
+    let seed = Math.round(hz * 1000) | 1;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) | 0) / 2147483648);
+    // a pick position (comb) and a softened start make the attack closer to a finger or pick than to raw noise
+    const burst = new Float32Array(n);
+    for (let i = 0; i < n; i++) burst[i] = rnd();
+    const pos = Math.max(1, Math.round(n * 0.18));
+    for (let i = 0; i < n; i++) y[i] = burst[i] - (i >= pos ? burst[i - pos] : 0) * 0.8;
+    let lp = 0;
+    for (let i = 0; i < n; i++) { lp += (y[i] - lp) * 0.7; y[i] = lp; }
+    const loss = Math.min(0.9996, 0.5 + 0.5 * Math.pow(0.5, 1 / (hz * 2.4))); // lower strings ring longer
+    for (let i = n; i < len; i++) {
+      const p = i - L, k = Math.floor(p), f = p - k;
+      const a = y[k] * (1 - f) + y[k + 1] * f, b = y[k - 1] * (1 - f) + y[k] * f;
+      y[i] = (a + b) * 0.5 * loss;
+    }
+    let peak = 0;
+    for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(y[i]));
+    for (let i = 0; i < len; i++) y[i] /= peak || 1;
+    return buf;
+  }
   function tone(hz, pure, btn) {
     const was = voice?.btn;
     stopTone();
     if (was === btn) return;
     tctx ??= new AudioContext({ latencyHint: 'playback' });
     tctx.resume();
-    const osc = tctx.createOscillator();
-    // phone speakers cannot reproduce 82 Hz, so strings get overtones (the ear still hears the pitch); the fork stays a pure sine
-    if (!pure) {
-      const re = new Float32Array([0, 1, 0.55, 0.4, 0.25, 0.15, 0.08]);
-      osc.setPeriodicWave(tctx.createPeriodicWave(re, new Float32Array(re.length)));
-    }
-    osc.frequency.value = hz;
-    const gain = tctx.createGain();
     const t = tctx.currentTime;
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(pure ? 0.4 : 0.3, t + 0.03);
-    if (!pure) gain.gain.setTargetAtTime(0.06, t + 0.1, 2.5); // a plucked string dies away; the fork rings on
+    const gain = tctx.createGain();
+    let osc;
+    if (pure) {
+      osc = tctx.createOscillator();
+      osc.frequency.value = hz;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.4, t + 0.03);
+      osc.start();
+      osc.stop(t + 60);
+    } else {
+      osc = tctx.createBufferSource();
+      osc.buffer = pluck(tctx, hz);
+      gain.gain.setValueAtTime(0.7, t);
+      osc.start();
+    }
     osc.connect(gain).connect(tctx.destination);
-    osc.start();
-    osc.stop(t + (pure ? 60 : 12));
     voice = { osc, gain, btn };
     btn.setAttribute('aria-pressed', 'true');
     osc.onended = () => { if (voice?.osc === osc) stopTone(); };

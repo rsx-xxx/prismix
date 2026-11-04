@@ -760,7 +760,7 @@ function update() {
     $('k-out').textContent = `${sm > 0 ? '+' : ''}${sm}${kn ? ` · ${kn}` : ''}`;
   }
   const mv = Math.round(masterLevel() * 100);
-  if (last.mv !== mv && document.activeElement !== $('m-range')) { last.mv = mv; $('m-range').value = String(mv); $('m-out').textContent = `${mv}%`; }
+  if (last.mv !== mv && document.activeElement !== $('m-range')) { last.mv = mv; $('m-range').value = String(mv); $('m-range').style.setProperty('--p', `${mv}%`); $('m-out').textContent = `${mv}%`; }
   if (!t) return;
   const st = t.structure;
   const bi = st ? floorIndex(t.barT, p) : -1;
@@ -862,7 +862,7 @@ $('t-range').onchange = (e) => act.tempo(e.target.value / 100);
 $('k-down').onclick = () => act.key(semis() - 1);
 $('k-up').onclick = () => act.key(semis() + 1);
 $('c-reset').onclick = () => act.chord(0);
-$('m-range').oninput = throttle((e) => { $('m-out').textContent = `${e.target.value}%`; act.master(e.target.value / 100); }, 60);
+$('m-range').oninput = throttle((e) => { e.target.style.setProperty('--p', `${e.target.value}%`); $('m-out').textContent = `${e.target.value}%`; act.master(e.target.value / 100); }, 60);
 $('m-range').onchange = (e) => act.master(e.target.value / 100);
 $('c-lock').onclick = () => act.chordLock(!chordLock());
 $('c-down').onclick = () => act.chord(chordKey() - 1);

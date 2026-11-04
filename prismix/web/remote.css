@@ -309,3 +309,11 @@ html.split .stage { padding: 0 max(1.1rem, 6vw); }
   -webkit-backdrop-filter: blur(28px) saturate(1.8); backdrop-filter: blur(28px) saturate(1.8);
 }
 :is([data-platform=ios], [data-platform=ipad]) .top .who b { font-size: 1.25rem; font-weight: 800; letter-spacing: -.02em; }
+
+/* vertical level slider: a slim pill that fills from the bottom with the accent colour; --p is set from the value in JS */
+.mpop input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+.mpop input[type=range]::-webkit-slider-runnable-track { width: 8px; border-radius: 99px; background: linear-gradient(to top, var(--accent) var(--p, 100%), var(--line) var(--p, 100%)); }
+.mpop input[type=range]::-moz-range-track { width: 8px; border-radius: 99px; background: var(--line); }
+.mpop input[type=range]::-moz-range-progress { width: 8px; border-radius: 99px; background: var(--accent); }
+.mpop input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-left: -6px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px #0000004d, 0 0 0 1px var(--line); }
+.mpop input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px #0000004d; }

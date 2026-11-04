@@ -135,6 +135,7 @@ public class Main extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         current = this;
+        setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
         bars(BG, false);
         prefs = getSharedPreferences("band", MODE_PRIVATE);
         importEmbeddedInvite();

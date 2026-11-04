@@ -1296,3 +1296,11 @@ img.cv.none { opacity: 0; }
 .split-dlg .set-row:first-of-type { border-top: 1px solid var(--line); }
 .split-dlg .dlg-actions { margin-top: 14px; }
 .split-dlg select { max-width: 60%; }
+
+/* vertical level slider: a slim pill that fills from the bottom with the accent colour; --p is set from the value in JS */
+.master-pop input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+.master-pop input[type=range]::-webkit-slider-runnable-track { width: 8px; border-radius: 99px; background: linear-gradient(to top, var(--accent) var(--p, 100%), var(--line) var(--p, 100%)); }
+.master-pop input[type=range]::-moz-range-track { width: 8px; border-radius: 99px; background: var(--line); }
+.master-pop input[type=range]::-moz-range-progress { width: 8px; border-radius: 99px; background: var(--accent); }
+.master-pop input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-left: -6px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px #0000004d, 0 0 0 1px var(--line); }
+.master-pop input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px #0000004d; }
