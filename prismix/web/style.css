@@ -447,6 +447,22 @@ kbd { font: 12px var(--font); background: var(--surface-2); border: 1px solid va
 .diagrams svg { color: var(--text); }
 .knob { position: relative; }
 .reset { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--accent); }
+.lock { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--muted); cursor: pointer; }
+.lock::before { content: ""; width: 14px; height: 14px; background: currentColor; -webkit-mask: var(--lock-ico) center / contain no-repeat; mask: var(--lock-ico) center / contain no-repeat; }
+.lock[aria-pressed=true] { --lock-ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%225%22 y=%2211%22 width=%2214%22 height=%2210%22 rx=%222%22/%3E%3Cpath d=%22M8 11V7a4 4 0 0 1 8 0v4%22/%3E%3C/svg%3E"); color: var(--accent); }
+.lock[aria-pressed=false] { --lock-ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%225%22 y=%2211%22 width=%2214%22 height=%2210%22 rx=%222%22/%3E%3Cpath d=%22M8 11V7a4 4 0 0 1 7.5-2%22/%3E%3C/svg%3E"); }
+.chord-off { opacity: .45; pointer-events: none; }
+.master { position: relative; }
+/* the master volume opens upward into a tall slider while the pointer or focus is on it */
+.master-pop {
+  position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding-bottom: 6px;
+  display: none; flex-direction: column; align-items: center; gap: 8px; z-index: 35;
+}
+.master:hover .master-pop, .master:focus-within .master-pop { display: flex; }
+.master-pop::before { content: ""; position: absolute; inset: 0 -8px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 22px rgb(0 0 0 / .16); z-index: -1; }
+.master-pop { padding: 10px 14px 12px; }
+.master-pop output { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.master-pop input[type=range] { writing-mode: vertical-lr; direction: rtl; width: 28px; height: 140px; margin: 0; }
 .reset:hover { background: var(--line-strong); }
 .reset[hidden] { display: none; }
 

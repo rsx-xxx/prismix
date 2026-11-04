@@ -118,6 +118,8 @@ def clean_setup(raw: object) -> dict:
         v = raw.get(key)
         if isinstance(v, int) and not isinstance(v, bool) and lo <= v <= hi:
             out[key] = v
+    if isinstance(raw.get("chordLock"), bool):
+        out["chordLock"] = raw["chordLock"]
     t = raw.get("tuning")
     if isinstance(t, str) and re.fullmatch(r"[a-z0-9:,]{1,40}", t):
         out["tuning"] = t

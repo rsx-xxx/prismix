@@ -34,7 +34,7 @@ export function createScore({ player, api, notice, onSetup }) {
   const alts = new Map(); // chord shape -> which alternative fingering is showing
   const remember = (k) => { try { localStorage.setItem(`stems:sc-${k}`, opts[k] ? '1' : '0'); } catch { /* ignore */ } };
 
-  const shift = () => player.semitones + player.chordKey;
+  const shift = () => player.chordShift;
   let tuning = tuningById('std'); // how the guitar is tuned; shapes are read through it
   const shape = () => shapeTuning(tuning);
   /** Semitones the written shapes sit from the sounding chords: capo and a down-tuned guitar both lower what you fret. */
@@ -588,12 +588,12 @@ export function createScore({ player, api, notice, onSetup }) {
 
   /** Move the chords and tab alone, the audio stays in its key. */
   function chordKeyPicker() {
-    const k = player.chordKey;
-    const sel = el('select', { 'aria-label': 'Chord key', title: 'Read the chords in another key without changing the sound' });
+    const k = player.chordShift;
+    const sel = el('select', { 'aria-label': 'Chord key', disabled: player.chordLock, title: player.chordLock ? 'Chords follow the key. Unlock them in the player to pick another key' : 'Read the chords in another key without changing the sound' });
     for (let v = -12; v <= 12; v++) {
       const key = cur.data?.structure.key;
-      const label = `${v > 0 ? '+' : ''}${v}${key ? ` · ${keyName(key, player.semitones + v)}` : ''}`;
-      sel.append(el('option', { value: String(v), textContent: v === 0 ? `Chord key: with the audio${key ? ` (${keyName(key, player.semitones)})` : ''}` : `Chord key: ${label}`, selected: v === k }));
+      const label = `${v > 0 ? '+' : ''}${v}${key ? ` · ${keyName(key, v)}` : ''}`;
+      sel.append(el('option', { value: String(v), textContent: v === 0 ? `Chord key: original${key ? ` (${keyName(key, 0)})` : ''}` : `Chord key: ${label}`, selected: v === k }));
     }
     sel.addEventListener('change', () => player.setChordKey(+sel.value));
     return sel;

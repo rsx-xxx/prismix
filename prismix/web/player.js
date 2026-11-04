@@ -14,7 +14,8 @@ export class StemPlayer extends EventTarget {
     this.duration = 0;
     this.tempo = 1;
     this.semitones = 0;
-    this.chordKey = 0; // chords and tab are read this far from the audio's key; the sound does not move
+    this.chordLock = true; // locked: chords and tab follow the audio's key; unlocked: only chordKey moves them
+    this.chordKey = 0; // unlocked: the key the chords and tab are read in (semitones from the original); the sound does not move
     this.cents = 0;
     this.formants = true;
     this.loop = null; // {a, b} seconds
@@ -312,6 +313,15 @@ export class StemPlayer extends EventTarget {
   }
 
   setTempo(rate) { this.tempo = clamp(rate, 0.5, 1.5); this._retune(); this._emit('tune'); }
+  get chordShift() { return this.chordLock ? this.semitones : this.chordKey; }
+  /** Locking snaps the chords back to the audio's key; unlocking keeps them where they are now. */
+  setChordLock(on) {
+    on = !!on;
+    if (on === this.chordLock) return;
+    if (!on) this.chordKey = this.semitones;
+    this.chordLock = on;
+    this._emit('tune');
+  }
   setChordKey(n) { this.chordKey = clamp(Math.round(n), -12, 12); this._emit('tune'); }
   setSemitones(n) { this.semitones = clamp(Math.round(n), -12, 12); this._retune(); this._emit('tune'); }
   setCents(c) { this.cents = clamp(Math.round(c), -50, 50); this._retune(); this._emit('tune'); }

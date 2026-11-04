@@ -20,6 +20,9 @@
     <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 5.8v12.4a.8.8 0 0 1-1.25.66l-8.6-6.2a.8.8 0 0 1 0-1.3l8.6-6.2A.8.8 0 0 1 19 5.8Z" fill="currentColor"/></symbol>
     <symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 5.8v12.4a.8.8 0 0 0 1.25.66l8.6-6.2a.8.8 0 0 0 0-1.3l-8.6-6.2A.8.8 0 0 0 5 5.8Z" fill="currentColor"/></symbol>
     <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="18.5" r="1.8" fill="currentColor"/></symbol>
+    <symbol id="i-vol" viewBox="0 0 24 24"><path d="M4 9.5v5h4l5 4v-13l-5 4zM16.5 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V7a4 4 0 0 1 8 0v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V7a4 4 0 0 1 7.5-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
@@ -100,7 +103,13 @@
           <button id="fwd" class="icon round" type="button" aria-label="Forward 5 seconds"><svg><use href="#i-fwd"/></svg></button>
           <button id="pl-next" class="icon round" type="button" aria-label="Next song in playlist" hidden><svg><use href="#i-next"/></svg></button>
         </div>
-        <button id="tune" class="tune" type="button" aria-label="Tempo and key"><small id="tune-l">Tempo · Key</small><b id="tune-v">100% · 0</b></button>
+        <div class="rside">
+          <div class="mvol" id="mvol">
+            <button id="m-btn" class="icon round" type="button" aria-label="Master volume"><svg><use href="#i-vol"/></svg></button>
+            <div class="mpop"><output id="m-out">100%</output><input id="m-range" type="range" min="0" max="100" step="1" value="100" aria-label="Master volume" aria-orientation="vertical"></div>
+          </div>
+          <button id="tune" class="tune" type="button" aria-label="Tempo and key"><small id="tune-l">Tempo · Key</small><b id="tune-v">100% · 0</b></button>
+        </div>
       </div>
       <p id="locked" class="note" hidden>The host locked playback controls.</p>
     </footer>
@@ -134,7 +143,7 @@
           <div class="s-ctl"><button id="k-down" class="icon round" type="button" aria-label="Lower"><svg><use href="#i-minus"/></svg></button><input id="k-range" type="range" min="-12" max="12" step="1" value="0"><button id="k-up" class="icon round" type="button" aria-label="Higher"><svg><use href="#i-plus"/></svg></button></div>
         </div>
         <div class="stepper">
-          <div class="s-head"><span>Chord key</span><output id="c-out">with the audio</output><button id="c-reset" class="link" type="button">Reset</button></div>
+          <div class="s-head"><span>Chord key</span><output id="c-out">follows key</output><button id="c-lock" class="icon round lockbtn" type="button" aria-pressed="true" aria-label="Lock chords to the key" title="Chords follow the key. Tap to unlock"><svg class="on"><use href="#i-lock"/></svg><svg class="off"><use href="#i-unlock"/></svg></button><button id="c-reset" class="link" type="button">Reset</button></div>
           <div class="s-ctl"><button id="c-down" class="icon round" type="button" aria-label="Lower"><svg><use href="#i-minus"/></svg></button><input id="c-range" type="range" min="-12" max="12" step="1" value="0"><button id="c-up" class="icon round" type="button" aria-label="Higher"><svg><use href="#i-plus"/></svg></button></div>
         </div>
       </section>

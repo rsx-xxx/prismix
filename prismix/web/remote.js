@@ -84,7 +84,7 @@ const S = {
   local: null, // StemPlayer, created on demand
   localTrack: null,
   lat: store.lat || 0, // ms
-  solo: { tempo: 1, semitones: 0, chord: 0 },
+  solo: { tempo: 1, semitones: 0, chord: 0, lock: true },
 };
 const serverNow = () => Date.now() + S.offset;
 
@@ -194,6 +194,7 @@ function setHost(m) {
     if (prev.tempo !== m.tempo) tell('tempo', m.tempo);
     else if (prev.semitones !== m.semitones) tell('pitch', m.semitones);
     else if ((prev.chordKey ?? 0) !== (m.chordKey ?? 0)) tell('chordkey', m.chordKey ?? 0);
+    else if ((prev.chordLock ?? true) !== (m.chordLock ?? true)) tell('chordlock', m.chordLock ?? true);
   }
   S.hostOnline = true;
   // Compare with the last song asked for, not the last state: a failed song must not be retried on every update.
@@ -240,6 +241,10 @@ const playing = () => (soloActive() ? S.local.playing : !!S.host?.playing);
 const tempo = () => (S.mode === 'solo' ? S.solo.tempo : S.host?.tempo ?? 1);
 const chordKey = () => (S.mode === 'solo' ? S.solo.chord : S.host?.chordKey ?? 0);
 const semis = () => (S.mode === 'solo' ? S.solo.semitones : S.host?.semitones ?? 0);
+const chordLock = () => (S.mode === 'solo' ? S.solo.lock : S.host?.chordLock ?? true);
+/** Semitones the chords are read from the original key: with the audio while locked, else only the chord key. */
+const chordShift = () => (chordLock() ? semis() : chordKey());
+const masterLevel = () => (S.mode === 'follow' ? S.host?.master ?? 1 : store.master ?? 1);
 
 // ── track data ──
 /**
@@ -337,9 +342,9 @@ async function loadTrack(id, model) {
 }
 
 // ── rendering ──
-const flats = () => S.track?.structure && useFlats(S.track.structure.key, semis() + chordKey());
-const cname = (c) => chordName(c, semis() + chordKey(), flats());
-const hueOf = (c) => chordPaint(c, semis() + chordKey()).hue;
+const flats = () => S.track?.structure && useFlats(S.track.structure.key, chordShift());
+const cname = (c) => chordName(c, chordShift(), flats());
+const hueOf = (c) => chordPaint(c, chordShift()).hue;
 function pill(c, i) {
   const e = el('span', { className: 'chord', textContent: cname(c) });
   e.style.setProperty('--h', hueOf(c));
@@ -422,7 +427,7 @@ function chrome() {
 }
 
 function render() {
-  last = { semis: semis() + chordKey() };
+  last = { semis: chordShift() };
   nodes = { chords: [] };
   const stage = $('stage');
   stage.replaceChildren();
@@ -741,16 +746,21 @@ function update() {
   if (last.cur !== cur) { $('t-cur').textContent = cur; last.cur = cur; }
   const tp = Math.round(tempo() * 100), sm = semis(), ck = chordKey();
   const st0 = t?.structure, bpm = st0?.bpm ? Math.round(st0.bpm * tp / 100) : 0, kn = st0?.key ? keyName(st0.key, sm) : '';
-  const tuneKey = `${tp}|${sm}|${bpm}|${kn}|${ck}`;
+  const cl = chordLock(), tuneKey = `${tp}|${sm}|${bpm}|${kn}|${ck}|${cl}`;
   if (last.tune !== tuneKey) {
     last.tune = tuneKey;
     $('tune-v').textContent = `${tp}% · ${sm > 0 ? '+' : ''}${sm}`;
     $('tune-v').classList.toggle('changed', tp !== 100 || sm !== 0);
     $('tune-l').textContent = bpm ? `${bpm} BPM · Key` : 'Tempo · Key';
     $('t-out').textContent = bpm ? `${tp}% · ${bpm} BPM` : `${tp}%`; $('t-range').value = String(tp); $('t-range').style.setProperty('--fill', `${tp - 50}%`);
-    $('c-out').textContent = ck ? `${ck > 0 ? '+' : ''}${ck}${st0?.key ? ` · ${keyName(st0.key, sm + ck)}` : ''}` : 'with the audio'; $('c-range').value = String(ck);
+    const cs = cl ? sm : ck;
+    $('c-out').textContent = `${cl ? 'follows key' : `${cs > 0 ? '+' : ''}${cs}`}${st0?.key ? ` · ${keyName(st0.key, cs)}` : ''}`; $('c-range').value = String(cs);
+    $('c-lock').setAttribute('aria-pressed', String(cl)); $('c-lock').title = cl ? 'Chords follow the key. Tap to unlock' : 'Chords set on their own. Tap to follow the key';
+    for (const id of ['c-down', 'c-up', 'c-range', 'c-reset']) $(id).disabled = cl;
     $('k-out').textContent = `${sm > 0 ? '+' : ''}${sm}${kn ? ` · ${kn}` : ''}`; $('k-range').value = String(sm); $('k-range').style.setProperty('--fill', `${((sm + 12) / 24) * 100}%`);
   }
+  const mv = Math.round(masterLevel() * 100);
+  if (last.mv !== mv && document.activeElement !== $('m-range')) { last.mv = mv; $('m-range').value = String(mv); $('m-out').textContent = `${mv}%`; }
   if (!t) return;
   const st = t.structure;
   const bi = st ? floorIndex(t.barT, p) : -1;
@@ -759,7 +769,7 @@ function update() {
   const wb = barNo > 0 ? String(barNo) : '–', wc = ci >= 0 && bi >= 0 ? cname(t.chords[ci]) : '';
   if (last.wb !== wb) { $('w-bar').textContent = wb; last.wb = wb; }
   if (last.wc !== wc) { $('w-chord').textContent = wc; last.wc = wc; }
-  if (last.semis !== sm + ck) { relabel(); last.semis = sm + ck; last.wc = null; }
+  if (last.semis !== chordShift()) { relabel(); last.semis = chordShift(); last.wc = null; }
 
   if (S.view === 'lyrics' && nodes.lines) {
     const synced = !!t.lyrics?.synced;
@@ -829,8 +839,14 @@ const act = {
     v = clamp(Math.round(v), -12, 12);
     if (S.mode === 'solo') { S.solo.chord = v; relabel(); last.semis = null; } else send('chordkey', v);
   },
+  chordLock: (on) => {
+    if (S.mode === 'solo') { if (!on) S.solo.chord = S.solo.semitones; S.solo.lock = on; relabel(); last.semis = null; last.tune = null; } else send('chordlock', on);
+  },
+  master: (v) => {
+    v = clamp(v, 0, 1);
+    if (S.mode === 'follow') send('master', v); else { store.master = v; save(); S.local?.setMaster(v); }
+  },
   key: (v) => {
-    v = clamp(Math.round(v), -12, 12);
     if (S.mode === 'solo') { S.solo.semitones = v; S.local?.setSemitones(v); } else send('pitch', v);
   },
 };
@@ -846,6 +862,9 @@ $('t-range').onchange = (e) => act.tempo(e.target.value / 100);
 $('k-down').onclick = () => act.key(semis() - 1);
 $('k-up').onclick = () => act.key(semis() + 1);
 $('c-reset').onclick = () => act.chord(0);
+$('m-range').oninput = throttle((e) => { $('m-out').textContent = `${e.target.value}%`; act.master(e.target.value / 100); }, 60);
+$('m-range').onchange = (e) => act.master(e.target.value / 100);
+$('c-lock').onclick = () => act.chordLock(!chordLock());
 $('c-range').oninput = throttle((e) => act.chord(+e.target.value), 90);
 $('c-range').onchange = (e) => act.chord(+e.target.value);
 $('c-down').onclick = () => act.chord(chordKey() - 1);
@@ -1204,7 +1223,7 @@ $('song-tabs').onclick = (e) => { const t = e.target.dataset?.tab; if (t) setSon
 function playSong(id, model, plist) {
   if (!root.classList.contains('split')) songs.close();
   if (plist !== undefined) S.pl = plist;
-  if (S.mode === 'solo') { S.solo.tempo = 1; S.solo.semitones = 0; S.solo.chord = 0; loadTrack(id, model); } else send('load', { id, model });
+  if (S.mode === 'solo') { S.solo.tempo = 1; S.solo.semitones = 0; S.solo.chord = 0; S.solo.lock = true; loadTrack(id, model); } else send('load', { id, model });
   syncPlNav();
 }
 const modelOf = (id) => library.find((i) => i.id === id)?.models?.[0];
@@ -1435,6 +1454,7 @@ async function setMode(mode) {
       // start solo from what the room is doing now
       S.solo.tempo = S.host?.tempo ?? 1;
       S.solo.semitones = S.host?.semitones ?? 0;
+      S.solo.chord = S.host?.chordKey ?? 0; S.solo.lock = S.host?.chordLock ?? true;
     }
     try { await ensureLocal(); } catch (err) {
       S.mode = 'follow'; if (!OFFLINE) { store.mode = 'follow'; save(); }
@@ -1452,7 +1472,7 @@ async function setMode(mode) {
     }
     if (mode === 'listen') { claimSpeaker(); syncLocal(true); }
   }
-  last = { semis: semis() + chordKey() };
+  last = { semis: chordShift() };
 }
 
 async function ensureLocal() {
@@ -1487,6 +1507,7 @@ async function ensureLocal() {
     S.local?.dispose();
     S.local = p;
     S.localTrack = key;
+    p.setMaster(store.master ?? 1);
     applyMix();
     modeUi();
     p.addEventListener('ended', () => { if (S.mode === 'solo') last = {}; });

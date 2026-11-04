@@ -182,6 +182,7 @@ class UploadRename(BaseModel):
 class SongSetup(BaseModel):
     semitones: int | None = Field(default=None, ge=-12, le=12)
     chord_key: int | None = Field(default=None, alias="chordKey", ge=-12, le=12)
+    chord_lock: bool | None = Field(default=None, alias="chordLock")
     capo: int | None = Field(default=None, ge=0, le=11)
     tuning: str | None = Field(default=None, max_length=40)
 

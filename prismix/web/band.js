@@ -11,6 +11,7 @@ export function describe(m) {
     tempo: `tempo ${Math.round(m.v * 100)}%`,
     pitch: `key ${signed(m.v)}`,
     cents: `fine tune ${signed(m.v)}`,
+    chordlock: m.v ? 'chords follow the key' : 'chords unlocked from the key',
     chordkey: `chord key ${signed(m.v)}`,
     load: 'song',
   }[m.op];
@@ -35,6 +36,7 @@ export function createBand({ player, current, open, onNotes, $ }) {
       tempo: player.tempo,
       semitones: player.semitones,
       chordKey: player.chordKey,
+      chordLock: player.chordLock,
       cents: player.cents,
       master: Number($('master').value) / 100,
       loop: q ? { a: q.a, b: q.b } : null,
@@ -54,6 +56,7 @@ export function createBand({ player, current, open, onNotes, $ }) {
     pitch: (v) => player.setSemitones(+v),
     cents: (v) => player.setCents(+v),
     chordkey: (v) => player.setChordKey(+v),
+    chordlock: (v) => player.setChordLock(!!v),
     loop: (v) => (v ? player.setLoop(+v.a, +v.b) : player.setLoop(null, null)),
     mute: (v) => player._stem(v?.name) && player.setMuted(v.name, !!v.on),
     solo: (v) => player._stem(v?.name) && player.setSolo(v.name, !!v.on),

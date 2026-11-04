@@ -598,7 +598,7 @@ $('mini-close').addEventListener('click', () => { player.dispose(); state.curren
 
 // ── studio ──
 /** What is shared about how the song is played: audio key, chords-only shift, guitar tuning. */
-const currentSetup = () => ({ semitones: player.semitones, chordKey: player.chordKey, tuning: score.tuning.get() });
+const currentSetup = () => ({ semitones: player.semitones, chordKey: player.chordKey, chordLock: player.chordLock, tuning: score.tuning.get() });
 let setupTimer;
 /** Saves the setup on this computer and, for cloud songs, for everybody; waits for the sliders to settle. */
 function saveSetup() {
@@ -716,7 +716,13 @@ async function openStudio(id, model) {
   const setup = await api(`/api/library/${id}/setup`).catch(() => ({}));
   if (token !== state.token) { player.dispose(); return; }
   applyPrefs({ ...loadPrefs(id), ...(setup.semitones != null && { semitones: setup.semitones }) });
-  player.setChordKey(setup.chordKey ?? 0);
+  // setups saved before the lock existed held the chords' offset from the audio's key
+  const legacy = setup.chordLock == null && !!setup.chordKey;
+  player.setChordLock(true);
+  if (setup.chordLock === false || legacy) {
+    player.setChordLock(false);
+    player.setChordKey(legacy ? player.semitones + setup.chordKey : setup.chordKey ?? 0);
+  }
   score.tuning.set(setup.tuning ?? 'std');
   state.current.setup = currentSetup();
   band.publish();
@@ -1065,6 +1071,13 @@ function syncDock() {
   $('key-out').textContent = player.semitones > 0 ? `+${player.semitones}` : String(player.semitones);
   $('key-out').classList.toggle('changed', player.semitones !== 0);
   $('key-reset').hidden = player.semitones === 0;
+  const ck = player.chordShift;
+  $('chord-lock').setAttribute('aria-pressed', String(player.chordLock));
+  $('chord-knob').classList.toggle('locked', player.chordLock);
+  for (const id of ['chord-down', 'chord-up', 'chord-key']) $(id).disabled = player.chordLock;
+  $('chord-key').value = ck;
+  $('chord-out').textContent = ck > 0 ? `+${ck}` : String(ck);
+  $('chord-out').classList.toggle('changed', ck !== 0);
   $('cents').value = player.cents;
   $('cents-out').textContent = `${player.cents > 0 ? '+' : ''}${player.cents} ct`;
   $('formants').checked = player.formants;
@@ -1144,6 +1157,10 @@ $('tempo-up').addEventListener('click', () => player.setTempo(Math.round(player.
 $('key').addEventListener('input', (e) => player.setSemitones(Number(e.target.value)));
 $('key-down').addEventListener('click', () => player.setSemitones(player.semitones - 1));
 $('key-up').addEventListener('click', () => player.setSemitones(player.semitones + 1));
+$('chord-lock').addEventListener('click', () => player.setChordLock(!player.chordLock));
+$('chord-key').addEventListener('input', (e) => player.setChordKey(Number(e.target.value)));
+$('chord-down').addEventListener('click', () => player.setChordKey(player.chordKey - 1));
+$('chord-up').addEventListener('click', () => player.setChordKey(player.chordKey + 1));
 $('cents').addEventListener('input', (e) => player.setCents(Number(e.target.value)));
 $('formants').addEventListener('change', (e) => player.setFormants(e.target.checked));
 $('master').addEventListener('input', (e) => { player.setMaster(e.target.value / 100); $('master-out').textContent = `${e.target.value}%`; band.publish(); });
