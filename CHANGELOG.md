@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.60.1
+
+The chord key and its lock moved from the player dock into the chords/tabs block, next to capo and tuning, so the dock keeps everything on one line with the master volume.
+
 ## 0.60.0
 
 The master volume now sits on the main player: hover (or tap) the speaker to open a tall slider, on the desktop dock and on the phone remote. A lock beside the new Chords key control decides what moves the chords and tabs: locked (the default) they follow the key, unlocked only the Chords key moves them and the key changer leaves them alone. The lock is saved per song and shared with the band.

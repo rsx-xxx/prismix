@@ -596,7 +596,9 @@ export function createScore({ player, api, notice, onSetup }) {
       sel.append(el('option', { value: String(v), textContent: v === 0 ? `Chord key: original${key ? ` (${keyName(key, 0)})` : ''}` : `Chord key: ${label}`, selected: v === k }));
     }
     sel.addEventListener('change', () => player.setChordKey(+sel.value));
-    return sel;
+    const lock = el('button', { type: 'button', className: 'lock', ariaPressed: String(player.chordLock), ariaLabel: 'Lock chords and tabs to the key', title: player.chordLock ? 'Chords and tabs follow the key. Click to unlock and set them only here' : 'Chords and tabs are set only here. Click to follow the key again' });
+    lock.addEventListener('click', () => player.setChordLock(!player.chordLock));
+    return el('span', { className: 'chordkey' }, lock, sel);
   }
 
   function capoPicker() {
@@ -775,11 +777,12 @@ export function createScore({ player, api, notice, onSetup }) {
   $('sc-pdf').addEventListener('click', pdf);
 
   // re-render when the key changes (debounced: dragging the slider fires many)
-  let tuneTimer, lastShift = 0, lastTempo = 1;
+  let tuneTimer, lastShift = 0, lastTempo = 1, lastLock = true;
   function tuned() {
     if (!cur?.data) return;
-    if (shift() === lastShift && player.tempo === lastTempo) return;
+    if (shift() === lastShift && player.tempo === lastTempo && player.chordLock === lastLock) return;
     lastShift = shift();
+    lastLock = player.chordLock;
     lastTempo = player.tempo;
     clearTimeout(tuneTimer);
     tuneTimer = setTimeout(() => { if (cur) cur.capo = null; renderAll(); }, 250);
