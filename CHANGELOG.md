@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.62.4
+
+Minor keys are written short everywhere (Gm instead of G minor).
+
 ## 0.62.3
 
 The desktop "Key" label now shows the song's exact key (for example "A minor") and follows the key changer.

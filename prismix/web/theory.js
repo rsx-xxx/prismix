@@ -27,7 +27,7 @@ export const keyName = (key, semitones = 0) => {
   if (!key) return '';
   const pc = mod12(key.tonic + semitones);
   const names = useFlats(key, semitones) ? FLAT : SHARP;
-  return `${names[pc]}${key.mode === 'minor' ? ' minor' : ' major'}`;
+  return key.mode === 'minor' ? `${names[pc]}m` : `${names[pc]} major`;
 };
 
 export const prefersFlats = (fifths) => fifths < 0;
