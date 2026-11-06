@@ -7,6 +7,7 @@ import { createLyrics } from './lyrics.js';
 import { createTab } from './studio-tab.js';
 import { createBlocks } from './blocks.js';
 import { createSources } from './sources.js';
+import { wireEggs } from './eggs.js';
 import { linkScroll, linkFollow } from './scroll.js';
 import { createMarkers } from './markers.js';
 import { createSplit } from './split.js';
@@ -805,6 +806,7 @@ api('/api/version').then((v) => {
   a.href = v.url;
   a.title = `Release notes for Prismix ${v.version}`;
   a.hidden = false;
+  wireEggs({ label: a, version: v.version, notice });
 }).catch(() => { /* the version label is optional */ });
 
 let updateWired = false;

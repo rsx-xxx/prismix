@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.67.1
+
+A small secret for every 0.67.x and 0.69.x release: hold Shift and click the version label.
+
 ## 0.67.0
 
 New "Check tab against the recording" in Song sources: each instrument's stem is transcribed and compared bar by bar with the published tab, so covers and mashups keep the tab where it is right. Differing bars are flagged, and the recording's own notes for them are added as a separate part marked auto. Machine fingering now keeps the hand in one playable position (beam search over hand movement) and follows where the published tab held it.
