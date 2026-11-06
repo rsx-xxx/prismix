@@ -202,7 +202,7 @@ def finger(kind: str, chords: list[list[int]], hints: list[float | None]) -> lis
     """[string, fret] groups for a run of chords, by beam search over hand movement: the whole line stays in one playable
     position instead of each note taking its own lowest fret. `hints` is where a published tab held the hand there, if any."""
     beam: list[tuple[float, float | None, list]] = [(0.0, None, [])]
-    for pitches, hint in zip(chords, hints):
+    for pitches, hint in zip(chords, hints, strict=False):
         opts = _fingerings(kind, pitches)
         if not opts:
             beam = [(c, pos, path + [[]]) for c, pos, path in beam]
@@ -266,7 +266,7 @@ def to_bars(notes: list[tuple[int, float, float]], structure: dict, kind: str, h
         held = finger(kind, [c[2] for c in plan], hint)
     else:
         held = [_strings(kind, c[2])[: POLY[kind]] for c in plan]
-    for (j, at, _, steps, ln, nxt), frets in zip(plan, held):
+    for (j, at, _, steps, ln, nxt), frets in zip(plan, held, strict=False):
         if frets:
             bars[j]["n"].append([round(at / steps, 4), round(min(ln, nxt - at) / steps, 4), frets])
     return bars

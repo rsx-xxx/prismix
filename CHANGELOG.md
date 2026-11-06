@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.68.1
+
+Fixes the release build, which stopped at a lint check in the tab fingering code since 0.67.2. No change in behaviour; this release also carries everything from 0.67.2 and 0.68.0.
+
 ## 0.68.0
 
 New rehearsal mode, "Follow" in the dock: with the drum stem muted, the stems adapt their tempo to a live drummer on an electronic kit (MIDI), so the band no longer splits from a drummer who rushes or drags; the sound keeps its pitch. Click four sticks while the stems are stopped to start them at the drummer's tempo on his downbeat; "Set in sync" trims out the kit and speaker latency. Pick the kit in the dock; microphone and phone support come next.
