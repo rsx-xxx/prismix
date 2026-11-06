@@ -154,6 +154,7 @@ def test_import_file_saves_fitted_tab(tmp_path, monkeypatch):
     monkeypatch.setattr(tabdata, "gapfill", lambda *a: None)
     monkeypatch.setattr(tabdata, "mark_weak", lambda *a: None)
     monkeypatch.setattr(tabdata, "retune", lambda *a: None)
+    monkeypatch.setattr(tabdata, "_raw", lambda v: None)
     monkeypatch.setattr(tabdata, "_save", lambda v, d: saved.update(d))
     monkeypatch.setattr(tabdata, "read", lambda v: None)
     monkeypatch.setattr(tabdata, "_edits_path", lambda v: tmp_path / "edits.json")
@@ -169,3 +170,26 @@ def test_import_file_refuses_unknown_type():
     except tabfiles.FileError:
         return
     raise AssertionError
+
+
+def test_add_source_lays_score_beside_existing_tab(tmp_path, monkeypatch):
+    from prismix import tabdata
+
+    store = {}
+    monkeypatch.setattr(tabdata, "_raw", lambda v: store.get("tab"))
+    monkeypatch.setattr(tabdata, "_save", lambda v, d: store.__setitem__("tab", d))
+    monkeypatch.setattr(tabdata, "_edits_path", lambda v: tmp_path / "edits.json")
+    bar = lambda f: {"len": 1.0, "n": [[0.0, 1.0, [[0, f]]]]}  # noqa: E731
+    store["tab"] = {
+        "found": True, "source": "songsterr", "url": "https://s/x", "map": [0, 1, None, 3],
+        "tracks": {"guitar": {"kind": "guitar", "name": "G", "tuning": [64], "bars": [bar(0)] * 4}},
+    }
+    # the new score's bar k plays recording bar 3 - k: its bars are found through the recording, not by position
+    part = {"kind": "guitar", "name": "Lead", "tuning": [64], "bars": [bar(9), bar(8), bar(7), bar(6)]}
+    tab = tabdata.add_source("v", {"guitar": part}, {"map": [3, 2, 1, 0]}, {"source": "file", "origin": "file:a.gp", "label": "a.gp"})
+    assert tab["added"] == ["guitar2"]
+    new = tab["tracks"]["guitar2"]
+    assert new["source"] == "file" and new["label"] == "a.gp" and tab["tracks"]["guitar"]["source"] == "songsterr"
+    assert [b["n"][0][2][0][1] if b["n"] else None for b in new["bars"]] == [6, 7, None, 9]
+    again = tabdata.add_source("v", {"guitar": dict(part, bars=[bar(5)] * 4)}, {"map": [0, 1, 2, 3]}, {"source": "file", "origin": "file:a.gp", "label": "a.gp"})
+    assert list(again["tracks"]) == ["guitar", "guitar2"]  # the same file again replaces its parts

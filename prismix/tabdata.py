@@ -177,14 +177,11 @@ def import_soundslice(video_id: str, url: str) -> dict:
     if not fitted:
         raise TabDataError("That tab does not look like this recording")
     gapfill(parts, fitted, structure)
-    result = {
-        "found": True, "v": FORMAT, "source": "soundslice", "songId": code, "url": f"https://www.soundslice.com/slices/{code}/",
-        "artist": " ".join((head.get("a") or "").split()), "title": " ".join((head.get("name") or "").split()), **fitted,
-        "tracks": parts,
-    }
-    _save(video_id, result)
-    _edits_path(video_id).unlink(missing_ok=True)  # edits belonged to the tab this one replaces
-    return read(video_id) or result
+    return add_source(video_id, parts, fitted, {
+        "source": "soundslice", "origin": f"soundslice:{code}", "url": f"https://www.soundslice.com/slices/{code}/",
+        "label": " ".join((head.get("name") or "").split()) or code,
+        "artist": " ".join((head.get("a") or "").split()), "title": " ".join((head.get("name") or "").split()),
+    })
 
 
 # ───────────────────────── lookup ─────────────────────────
@@ -695,6 +692,51 @@ def add_auto(video_id: str, parts: dict[str, dict], nbars: int) -> dict:
         tracks[part_key(kind, n)] = part
     _save(video_id, raw)
     return read(video_id) or raw
+
+
+def add_source(video_id: str, parts: dict[str, dict], fitted: dict, meta: dict) -> dict:
+    """Keep a user-supplied score (a Soundslice slice, a file) beside the tab the track already has; returns the tab.
+
+    Each new part is tagged with where it came from (`source`, `origin`, `label`, `url`). Its bars are laid on the tab's
+    shared bar list through the recording's bars, so it stays in step with the audio and with every other part. The same
+    origin imported again replaces its earlier parts. A track without a tab takes the score as its tab.
+    """
+    for p in parts.values():
+        p.update({"source": meta["source"], "origin": meta["origin"], "label": meta["label"], "url": meta.get("url", "")})
+    raw = _raw(video_id)
+    if not raw or not raw.get("found") or not raw.get("tracks"):
+        _save(video_id, {
+            "found": True, "v": FORMAT, "source": meta["source"], "songId": meta["origin"], "url": meta.get("url", ""),
+            "artist": meta.get("artist", ""), "title": meta.get("title", ""), **fitted, "tracks": parts,
+        })
+        _edits_path(video_id).unlink(missing_ok=True)  # edits belonged to the tab this one replaces
+        return {**(read(video_id) or {}), "added": list(parts)}
+    tracks = raw["tracks"]
+    for key in [k for k, p in tracks.items() if p.get("origin") == meta["origin"]]:
+        del tracks[key]
+        edits = _read_edits(video_id)
+        if edits.pop(key, None) is not None:
+            _write(_edits_path(video_id), edits)
+    for p in tracks.values():
+        p.setdefault("source", raw.get("source") or "songsterr")
+        p.setdefault("url", raw.get("url") or "")
+    ref = next(iter(tracks.values()))["bars"]
+    at = {j: k for k, j in reversed(list(enumerate(fitted["map"]))) if j is not None}  # recording bar -> this score's bar
+    for part in parts.values():
+        own = part["bars"]
+        part["bars"] = [
+            dict(own[at[j]]) if j is not None and j in at and at[j] < len(own) else {"len": ref[i]["len"], "n": []}
+            for i, j in enumerate(raw["map"])
+        ]
+    added = []
+    for part in parts.values():
+        n = 1
+        while part_key(part["kind"], n) in tracks:
+            n += 1
+        added.append(part_key(part["kind"], n))
+        tracks[added[-1]] = part
+    _save(video_id, raw)
+    return {**(read(video_id) or raw), "added": added}
 
 
 def _download(song: dict) -> dict[str, dict]:

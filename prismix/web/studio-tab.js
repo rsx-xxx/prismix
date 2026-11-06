@@ -136,7 +136,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     document.dispatchEvent(new Event('tab:kind'));
   }
 
-  async function open(id) {
+  async function open(id, focus) {
     close();
     let tab, st;
     try {
@@ -146,7 +146,8 @@ export function createTab({ player, chordsIn = () => [] }) {
     } catch { return; }
     if (!tab?.found || !st?.bars?.length) return;
     cur = { id, tab, st, secs: [], ends: [], rec: st.bars.map((b) => beatSec(st.beats, b)), cells: [], rows: [], row: -1 };
-    if (!tab.tracks[part]) part = tab.tracks[localStorage.getItem(PART_KEY)] ? localStorage.getItem(PART_KEY) : Object.keys(tab.tracks)[0];
+    if (focus && tab.tracks[focus]) part = focus;
+    else if (!tab.tracks[part]) part = tab.tracks[localStorage.getItem(PART_KEY)] ? localStorage.getItem(PART_KEY) : Object.keys(tab.tracks)[0];
     for (const [k, t] of Object.entries(tab.tracks)) t.kind ||= kindOf(k);
     root.hidden = false;
     render();
@@ -197,9 +198,12 @@ export function createTab({ player, chordsIn = () => [] }) {
     if (!cur) return;
     const { tab, st, rec: secs } = cur;
     const p = tab.tracks[part];
-    credit.replaceChildren(...(p.auto
+    const src = p.auto ? 'auto' : p.source || tab.source;
+    credit.replaceChildren(...(src === 'auto'
       ? [`${shortName(p, part)} · written from the recording by the app, check it by ear`]
-      : [`${shortName(p, part)} · tab by `, el('a', { href: tab.url, target: '_blank', rel: 'noopener', textContent: tab.source === 'soundslice' ? 'Soundslice' : 'Songsterr' })]), p.edited ? ' · edited' : '');
+      : src === 'file'
+        ? [`${shortName(p, part)} · from your file ${p.label || ''}`]
+        : [`${shortName(p, part)} · tab by `, el('a', { href: p.url || tab.url, target: '_blank', rel: 'noopener', textContent: src === 'soundslice' ? 'Soundslice' : 'Songsterr' })]), p.edited ? ' · edited' : '');
     paintPicker();
     paintTools();
     announce();
@@ -337,6 +341,14 @@ export function createTab({ player, chordsIn = () => [] }) {
   }
 
 
+  // Where a part came from, shown beside its name once the tab mixes sources (Songsterr, an imported slice or file, the app's own transcription).
+  const sourceOf = (t) => (t.auto ? 'auto' : t.source || cur.tab.source);
+  const mixed = () => new Set(Object.values(cur.tab.tracks).map(sourceOf)).size > 1;
+  const tagOf = (t) => {
+    if (!mixed()) return '';
+    const s = sourceOf(t);
+    return ` (${s === 'soundslice' ? 'Soundslice' : s === 'file' ? t.label || 'file' : s === 'auto' ? 'auto' : 'Songsterr'})`;
+  };
   const shortName = (p, key) => p.name.split('|').at(-1).trim() || `${cap(p.kind || kindOf(key))}`;
 
   function paintPicker() {
@@ -344,7 +356,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     const kind = cur.tab.tracks[part].kind;
     const kinds = KINDS.filter((k) => keys.some((x) => cur.tab.tracks[x].kind === k));
     const ofKind = (k) => keys.filter((x) => cur.tab.tracks[x].kind === k);
-    const nameOf = (k) => cur.tab.tracks[k].name.replaceAll(' | ', ' · ') || cap(cur.tab.tracks[k].kind);
+    const nameOf = (k) => (cur.tab.tracks[k].name.replaceAll(' | ', ' · ') || cap(cur.tab.tracks[k].kind)) + tagOf(cur.tab.tracks[k]);
     pick.replaceChildren(...kinds.map((k) => {
       const mine = ofKind(k);
       if (k === 'other' && mine.length > 1) { // several unnamed instruments: one dropdown to pick each
@@ -369,7 +381,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     }));
     pick.hidden = kinds.length < 2;
     const same = keys.filter((x) => cur.tab.tracks[x].kind === kind);
-    const names = same.map((k) => cur.tab.tracks[k].name.replaceAll(' | ', ' · ') || cap(kind));
+    const names = same.map((k) => (cur.tab.tracks[k].name.replaceAll(' | ', ' · ') || cap(kind)) + tagOf(cur.tab.tracks[k]));
     const sel = el('select', { className: 'tab-sel', ariaLabel: `${cap(kind)} part` });
     same.forEach((k, i) => {
       const t = cur.tab.tracks[k], dup = names.filter((x) => x === names[i]).length > 1;

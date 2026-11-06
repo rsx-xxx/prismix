@@ -68,9 +68,9 @@ const tabView = createTab({ player, chordsIn: (j) => score.chordsIn(j) });
 document.addEventListener('tab:seek', (e) => player.seek(e.detail));
 const lyrics = createLyrics({ player, api, chords: () => score.timeline() });
 const sources = createSources({
-  api,
+  api, notice,
   onChange: (id) => { if (state.current?.id === id) { lyrics.open(id); score.retab(id); } },
-  onTab: (id) => { if (state.current?.id === id) tabView.open(id); },
+  onTab: (id, part) => { if (state.current?.id === id) tabView.open(id, part); },
 });
 const blocks = createBlocks();
 createSplit();

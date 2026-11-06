@@ -572,11 +572,9 @@ def import_file(video_id: str, filename: str, data: bytes) -> dict:
     tabdata.gapfill(parts, fitted, structure)
     tabdata.mark_weak(parts, fitted, structure)
     tabdata.retune(parts, fitted["shift"])
-    tabdata._save(video_id, {
-        "found": True, "v": tabdata.FORMAT, "source": "file", "url": "", "artist": "", "title": Path(filename).stem, **fitted, "tracks": parts,
+    return tabdata.add_source(video_id, parts, fitted, {
+        "source": "file", "origin": f"file:{Path(filename).name}", "label": Path(filename).name, "title": Path(filename).stem,
     })
-    tabdata._edits_path(video_id).unlink(missing_ok=True)  # edits belonged to the tab this one replaces
-    return tabdata.read(video_id) or {}
 
 
 def import_folder(folder: str) -> dict:

@@ -2,7 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 
-export function createSources({ api, onChange, onTab }) {
+export function createSources({ api, notice, onChange, onTab }) {
   let id = null;
   const dlg = $('sources');
   const close = () => dlg.close();
@@ -97,12 +97,14 @@ export function createSources({ api, onChange, onTab }) {
     $('slice-import').disabled = true;
     $('slice-msg').textContent = 'Reading the slice…';
     try {
-      await api('/api/tabdata', {
+      const tab = await api('/api/tabdata', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoId: target, url }),
       });
+      $('slice-msg').textContent = '';
+      $('src-slice').value = '';
       close();
-      onTab(target);
+      added(target, tab, 'Soundslice');
     } catch (err) {
       $('slice-msg').textContent = err.message;
     } finally {
@@ -118,16 +120,25 @@ export function createSources({ api, onChange, onTab }) {
     try {
       const body = new FormData();
       body.append('file', file);
-      await api(`/api/tabdata/${encodeURIComponent(target)}/file`, { method: 'POST', body });
+      const tab = await api(`/api/tabdata/${encodeURIComponent(target)}/file`, { method: 'POST', body });
       $('file-msg').textContent = '';
+      $('src-file').value = '';
       close();
-      onTab(target);
+      added(target, tab, file.name);
     } catch (err) {
       $('file-msg').textContent = err.message;
     } finally {
       $('file-import').disabled = false;
     }
   });
+
+  // The score is added beside the tab the song has: say what arrived, and open the first new part.
+  function added(target, tab, from) {
+    const keys = tab.added || [];
+    const names = keys.map((k) => tab.tracks[k]?.name?.split('|').at(-1).trim() || k);
+    notice(`Added from ${from}: ${names.join(', ') || 'tab'}. Shown in the Tabs view, labelled by source.`, 'ok');
+    onTab(target, keys[0]);
+  }
 
   return { setTrack: (v) => { id = v; } };
 }

@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.66.0
+
+Importing a Soundslice link or a score file now adds its parts beside the song's existing tab instead of replacing it, lined up with the recording bar by bar. Parts are labelled by source (Songsterr, Soundslice, your file name) in the instrument lists and under the tab, and after an import a message says what was added and the new part opens. Importing the same file again replaces its earlier parts.
+
 ## 0.65.0
 
 Tab buttons now follow when each instrument really sounds, by time rather than by bar, so short silences switch the highlight off. Parts hidden in a same-instrument dropdown get a dot in the list while they sound, and the dropdown lights up too. Search finds library songs regardless of punctuation and also by the matched video name.
