@@ -668,8 +668,11 @@ def _save(video_id: str, data: dict) -> None:
     _write(_path(video_id), data)
 
 
-def add_auto(video_id: str, parts: dict[str, dict], nbars: int) -> dict:
-    """Keep machine-transcribed parts beside the published ones (or alone when the track has no tab); returns the tab."""
+def add_auto(video_id: str, parts: dict[str, dict], nbars: int, flagged: dict[str, set[int]] | None = None) -> dict:
+    """Keep machine-transcribed parts beside the published ones (or alone when the track has no tab); returns the tab.
+
+    `flagged` {kind: tab bars} marks those bars of the published parts as differing from the recording; a part with an `origin`
+    replaces the earlier part of the same origin."""
     raw = _raw(video_id)
     if not raw or not raw.get("found"):
         info = library.read_info(video_id) or {}
@@ -687,8 +690,21 @@ def add_auto(video_id: str, parts: dict[str, dict], nbars: int) -> dict:
                 dict(rec[j]) if j is not None and j < len(rec) else {"len": ref[i]["len"], "n": []}
                 for i, j in enumerate(raw["map"])
             ]
+    for key in [k for k, p in tracks.items() if p.get("origin") and p["origin"] in {x.get("origin") for x in parts.values()}]:
+        del tracks[key]
+    for kind, bars in (flagged or {}).items():
+        tracks = {k: p for k, p in tracks.items() if p.get("origin") != f"check:{kind}" or kind in parts}
+        raw["tracks"] = tracks
+        for p in tracks.values():
+            if p.get("kind") == kind and not p.get("auto"):
+                for i in range(len(p["bars"])):
+                    p["bars"][i].pop("weak", None)
+                    if i in bars:
+                        p["bars"][i]["weak"] = 1
     for kind, part in parts.items():
-        n = 1 + sum(1 for p in tracks.values() if p.get("kind") == kind)
+        n = 1
+        while part_key(kind, n) in tracks:
+            n += 1
         tracks[part_key(kind, n)] = part
     _save(video_id, raw)
     return read(video_id) or raw

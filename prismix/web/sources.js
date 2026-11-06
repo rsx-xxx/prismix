@@ -18,16 +18,37 @@ export function createSources({ api, notice, onChange, onTab }) {
       $('src-chords').value = got.chords || '';
     } catch { /* the form opens empty */ }
     $('auto-msg').textContent = '';
+    $('check-tab').hidden = $('check-note').hidden = true;
     const btn = $('auto-tab');
     btn.hidden = true;
     $('hf-box').hidden = $('hf-login').hidden = $('hf-code-link').hidden = true;
     api(`/api/tabdata/${id}/auto`).then((d) => {
       const ready = d.available && d.kinds.length;
       btn.hidden = !ready || !d.signedIn;
+      $('check-tab').hidden = $('check-note').hidden = !d.available || !d.signedIn;
       $('hf-box').hidden = $('hf-login').hidden = !ready || d.signedIn;
       if (ready) btn.textContent = `Transcribe ${d.kinds.join(', ')}`;
     }).catch(() => {});
     dlg.showModal();
+  });
+
+  $('check-tab').addEventListener('click', async () => {
+    const target = id, btn = $('check-tab');
+    if (!target) return;
+    btn.disabled = true;
+    $('auto-msg').textContent = 'Listening to every instrument and comparing it with the tab… this can take a few minutes.';
+    try {
+      const tab = await api(`/api/tabdata/${target}/check`, { method: 'POST' });
+      const flagged = Object.values(tab.tracks || {}).filter((t) => !t.auto && !t.edited).reduce((n, t) => Math.max(n, t.bars.filter((b) => b.weak).length), 0);
+      const fixed = Object.entries(tab.tracks || {}).filter(([, t]) => t.origin?.startsWith('check:')).map(([, t]) => t.kind);
+      close();
+      notice(flagged ? `${flagged} bar${flagged > 1 ? 's' : ''} differ from the recording; corrected ${fixed.join(', ') || 'none'} added as auto parts.` : 'The tab matches the recording in every bar.', flagged ? 'info' : 'ok');
+      onTab(target, Object.keys(tab.tracks || {}).find((k) => tab.tracks[k].origin?.startsWith('check:')));
+    } catch (err) {
+      $('auto-msg').textContent = err.message;
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   $('hf-login').addEventListener('click', async () => {

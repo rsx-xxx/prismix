@@ -39,6 +39,8 @@ DRUM_LINES = {
 DRUM_FOLD = {41: 43, 45: 47, 48: 50}  # no separate line for the lowest toms: they share one with the next one up
 RANGE = {"guitar": (40, 40 + 24 + 20), "bass": (28, 28 + 24 + 15)}
 MAX_FRET = 24
+MATCH = 0.45  # onset/pitch-class F1 of a published bar against the stem, below which the bar is called different from the recording
+BEAM, SPAN, KEEP = 8, 4, 24  # fingering search: states kept, widest hand stretch in frets, candidate fingerings kept per chord
 MIN_NOTE = 0.04  # seconds; shorter blips are the model's noise
 POLY = {"guitar": 6, "bass": 2, "keys": 10, "other": 8, "drums": 6}
 _lock = threading.Lock()
@@ -152,7 +154,63 @@ def _strings(kind: str, pitches: list[int]) -> list[list[int]]:
     return out
 
 
-def to_bars(notes: list[tuple[int, float, float]], structure: dict, kind: str) -> list[dict]:
+def _fingerings(kind: str, pitches: list[int]) -> list[tuple[float, float | None, list[list[int]]]]:
+    """Playable ways to hold `pitches`: (cost, hand position, [[string, fret]...]), cheapest first. A note that fits nowhere costs a lot."""
+    tuning = TUNINGS[kind]
+    lo, hi = RANGE[kind]
+    ps = []
+    for p in sorted(set(pitches), reverse=True)[: POLY[kind]]:
+        while p < lo:
+            p += 12
+        while p > hi:
+            p -= 12
+        ps.append(p)
+    out: list[tuple[float, float | None, list[list[int]]]] = []
+
+    def walk(i: int, used: frozenset, held: list[list[int]], skipped: int) -> None:
+        if i == len(ps):
+            fretted = [f for _, f in held if f > 0]
+            if fretted and max(fretted) - min(fretted) > SPAN:
+                return
+            pos = statistics.fmean(fretted) if fretted else None
+            cost = 6.0 * skipped + 0.08 * (pos or 0) + (0.4 * (max(fretted) - min(fretted)) if fretted else 0)
+            out.append((cost, pos, sorted(held)))
+            return
+        placed = False
+        for st, t in enumerate(tuning):
+            f = ps[i] - t
+            if 0 <= f <= MAX_FRET and st not in used:
+                placed = True
+                walk(i + 1, used | {st}, held + [[st, f]], skipped)
+        if not placed or len(ps) > len(tuning):
+            walk(i + 1, used, held, skipped + 1)
+
+    walk(0, frozenset(), [], 0)
+    out.sort(key=lambda c: c[0])
+    return out[:KEEP]
+
+
+def finger(kind: str, chords: list[list[int]], hints: list[float | None]) -> list[list[list[int]]]:
+    """[string, fret] groups for a run of chords, by beam search over hand movement: the whole line stays in one playable
+    position instead of each note taking its own lowest fret. `hints` is where a published tab held the hand there, if any."""
+    beam: list[tuple[float, float | None, list]] = [(0.0, None, [])]
+    for pitches, hint in zip(chords, hints):
+        opts = _fingerings(kind, pitches)
+        if not opts:
+            beam = [(c, pos, path + [[]]) for c, pos, path in beam]
+            continue
+        nxt = []
+        for cost, pos, path in beam:
+            for c, p, held in opts:
+                move = 0.5 * abs(p - pos) if p is not None and pos is not None else 0.0
+                lead = 0.3 * abs((p if p is not None else 0.0) - hint) if hint is not None else 0.0  # an open string is the nut, far from a high position
+                nxt.append((cost + c + move + lead, p if p is not None else pos, path + [held]))
+        nxt.sort(key=lambda b: b[0])
+        beam = nxt[:BEAM]
+    return beam[0][2]
+
+
+def to_bars(notes: list[tuple[int, float, float]], structure: dict, kind: str, hints: dict[int, float] | None = None) -> list[dict]:
     """Note times -> bars of `[pos, dur, [[string, fret]...]]` on the recording's bar grid, sixteenth-note resolution."""
     beats, starts = structure["beats"], structure["bars"]
     if len(beats) < 2 or not starts:
@@ -186,15 +244,23 @@ def to_bars(notes: list[tuple[int, float, float]], structure: dict, kind: str) -
         if pitch not in ps:
             ps.append(pitch)
         cells[j][at] = (ps, max(ln, length))
+    plan = []  # every chord in playing order: (bar, grid step, pitches, steps in the bar, steps until the next chord)
     for j, grid in enumerate(cells):
         steps = per_bar[j] * 4
         order = sorted(grid)
         for k, at in enumerate(order):
             ps, ln = grid[at]
             nxt = order[k + 1] if k + 1 < len(order) else steps
-            frets = _strings(kind, ps[: POLY[kind] * 2])[: POLY[kind]]
-            if frets:
-                bars[j]["n"].append([round(at / steps, 4), round(min(ln, nxt - at) / steps, 4), frets])
+            plan.append((j, at, ps[: POLY[kind] * 2], steps, ln, nxt))
+    if kind in RANGE:
+        near = sorted(hints or {})
+        hint = [(hints or {}).get(min(near, key=lambda b: abs(b - j))) if near and min(abs(b - j) for b in near) <= 8 else None for j, *_ in plan]
+        held = finger(kind, [c[2] for c in plan], hint)
+    else:
+        held = [_strings(kind, c[2])[: POLY[kind]] for c in plan]
+    for (j, at, _, steps, ln, nxt), frets in zip(plan, held):
+        if frets:
+            bars[j]["n"].append([round(at / steps, 4), round(min(ln, nxt - at) / steps, 4), frets])
     return bars
 
 
@@ -239,3 +305,70 @@ def run(video_id: str, size: str = "medium", kinds: list[str] | None = None) -> 
     if not parts:
         return {"found": False}
     return tabdata.add_auto(video_id, parts, len(structure["bars"]))
+
+
+def _events(bars: list[dict], tuning: list[int]) -> set[tuple[int, int]]:
+    """What a bar sounds like, without its fingering: (eighth of the bar, pitch class) of every note."""
+    return {(int(n[0] * 8 + 1e-6), (tuning[s] + f) % 12) for b in bars for n in b["n"] for s, f in n[2] if s < len(tuning)}
+
+
+def agreement(tab: set[tuple[int, int]], heard: set[tuple[int, int]]) -> float | None:
+    """How well the notes a tab writes for one bar match the notes heard there (onset +-1 eighth, pitch class): F1, None if both are silent."""
+    if not tab and not heard:
+        return None
+    if not tab or not heard:
+        return 0.0
+    def hit(e: tuple[int, int], other: set[tuple[int, int]]) -> bool:
+        return any((e[0] + d, e[1]) in other for d in (-1, 0, 1))
+
+    recall = sum(hit(e, heard) for e in tab) / len(tab)
+    precision = sum(hit(e, tab) for e in heard) / len(heard)
+    return 0.0 if recall + precision == 0 else 2 * recall * precision / (recall + precision)
+
+
+def hints_of(tab: dict, kind: str) -> dict[int, float]:
+    """Where the published tab holds the hand, by recording bar: the median fretted position of its parts of this kind."""
+    out: dict[int, float] = {}
+    for i, j in enumerate(tab["map"]):
+        fr = [f for p in tab["tracks"].values() if p.get("kind") == kind and i < len(p["bars"]) for n in p["bars"][i]["n"] for _, f in n[2] if f > 0]
+        if j is not None and fr:
+            out[j] = statistics.median(fr)
+    return out
+
+
+def check(video_id: str, size: str = "medium") -> dict:
+    """Hold every published part up to the recording. For each instrument whose stem exists, the stem is transcribed and each
+    bar of the tab is compared with it. Bars that disagree are flagged, and the bars the recording plays differently are
+    written out from the stem as a separate auto part, so a mashup or cover keeps the tab where it is right and has the
+    recording's own notes where it is not. Returns the tab ({"found": False} when there is none)."""
+    from . import analysis, tabdata
+
+    if size not in SIZES:
+        raise AutoTabError("Unknown model size")
+    structure = analysis.read_structure(video_id)
+    tab = tabdata.read(video_id)
+    if not structure or not tab or not tab.get("found") or tab.get("source") == "auto":
+        raise AutoTabError("There is no published tab to check yet")
+    fixes, flagged = {}, {}
+    try:
+        for stem, kind in STEM_KINDS.items():
+            mine = [p for p in tab["tracks"].values() if p.get("kind") == kind and not p.get("auto")]
+            if kind == "drums" or not mine or not stem_file(video_id, stem):
+                continue
+            heard = to_bars(transcribe_stem(stem_file(video_id, stem), size), structure, kind, hints_of(tab, kind))
+            bad, fix = set(), [{"len": b["len"], "n": []} for b in heard]
+            for i, j in enumerate(tab["map"]):
+                if j is None or j >= len(heard):
+                    continue
+                got = _events([heard[j]], TUNINGS[kind])
+                want = set().union(*(_events([p["bars"][i]], p["tuning"]) for p in mine if i < len(p["bars"])))
+                score = agreement(want, got)
+                if score is not None and score < MATCH:
+                    bad.add(i)
+                    fix[j] = heard[j]
+            flagged[kind] = bad
+            if bad:
+                fixes[kind] = part(kind, "Corrected", fix) | {"name": f"{kind.capitalize()} · corrected from the recording (auto)", "origin": f"check:{kind}"}
+    finally:
+        unload()
+    return tabdata.add_auto(video_id, fixes, len(structure["bars"]), flagged)

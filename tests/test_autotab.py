@@ -48,3 +48,58 @@ def test_drum_hits_become_kit_lanes():
     first, second, third = bars[0]["n"]
     assert sorted(m for _, m in first[2]) == [36, 42] and second[2] == [[1.5, 38]]
     assert third[2] == [[0.5, 50]]  # the lowest toms share a lane with the next one up
+
+
+def test_fingering_keeps_one_position_and_follows_the_hint():
+    from prismix import autotab
+
+    # without a hint the line stays low on the neck
+    held = autotab.finger("guitar", [[64], [67], [69], [71], [74]], [None] * 5)
+    assert max(f for chord in held for _, f in chord) <= 10
+    # the same notes played around the 12th fret when a published tab holds the hand there
+    high = autotab.finger("guitar", [[64], [67], [69]], [12.0] * 3)
+    assert min(f for chord in high for _, f in chord) >= 5
+
+
+def test_fingering_never_stacks_two_notes_on_a_string():
+    from prismix import autotab
+
+    (chord,) = autotab.finger("guitar", [[40, 47, 52, 56, 59, 64]], [None])
+    assert len({s for s, _ in chord}) == len(chord) == 6
+
+
+def test_agreement_tells_a_matching_bar_from_a_different_one():
+    from prismix import autotab
+
+    tab = {(0, 0), (2, 4), (4, 7)}
+    assert autotab.agreement(tab, {(0, 0), (3, 4), (4, 7)}) == 1.0  # a note off by one eighth still counts
+    assert autotab.agreement(tab, {(0, 2), (2, 9)}) == 0.0
+    assert autotab.agreement(tab, set()) == 0.0 and autotab.agreement(set(), set()) is None
+
+
+def test_check_flags_bars_the_recording_plays_differently(monkeypatch, tmp_path):
+    from prismix import analysis, autotab, tabdata
+
+    structure = {"beats": [float(i) / 2 for i in range(17)], "bars": [0, 4, 8, 12]}  # four bars of 4 beats at 120 bpm
+    store = {"tab": {
+        "found": True, "source": "songsterr", "url": "u", "map": [0, 1, 2, 3],
+        "tracks": {"guitar": {"kind": "guitar", "name": "G", "tuning": autotab.TUNINGS["guitar"], "bars": [
+            {"len": 1.0, "n": [[0.0, 0.25, [[0, 0]]]]},  # E4 on beat 1 of every bar
+            {"len": 1.0, "n": [[0.0, 0.25, [[0, 0]]]]},
+            {"len": 1.0, "n": [[0.0, 0.25, [[0, 0]]]]},
+            {"len": 1.0, "n": [[0.0, 0.25, [[0, 0]]]]},
+        ]}},
+    }}
+    monkeypatch.setattr(analysis, "read_structure", lambda v: structure)
+    monkeypatch.setattr(tabdata, "read", lambda v: store["tab"])
+    monkeypatch.setattr(tabdata, "_raw", lambda v: store["tab"])
+    monkeypatch.setattr(tabdata, "_save", lambda v, d: store.__setitem__("tab", d))
+    monkeypatch.setattr(autotab, "stem_file", lambda v, s: "x" if s == "guitar" else None)
+    # the stem plays E4 in bars 0, 1 and 3 but a G4 in bar 2 (a mashup went its own way there)
+    notes = [(64, 0.0, 0.4), (64, 2.0, 2.4), (67, 4.0, 4.4), (64, 6.0, 6.4)]
+    monkeypatch.setattr(autotab, "transcribe_stem", lambda path, size, drums=False: notes)
+    tab = autotab.check("v", "small")
+    assert [b.get("weak", 0) for b in tab["tracks"]["guitar"]["bars"]] == [0, 0, 1, 0]
+    fix = tab["tracks"]["guitar2"]
+    assert fix["auto"] and [bool(b["n"]) for b in fix["bars"]] == [False, False, True, False]
+    assert autotab.check("v", "small")["tracks"].keys() == {"guitar", "guitar2"}  # a second check replaces, never piles up

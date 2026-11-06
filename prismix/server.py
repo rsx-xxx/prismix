@@ -901,6 +901,16 @@ def create_app() -> FastAPI:
         except (autotab.AutoTabError, tabdata.TabDataError) as e:
             raise HTTPException(422, str(e)) from e
 
+    @app.post("/api/tabdata/{video_id}/check")
+    async def check_tabdata(video_id: str, size: str = "medium"):
+        # Holds the published tab up to each stem's own transcription; flags differing bars and writes the recording's version of them
+        try:
+            return await asyncio.to_thread(autotab.check, video_id, size)
+        except ValueError:
+            raise HTTPException(404, "Not found") from None
+        except (autotab.AutoTabError, tabdata.TabDataError) as e:
+            raise HTTPException(422, str(e)) from e
+
     @app.post("/api/tabdata/{video_id}/file")
     async def import_tab_file(video_id: str, file: UploadFile = File(...)):
         # One score the user picked (Guitar Pro, MusicXML, MIDI) for this track; read whole, capped by tabfiles.MAX_BYTES

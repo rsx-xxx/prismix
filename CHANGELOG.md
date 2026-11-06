@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.67.0
+
+New "Check tab against the recording" in Song sources: each instrument's stem is transcribed and compared bar by bar with the published tab, so covers and mashups keep the tab where it is right. Differing bars are flagged, and the recording's own notes for them are added as a separate part marked auto. Machine fingering now keeps the hand in one playable position (beam search over hand movement) and follows where the published tab held it.
+
 ## 0.66.0
 
 Importing a Soundslice link or a score file now adds its parts beside the song's existing tab instead of replacing it, lined up with the recording bar by bar. Parts are labelled by source (Songsterr, Soundslice, your file name) in the instrument lists and under the tab, and after an import a message says what was added and the new part opens. Importing the same file again replaces its earlier parts.
