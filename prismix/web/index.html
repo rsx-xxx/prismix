@@ -265,6 +265,15 @@
         </div>
       </div>
 
+      <div class="group knob" id="follow-g">
+        <label id="follow-l" for="follow">Drummer</label>
+        <div class="follow-row">
+          <button class="chip" id="follow" type="button" aria-pressed="false" title="Follow the drummer: the stems adapt to his tempo (electronic kit over MIDI)">Follow</button>
+          <select id="follow-port" aria-label="MIDI drum kit" hidden></select>
+          <button class="chip" id="follow-trim" type="button" title="Count the stems' present offset as in time" hidden>Set in sync</button>
+        </div>
+      </div>
+
       <div class="group knob">
         <label id="key-l" for="key-out">Key</label>
         <button class="reset" id="key-reset" type="button" aria-label="Reset key to original" title="Reset key (Shift+R)" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>

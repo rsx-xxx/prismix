@@ -247,6 +247,8 @@ dialog legend { font-size: 12px; text-transform: uppercase; letter-spacing: .08e
 .chip { border: 1px solid var(--line-strong); background: transparent; border-radius: 999px; padding: 6px 14px; font-size: 13px; color: var(--muted); transition: all .15s; }
 .chip:hover { color: var(--text); border-color: var(--text); }
 .chip[aria-pressed=true] { background: var(--text); color: var(--bg); border-color: transparent; }
+.follow-row { display: flex; align-items: center; gap: 6px; }
+.follow-row select { max-width: 150px; font-size: 12px; }
 
 .mixer {
   display: grid; grid-template-columns: minmax(250px, 320px) 1fr; background: var(--surface);

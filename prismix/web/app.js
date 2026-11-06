@@ -1,4 +1,5 @@
 import { StemPlayer } from './player.js';
+import { createRehearse } from './rehearse.js';
 import { createPlaylists } from './playlists.js';
 import { createPlaylistView } from './playlist-view.js';
 import { createVideo } from './video.js';
@@ -63,6 +64,7 @@ const state = {
 const STEM_ICONS = [[/vocal|voice|sing/, 'mic'], [/drum|perc/, 'drum'], [/bass/, 'wave'], [/guitar/, 'guitar'], [/piano|key|synth/, 'piano'], [/other|fx|rest/, 'spark']];
 const stemIcon = (name) => STEM_ICONS.find(([re]) => re.test(name.toLowerCase()))?.[1] ?? 'note';
 const player = new StemPlayer();
+const rehearse = createRehearse({ player, onChange: () => syncFollow() });
 window.stemPlayer = player; // debug handle
 const score = createScore({ player, api, notice: (m, k) => notice(m, k), onSetup: () => saveSetup() });
 const tabView = createTab({ player, chordsIn: (j) => score.chordsIn(j) });
@@ -761,7 +763,8 @@ async function openStudio(id, model) {
   state.current = { id, model, meta };
   state.baseBpm = 0;
   state.baseKey = null;
-  fetch(`/media/${id}/structure.json`).then((r) => (r.ok ? r.json() : null)).then((s) => { if (state.current?.id === id) { state.baseBpm = s?.bpm || 0; state.baseKey = s?.key || null; syncDock(); } }).catch(() => {});
+  rehearse.setBeats([]);
+  fetch(`/media/${id}/structure.json`).then((r) => (r.ok ? r.json() : null)).then((s) => { if (state.current?.id === id) { state.baseBpm = s?.bpm || 0; state.baseKey = s?.key || null; rehearse.setBeats(s?.beats); syncDock(); } }).catch(() => {});
   $('nt-toggle').hidden = false;
   stickers.load();
   const setup = await api(`/api/library/${id}/setup`).catch(() => ({}));
@@ -1111,6 +1114,25 @@ function syncMixer() {
   savePrefs();
 }
 player.addEventListener('mix', syncMixer);
+
+function syncFollow() {
+  const on = rehearse.on;
+  $('follow').setAttribute('aria-pressed', String(on));
+  $('follow-l').textContent = on ? rehearse.status : 'Drummer';
+  const sel = $('follow-port');
+  sel.hidden = !on || !rehearse.ports.length || (rehearse.ports.length === 1 && !!rehearse.open);
+  const ports = rehearse.ports;
+  if (sel.dataset.ports !== ports.join('\n') || sel.value !== rehearse.open) {
+    sel.dataset.ports = ports.join('\n');
+    sel.replaceChildren(new Option('Choose kit…', ''), ...ports.map((p) => new Option(p, p)));
+    sel.value = rehearse.open;
+  }
+  $('follow-trim').hidden = !on || !rehearse.canTrim;
+}
+$('follow').addEventListener('click', () => rehearse.setOn(!rehearse.on));
+$('follow-port').addEventListener('change', (e) => rehearse.use(e.target.value));
+$('follow-trim').addEventListener('click', () => { if (rehearse.trimNow()) notice('Stems now count as in time with the drummer', 'info'); });
+player.addEventListener('rate', () => syncDock());
 
 function syncDock() {
   $('play').innerHTML = player.playing ? ICON.pause : ICON.play;

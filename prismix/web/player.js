@@ -19,6 +19,7 @@ export class StemPlayer extends EventTarget {
     this.cents = 0;
     this.formants = true;
     this.loop = null; // {a, b} seconds
+    this.following = false; // rehearsal follow: the stretch engine stays on so the rate can track a live drummer
     this.playing = false;
     this._anchor = { pos: 0, t: 0 }; // input position `pos` is heard at context time `t`
     this._latency = 0.1;
@@ -159,7 +160,7 @@ export class StemPlayer extends EventTarget {
     };
   }
 
-  get _needsStretch() { return this.tempo !== 1 || this.pitch !== 0; }
+  get _needsStretch() { return this.tempo !== 1 || this.pitch !== 0 || this.following; }
 
   /** Hand each stem to the stretch engine (copies the audio one stem at a time to keep peak memory low). */
   _prepStretch() {
@@ -249,15 +250,23 @@ export class StemPlayer extends EventTarget {
     return ctx.state === 'running';
   }
 
-  async play() {
+  /**
+   * Start playing. `at` is the audio-graph time (as heardAt() gives it) at which the current position must sound: it lines
+   * the music up with an outside beat such as the end of a count-in. If that moment is already too close, the start moves on to match.
+   */
+  async play({ at = null } = {}) {
     if (!this.ctx || this.playing) return;
     const ctx = this.ctx;
     if (this._needsStretch) await this._prepStretch().catch(() => {});
     if (!(await this._wake()) || ctx !== this.ctx || this.playing) return this._emit('blocked'); // never claim to play while silent
     if (this._anchor.pos >= this.duration - 0.05) this._anchor.pos = this.loop?.a ?? 0;
     const stretch = this._needsStretch && this._stretchOk;
-    const t = ctx.currentTime + (stretch ? this._latency : 0.05);
-    const pos = this._anchor.pos;
+    let t = ctx.currentTime + (stretch ? this._latency : 0.05);
+    let pos = this._anchor.pos;
+    if (at != null) {
+      if (at >= t) t = at;
+      else pos = clamp(pos + (t - at) * (stretch ? this.tempo : 1), 0, this.duration);
+    }
     this.duck.gain.cancelScheduledValues(ctx.currentTime);
     this.duck.gain.setValueAtTime(0, ctx.currentTime);
     this.duck.gain.setTargetAtTime(1, t - 0.01, 0.01);
@@ -311,6 +320,44 @@ export class StemPlayer extends EventTarget {
     }
     this._emit('seek');
   }
+
+  /**
+   * Rehearsal follow: let the rate be driven live (by a drummer's hits) instead of by the tempo buttons. Resolves once the
+   * stretch engine is ready, so the caller can then arm a count-in knowing playback can start sample-accurately.
+   */
+  async setFollowing(on) {
+    this.following = !!on;
+    this._retune();
+    if (this.following && this.ctx) await this._prepStretch().catch(() => { this.following = false; });
+    this._emit('follow');
+  }
+
+  /** Change the speed while playing, glitch-free: only the stretch engine's rate moves, pitch and position carry on. */
+  follow(rate) {
+    if (!this.ctx) return;
+    rate = clamp(rate, 0.5, 1.5);
+    if (Math.abs(rate - this.tempo) < 0.0004) return;
+    this.tempo = rate;
+    if (this.playing && this._engine === 'stretch') {
+      const t = this.ctx.currentTime + 0.02;
+      const pos = this._positionAt(t);
+      this._anchor = { pos, t };
+      this._rate = rate;
+      this._scheduleStretch({ ...this._params(), output: t, input: pos, active: true });
+    } else if (!this.playing) this._rate = this._stretchOk ? rate : 1;
+    this._emit('rate'); // not 'tune': that one saves the song's setup, and this changes several times a second
+  }
+
+  /** Audio-graph time that is being heard at the performance.now() instant `ms` (a MIDI or microphone event's timestamp). */
+  heardAt(ms) {
+    const c = this.ctx;
+    const ts = c.getOutputTimestamp?.();
+    if (ts && ts.performanceTime > 0) return ts.contextTime + (ms - ts.performanceTime) / 1000;
+    return c.currentTime + (ms - performance.now()) / 1000 - this.outLatency; // Safari: no output timestamp
+  }
+
+  /** Song position heard at the performance.now() instant `ms`. */
+  positionHeardAt(ms) { return this._positionAt(this.heardAt(ms)); }
 
   setTempo(rate) { this.tempo = clamp(rate, 0.5, 1.5); this._retune(); this._emit('tune'); }
   get chordShift() { return this.chordLock ? this.semitones : this.chordKey; }

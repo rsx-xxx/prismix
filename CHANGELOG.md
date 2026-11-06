@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.68.0
+
+New rehearsal mode, "Follow" in the dock: with the drum stem muted, the stems adapt their tempo to a live drummer on an electronic kit (MIDI), so the band no longer splits from a drummer who rushes or drags; the sound keeps its pitch. Click four sticks while the stems are stopped to start them at the drummer's tempo on his downbeat; "Set in sync" trims out the kit and speaker latency. Pick the kit in the dock; microphone and phone support come next.
+
 ## 0.67.2
 
 String letters in the tab view now sit exactly against their strings at every zoom level. "Check tab against the recording" no longer breaks on tabs with technique marks, also checks drums, restricts each stem to its own instrument while listening, and judges bars against the song's own level; an instrument whose stem is too unlike the tab to judge is reported as such instead of being flagged bar by bar. The test suite no longer touches the real band-cloud sign-in.

@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import threading
+import time
 from contextlib import asynccontextmanager
 from typing import Literal
 from urllib.parse import quote, urlparse
@@ -20,6 +21,7 @@ from fastapi import (
     Request,
     UploadFile,
     WebSocket,
+    WebSocketDisconnect,
 )
 from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
@@ -41,6 +43,7 @@ from . import (
     lyrics,
     markers,
     mashup,
+    midi,
     notes,
     original,
     pipeline,
@@ -328,6 +331,45 @@ def create_app() -> FastAPI:
             await client.relay_ws(ws, up)
             return
         await band.serve(ws)
+
+    @app.websocket("/ws/midi")
+    async def midi_ws(ws: WebSocket):
+        """Drum-kit hits from this computer's MIDI ports, for rehearsal follow. Only the app's own page may listen."""
+        if not band_mod.is_loopback(ws.client.host if ws.client else None) \
+                or not band_mod.same_origin(ws.headers.get("origin"), ws.headers.get("host")):
+            await ws.close(code=4403)
+            return
+        await ws.accept()
+        loop = asyncio.get_running_loop()
+        session = midi.MidiSession(loop)
+
+        async def pump():
+            while True:
+                await ws.send_json(await session.queue.get())
+
+        async def watch():  # a kit plugged in or pulled out while the page is open
+            while True:
+                await asyncio.sleep(midi.RESCAN)
+                if session.scan():
+                    await ws.send_json(session.state())
+
+        session.scan()
+        await ws.send_json(session.state())
+        tasks = [asyncio.create_task(pump()), asyncio.create_task(watch())]
+        try:
+            while True:
+                msg = await ws.receive_json()
+                if msg.get("type") == "ping":  # the page measures how its clock relates to ours from these
+                    await ws.send_json({"type": "pong", "c": msg.get("c"), "s": time.monotonic() * 1000})
+                elif msg.get("type") == "use":
+                    session.use(str(msg.get("port") or ""))
+                    await ws.send_json(session.state())
+        except (WebSocketDisconnect, RuntimeError, ValueError):
+            pass
+        finally:
+            for t in tasks:
+                t.cancel()
+            session.close()
 
     @app.get("/api/band")
     def band_status():
