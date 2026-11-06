@@ -144,6 +144,7 @@ const syncTask = () => { $('split-stems').hidden = $('task').value === 'chords';
 $('task').addEventListener('change', () => { syncTask(); try { localStorage.setItem('stems:task', $('task').value); } catch { /* ignore */ } });
 $('omni').addEventListener('submit', async (e) => {
   e.preventDefault();
+  clearTimeout(previewTimer);
   const text = $('q').value.trim();
   if (!text) return;
   notice('');
@@ -152,7 +153,7 @@ $('omni').addEventListener('submit', async (e) => {
     $('results').hidden = true;
     hidePreview();
     plPicker.openUrl(text);
-  } else if (/^(https?:\/\/|www\.|(m\.|music\.)?youtu|spotify:)/i.test(text) || /^[\w-]{11}$/.test(text)) {
+  } else if (isLink(text)) {
     $('results').hidden = true;
     hidePreview();
     askSplit(text, () => startProcess(text, $('quality').value));
@@ -163,6 +164,33 @@ $('omni').addEventListener('submit', async (e) => {
 
 const SEARCH_PAGE = 10;
 let searchRun = 0;
+const isLink = (text) => /^(https?:\/\/|www\.|(m\.|music\.)?youtu|spotify:)/i.test(text) || /^[\w-]{11}$/.test(text);
+
+/** Songs already in the library whose title or channel contains every typed word. */
+function libraryMatches(q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  return state.library.filter((it) => {
+    const hay = `${it.title} ${it.channel}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  }).slice(0, 5);
+}
+
+function libraryRow(it, box) {
+  const open = () => {
+    box.hidden = true;
+    hidePreview();
+    state.plist = null;
+    location.hash = `#/v/${it.id}/${it.models.includes(state.defaultModel) ? state.defaultModel : it.models[0]}`;
+  };
+  const pic = el('div', { className: 'pic' }, paintCover(el('img', { alt: '' }), it.id));
+  const info = el('div', { className: 'info' }, el('div', { className: 't', textContent: it.title }),
+    el('div', { className: 's', textContent: `${it.channel}${it.duration ? ' · ' + fmt(it.duration) : ''}` }));
+  const go = el('button', { className: 'btn small go', type: 'button', textContent: 'Open' });
+  const row = el('div', { className: 'result lib' }, pic, info, go);
+  row.style.cursor = 'pointer';
+  row.addEventListener('click', open);
+  return row;
+}
 
 function resultRow(it, box) {
   const pic = el('button', { className: 'pic', type: 'button', title: 'Preview', ariaLabel: `Preview ${it.title}` },
@@ -187,14 +215,20 @@ async function runSearch(q) {
   box.hidden = false;
   box.onscroll = null;
   box.scrollTop = 0;
-  box.replaceChildren(el('p', { className: 'muted', textContent: 'Searching…' }));
-  const seen = new Set();
+  const mine = libraryMatches(q).filter((it) => it.models.length);
+  const hits = el('div', { className: 'yt-hits' });
+  const head = (text) => el('p', { className: 'muted', textContent: text });
+  const searching = el('p', { className: 'muted', textContent: 'Searching…' });
+  hits.append(searching);
+  box.replaceChildren(...(mine.length ? [head('In your library'), ...mine.map((it) => libraryRow(it, box)), head('On YouTube')] : []), hits);
+  const seen = new Set(mine.map((it) => it.id));
+  const emptyHint = () => (mine.length ? 'Nothing more found.' : 'Nothing found.');
   let offset = 0, done = false, loading = false;
   const more = async (first) => {
     if (loading || done) return;
     loading = true;
     const tail = el('p', { className: 'muted', textContent: 'Loading more…' });
-    if (!first) box.append(tail);
+    if (!first) hits.append(tail);
     try {
       const items = await api(`/api/search?q=${encodeURIComponent(q)}&offset=${offset}&limit=${SEARCH_PAGE}`);
       if (run !== searchRun) return;
@@ -202,15 +236,18 @@ async function runSearch(q) {
       const fresh = items.filter((it) => !seen.has(it.id));
       fresh.forEach((it) => seen.add(it.id));
       if (items.length < SEARCH_PAGE || (!fresh.length && !first)) done = true;
-      if (first && !fresh.length) { box.replaceChildren(el('p', { className: 'muted', textContent: 'Nothing found.' })); return; }
+      if (first && !fresh.length) { hits.replaceChildren(head(emptyHint())); return; }
       tail.remove();
-      if (first) box.replaceChildren();
-      box.append(...fresh.map((it) => resultRow(it, box)));
-      if (done) box.append(el('p', { className: 'muted', textContent: 'End of results.' }));
+      if (first) hits.replaceChildren();
+      hits.append(...fresh.map((it) => resultRow(it, box)));
+      if (done) hits.append(head('End of results.'));
     } catch (err) {
       if (run !== searchRun) return;
       tail.remove();
-      if (first) { box.hidden = true; notice(err.message); } else { done = true; notice(err.message); }
+      if (first) {
+        if (mine.length) hits.replaceChildren(head('YouTube search failed.')); else box.hidden = true;
+        notice(err.message);
+      } else { done = true; notice(err.message); }
     } finally {
       loading = false;
     }
@@ -278,8 +315,15 @@ if (matchMedia('(max-width: 760px)').matches) $('q').placeholder = $('q').datase
 $('q').addEventListener('input', () => {
   clearTimeout(previewTimer);
   previewTimer = setTimeout(() => {
-    const id = ytId($('q').value);
+    const text = $('q').value.trim();
+    const id = ytId(text);
+    if (!id && !isLink(text) && text.length >= 2) {
+      runSearch(text);
+      return;
+    }
+    if (!id && !text) { searchRun++; $('results').hidden = true; }
     if (id) {
+      searchRun++;
       if (location.hash !== '#/' && location.hash !== '') location.hash = '#/';
       $('results').hidden = true;
       const known = state.library.find((i) => i.id === id);

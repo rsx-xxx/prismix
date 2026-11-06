@@ -189,6 +189,8 @@ main { width: min(1180px, 100% - 28px); margin: 0 auto; padding: 8px 0 calc(var(
 .result .pic::after { content: ""; position: absolute; inset: 0; border-radius: 8px; background: #0004 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5.5v13l11-6.5z' fill='white'/%3E%3C/svg%3E") center/32px no-repeat; opacity: 0; transition: opacity .15s; }
 .result:hover .pic::after, .result .pic:focus-visible::after { opacity: 1; }
 .result .info { min-width: 0; }
+.yt-hits { display: grid; gap: 4px; }
+.result.lib .pic::after { content: none; }
 
 /* ── export dialog ── */
 dialog.wide { width: min(480px, calc(100vw - 32px)); max-width: none; }

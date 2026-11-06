@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.63.0
+
+Search runs as you type, and songs you already have in the library show up first; click one to open it.
+
 ## 0.62.4
 
 Minor keys are written short everywhere (Gm instead of G minor).
