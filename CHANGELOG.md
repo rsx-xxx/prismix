@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.67.2
+
+String letters in the tab view now sit exactly against their strings at every zoom level. "Check tab against the recording" no longer breaks on tabs with technique marks, also checks drums, restricts each stem to its own instrument while listening, and judges bars against the song's own level; an instrument whose stem is too unlike the tab to judge is reported as such instead of being flagged bar by bar. The test suite no longer touches the real band-cloud sign-in.
+
 ## 0.67.1
 
 A small secret for every 0.67.x and 0.69.x release: hold Shift and click the version label.

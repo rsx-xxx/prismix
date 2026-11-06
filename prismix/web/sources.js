@@ -42,7 +42,8 @@ export function createSources({ api, notice, onChange, onTab }) {
       const flagged = Object.values(tab.tracks || {}).filter((t) => !t.auto && !t.edited).reduce((n, t) => Math.max(n, t.bars.filter((b) => b.weak).length), 0);
       const fixed = Object.entries(tab.tracks || {}).filter(([, t]) => t.origin?.startsWith('check:')).map(([, t]) => t.kind);
       close();
-      notice(flagged ? `${flagged} bar${flagged > 1 ? 's' : ''} differ from the recording; corrected ${fixed.join(', ') || 'none'} added as auto parts.` : 'The tab matches the recording in every bar.', flagged ? 'info' : 'ok');
+      const skipped = tab.unverified?.length ? ` Could not judge ${tab.unverified.join(', ')}: its recording is too unlike the tab.` : '';
+      notice((flagged ? `${flagged} bar${flagged > 1 ? 's' : ''} differ from the recording; corrected ${fixed.join(', ') || 'none'} added as auto parts.` : 'No bar clearly differs from the recording.') + skipped, flagged || skipped ? 'info' : 'ok');
       onTab(target, Object.keys(tab.tracks || {}).find((k) => tab.tracks[k].origin?.startsWith('check:')));
     } catch (err) {
       $('auto-msg').textContent = err.message;

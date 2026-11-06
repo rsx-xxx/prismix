@@ -793,8 +793,8 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .trow { display: flex; gap: 6px; margin-bottom: 14px; align-items: flex-end; }
 .trow .strs { flex: 0 0 1.1rem; }
 .trow .tbar { min-width: 0; }
-.trow .strs { display: grid; grid-auto-rows: var(--row); padding-bottom: 6px; font-size: 10px; color: var(--muted); text-align: center; align-content: end; }
-.trow .strs span { display: grid; place-items: center; }
+.trow .strs { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 6px; font-size: 10px; color: var(--muted); text-align: center; align-content: end; }
+.trow .strs span { display: grid; place-items: center; flex: none; height: var(--row); } /* a height, not grid tracks: tracks do not follow the pane's zoom in WebKit, so the letters drifted off their strings */
 .tbar { position: relative; padding: 22px 6px 6px; border-radius: 10px; cursor: pointer; background: var(--surface); border: 1px solid var(--line); }
 .tbar:hover { border-color: var(--line-strong); }
 .tbar.auto { border-style: dashed; }
@@ -1250,7 +1250,7 @@ img.cv.none { opacity: 0; }
 
 /* guitar and bass: one continuous staff per row, bars divided by barlines like printed tab */
 .trow.gt { align-items: flex-start; gap: 0; margin-bottom: 18px; }
-.trow.gt .strs { position: relative; flex: 0 0 1.3rem; margin-top: 47px; padding: 0 3px 0 0; align-content: start; height: calc(var(--strings) * var(--row)); }
+.trow.gt .strs { position: relative; flex: 0 0 1.3rem; margin-top: 47px; padding: 0 3px 0 0; justify-content: flex-start; height: calc(var(--strings) * var(--row)); }
 .trow.gt .strs::after, .tbar.gt .stf::after { content: ""; position: absolute; right: 0; top: calc(var(--row) / 2); bottom: calc(var(--row) / 2); width: 1px; background: var(--text); opacity: .7; }
 .tbar.gt { padding: 0; border: 0; border-radius: 0; background: none; }
 .tbar.gt:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }

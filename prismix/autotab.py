@@ -37,9 +37,17 @@ DRUM_LINES = {
     49: -1, 50: 0.5, 51: 0, 52: -1, 53: 0, 54: -0.5, 55: -1, 56: 0, 57: -1, 59: 0,
 }
 DRUM_FOLD = {41: 43, 45: 47, 48: 50}  # no separate line for the lowest toms: they share one with the next one up
+# the model's instrument groups each stem may hold: anything else is forbidden while decoding, so a bass stem cannot come out as C1 synth noise
+GROUPS = {
+    "guitar": ["acoustic_guitar", "clean_electric_guitar", "distorted_electric_guitar"],
+    "bass": ["acoustic_bass", "electric_bass"],
+    "keys": ["acoustic_piano", "electric_piano", "organ"],
+    "drums": ["drums"],
+}
 RANGE = {"guitar": (40, 40 + 24 + 20), "bass": (28, 28 + 24 + 15)}
 MAX_FRET = 24
 MATCH = 0.45  # onset/pitch-class F1 of a published bar against the stem, below which the bar is called different from the recording
+TRUST = 0.3  # median agreement of an instrument below this: the transcription of its stem is too unlike the tab to judge any bar, so none is flagged
 BEAM, SPAN, KEEP = 8, 4, 24  # fingering search: states kept, widest hand stretch in frets, candidate fingerings kept per chord
 MIN_NOTE = 0.04  # seconds; shorter blips are the model's noise
 POLY = {"guitar": 6, "bass": 2, "keys": 10, "other": 8, "drums": 6}
@@ -95,7 +103,7 @@ def _audio(path):
     return torch.from_numpy(np.frombuffer(out.stdout, dtype=np.float32).copy()), RATE
 
 
-def transcribe_stem(path, size: str = "medium", drums: bool = False) -> list[tuple[int, float, float]]:
+def transcribe_stem(path, size: str = "medium", drums: bool = False, kind: str | None = None) -> list[tuple[int, float, float]]:
     """(MIDI pitch, onset, offset) in seconds of every pitched note (or, with `drums`, every drum hit) the model hears in the file."""
     from muscriptor import NoteEndEvent, NoteStartEvent
 
@@ -103,7 +111,7 @@ def transcribe_stem(path, size: str = "medium", drums: bool = False) -> list[tup
     starts: dict[int, NoteStartEvent] = {}
     ends: dict[int, float] = {}
     with _lock:
-        for ev in _model(size).transcribe(audio):
+        for ev in _model(size).transcribe(audio, instruments=GROUPS.get("drums" if drums else kind)):
             if isinstance(ev, NoteStartEvent):
                 if (ev.instrument == "drums") == drums:
                     starts[ev.index] = ev
@@ -296,7 +304,7 @@ def run(video_id: str, size: str = "medium", kinds: list[str] | None = None) -> 
     parts = {}
     try:
         for kind, stem in todo.items():
-            notes = transcribe_stem(stem_file(video_id, stem), size, drums=kind == "drums")
+            notes = transcribe_stem(stem_file(video_id, stem), size, drums=kind == "drums", kind=kind)
             bars = to_bars(notes, structure, kind)
             if density(bars) > 0:
                 parts[kind] = part(kind, kind.capitalize(), bars)
@@ -307,9 +315,14 @@ def run(video_id: str, size: str = "medium", kinds: list[str] | None = None) -> 
     return tabdata.add_auto(video_id, parts, len(structure["bars"]))
 
 
-def _events(bars: list[dict], tuning: list[int]) -> set[tuple[int, int]]:
-    """What a bar sounds like, without its fingering: (eighth of the bar, pitch class) of every note."""
-    return {(int(n[0] * 8 + 1e-6), (tuning[s] + f) % 12) for b in bars for n in b["n"] for s, f in n[2] if s < len(tuning)}
+DRUM_GROUPS = {35: 0, 36: 0, 37: 1, 38: 1, 39: 1, 40: 1, 42: 2, 44: 2, 46: 2}  # kick, snare, hi-hat; every other piece is a cymbal or tom: 3
+
+
+def _events(bars: list[dict], tuning: list[int], drums: bool = False) -> set[tuple[int, int]]:
+    """What a bar sounds like, without its fingering: (eighth of the bar, pitch class) of every note, or (eighth, kick/snare/hi-hat/other) of every drum hit."""
+    if drums:
+        return {(int(n[0] * 8 + 1e-6), DRUM_GROUPS.get(h[1], 3)) for b in bars for n in b["n"] for h in n[2]}
+    return {(int(n[0] * 8 + 1e-6), (tuning[s] + f) % 12) for b in bars for n in b["n"] for s, f, *_ in n[2] if s < len(tuning)}
 
 
 def agreement(tab: set[tuple[int, int]], heard: set[tuple[int, int]]) -> float | None:
@@ -330,7 +343,7 @@ def hints_of(tab: dict, kind: str) -> dict[int, float]:
     """Where the published tab holds the hand, by recording bar: the median fretted position of its parts of this kind."""
     out: dict[int, float] = {}
     for i, j in enumerate(tab["map"]):
-        fr = [f for p in tab["tracks"].values() if p.get("kind") == kind and i < len(p["bars"]) for n in p["bars"][i]["n"] for _, f in n[2] if f > 0]
+        fr = [f for p in tab["tracks"].values() if p.get("kind") == kind and i < len(p["bars"]) for n in p["bars"][i]["n"] for _, f, *_ in n[2] if f > 0]
         if j is not None and fr:
             out[j] = statistics.median(fr)
     return out
@@ -349,26 +362,35 @@ def check(video_id: str, size: str = "medium") -> dict:
     tab = tabdata.read(video_id)
     if not structure or not tab or not tab.get("found") or tab.get("source") == "auto":
         raise AutoTabError("There is no published tab to check yet")
-    fixes, flagged = {}, {}
+    fixes, flagged, unverified = {}, {}, []
     try:
         for stem, kind in STEM_KINDS.items():
             mine = [p for p in tab["tracks"].values() if p.get("kind") == kind and not p.get("auto")]
-            if kind == "drums" or not mine or not stem_file(video_id, stem):
+            if not mine or not stem_file(video_id, stem):
                 continue
-            heard = to_bars(transcribe_stem(stem_file(video_id, stem), size), structure, kind, hints_of(tab, kind))
-            bad, fix = set(), [{"len": b["len"], "n": []} for b in heard]
+            drums = kind == "drums"
+            heard = to_bars(transcribe_stem(stem_file(video_id, stem), size, drums=drums, kind=kind), structure, kind, None if drums else hints_of(tab, kind))
+            scored = {}
             for i, j in enumerate(tab["map"]):
                 if j is None or j >= len(heard):
                     continue
-                got = _events([heard[j]], TUNINGS[kind])
-                want = set().union(*(_events([p["bars"][i]], p["tuning"]) for p in mine if i < len(p["bars"])))
+                got = _events([heard[j]], TUNINGS[kind], drums)
+                want = set().union(*(_events([p["bars"][i]], p["tuning"], drums) for p in mine if i < len(p["bars"])))
                 score = agreement(want, got)
-                if score is not None and score < MATCH:
-                    bad.add(i)
-                    fix[j] = heard[j]
+                if score is not None:
+                    scored[i] = score
+            typical = statistics.median(scored.values()) if scored else 0.0
+            if typical < TRUST:  # the stem's notes do not even match the bars that should be easy: do not call every bar wrong
+                unverified.append(kind)
+                continue
+            limit = min(MATCH, typical / 2)  # judged against this song's own level: a rough transcription flags only the clear outliers
+            bad = {i for i, v in scored.items() if v < limit}
+            fix = [{"len": b["len"], "n": []} for b in heard]
+            for i in bad:
+                fix[tab["map"][i]] = heard[tab["map"][i]]
             flagged[kind] = bad
             if bad:
                 fixes[kind] = part(kind, "Corrected", fix) | {"name": f"{kind.capitalize()} · corrected from the recording (auto)", "origin": f"check:{kind}"}
     finally:
         unload()
-    return tabdata.add_auto(video_id, fixes, len(structure["bars"]), flagged)
+    return {**tabdata.add_auto(video_id, fixes, len(structure["bars"]), flagged), "unverified": unverified}

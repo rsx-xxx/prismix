@@ -97,9 +97,46 @@ def test_check_flags_bars_the_recording_plays_differently(monkeypatch, tmp_path)
     monkeypatch.setattr(autotab, "stem_file", lambda v, s: "x" if s == "guitar" else None)
     # the stem plays E4 in bars 0, 1 and 3 but a G4 in bar 2 (a mashup went its own way there)
     notes = [(64, 0.0, 0.4), (64, 2.0, 2.4), (67, 4.0, 4.4), (64, 6.0, 6.4)]
-    monkeypatch.setattr(autotab, "transcribe_stem", lambda path, size, drums=False: notes)
+    monkeypatch.setattr(autotab, "transcribe_stem", lambda path, size, drums=False, kind=None: notes)
     tab = autotab.check("v", "small")
     assert [b.get("weak", 0) for b in tab["tracks"]["guitar"]["bars"]] == [0, 0, 1, 0]
     fix = tab["tracks"]["guitar2"]
     assert fix["auto"] and [bool(b["n"]) for b in fix["bars"]] == [False, False, True, False]
     assert autotab.check("v", "small")["tracks"].keys() == {"guitar", "guitar2"}  # a second check replaces, never piles up
+
+
+def test_drum_bars_compare_by_piece_not_by_note_number():
+    from prismix import autotab
+
+    tab = [{"len": 1.0, "n": [[0.0, 0.1, [[3.5, 36]]], [0.5, 0.1, [[1.5, 38]]]]}]
+    heard = [{"len": 1.0, "n": [[0.0, 0.1, [[3.5, 35]]], [0.5, 0.1, [[1.5, 40]]]]}]  # another kick and snare sound, same groove
+    assert autotab.agreement(autotab._events(tab, [], True), autotab._events(heard, [], True)) == 1.0
+    other = [{"len": 1.0, "n": [[0.25, 0.1, [[-0.5, 42]]]]}]
+    assert autotab.agreement(autotab._events(tab, [], True), autotab._events(other, [], True)) == 0.0
+
+
+def test_published_notes_with_technique_flags_are_read():
+    from prismix import autotab
+
+    bars = [{"len": 1.0, "n": [[0.0, 0.25, [[0, 3, "h"], [1, 5]]]]}]  # a hammer-on flag rides along as a third item
+    assert autotab._events(bars, autotab.TUNINGS["guitar"]) == {(0, (64 + 3) % 12), (0, (59 + 5) % 12)}
+    tab = {"map": [0], "tracks": {"g": {"kind": "guitar", "bars": bars}}}
+    assert autotab.hints_of(tab, "guitar") == {0: 4.0}
+
+
+def test_check_does_not_flag_everything_when_the_stem_cannot_be_judged(monkeypatch):
+    from prismix import analysis, autotab, tabdata
+
+    structure = {"beats": [float(i) / 2 for i in range(17)], "bars": [0, 4, 8, 12]}
+    tab = {"found": True, "source": "songsterr", "url": "u", "map": [0, 1, 2, 3], "tracks": {"bass": {
+        "kind": "bass", "name": "B", "tuning": autotab.TUNINGS["bass"], "bars": [{"len": 1.0, "n": [[0.0, 0.25, [[0, 0]]]]}] * 4}}}
+    store = {"tab": tab}
+    monkeypatch.setattr(analysis, "read_structure", lambda v: structure)
+    monkeypatch.setattr(tabdata, "read", lambda v: store["tab"])
+    monkeypatch.setattr(tabdata, "_raw", lambda v: store["tab"])
+    monkeypatch.setattr(tabdata, "_save", lambda v, d: store.__setitem__("tab", d))
+    monkeypatch.setattr(autotab, "stem_file", lambda v, s: "x" if s == "bass" else None)
+    # a stem that matches nothing anywhere: no bar is singled out, the instrument is reported as unverifiable
+    monkeypatch.setattr(autotab, "transcribe_stem", lambda path, size, drums=False, kind=None: [(40, 0.0, 0.4), (41, 2.0, 2.4), (42, 4.0, 4.4), (43, 6.0, 6.4)])
+    out = autotab.check("v", "small")
+    assert out["unverified"] == ["bass"] and not any(b.get("weak") for b in out["tracks"]["bass"]["bars"]) and list(out["tracks"]) == ["bass"]
