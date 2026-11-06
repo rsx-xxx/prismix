@@ -296,11 +296,20 @@ export function createTab({ player, chordsIn = () => [] }) {
     cur.seg = -1;
     cur.nowCell = null;
     if (aligned) alignRows();
+    alignStrings();
     cur.row = -1;
     cur.now = -1;
     cur.shown = -2;
     declutter();
     if (!ro && window.ResizeObserver) { ro = new ResizeObserver(() => declutter()); ro.observe(body); }
+  }
+
+  // String letters sit right in front of their lines: the staff starts below the bar header and chord row, whose height varies.
+  function alignStrings() {
+    for (const { row } of cur?.rows ?? []) {
+      const strs = row.querySelector('.strs'), cell = row.querySelector('.tbar'), stf = cell?.querySelector('.stf');
+      if (strs && stf) strs.style.marginTop = `${cell.offsetTop + stf.offsetTop - row.offsetTop}px`;
+    }
   }
 
   // Chord names sit over their beat; when two would collide the later one slides right, and hides only if it would run out of the bar.
@@ -338,6 +347,7 @@ export function createTab({ player, chordsIn = () => [] }) {
       if (k === 'other' && mine.length > 1) { // several unnamed instruments: one dropdown to pick each
         const s = el('select', { className: 'tab-sel', ariaLabel: 'Other instruments' });
         s.setAttribute('aria-pressed', String(k === kind));
+        s.dataset.kind = k;
         mine.forEach((x) => s.append(el('option', { value: x, selected: x === part, textContent: nameOf(x) })));
         if (k !== kind) s.prepend(el('option', { value: '', selected: true, disabled: true, textContent: 'Others' }));
         s.addEventListener('change', () => choose(s.value));
@@ -346,6 +356,7 @@ export function createTab({ player, chordsIn = () => [] }) {
       const label = k === 'other' ? nameOf(mine[0]) : cap(k); // a lone instrument is called by its own name
       const b = el('button', { type: 'button', className: 'btn small ghost', textContent: label });
       b.setAttribute('aria-pressed', String(k === kind));
+      b.dataset.kind = k;
       b.addEventListener('click', () => {
         if (k === kind) return;
         const last = localStorage.getItem(`${PART_KEY}:${k}`);
@@ -354,6 +365,8 @@ export function createTab({ player, chordsIn = () => [] }) {
       return b;
     }));
     pick.hidden = kinds.length < 2;
+    cur.lit = null;
+    paintPlaying(cur.now);
     const same = keys.filter((x) => cur.tab.tracks[x].kind === kind);
     const names = same.map((k) => cur.tab.tracks[k].name.replaceAll(' | ', ' · ') || cap(kind));
     const sel = el('select', { className: 'tab-sel', ariaLabel: `${cap(kind)} part` });
@@ -364,6 +377,17 @@ export function createTab({ player, chordsIn = () => [] }) {
     sel.addEventListener('change', () => choose(sel.value));
     variants.replaceChildren(sel);
     variants.hidden = same.length < 2 || kind === 'other'; // Others have their own dropdown above
+  }
+
+  // Marks the picker buttons of the instruments that have notes in this bar, whether or not their tab is the one shown.
+  function paintPlaying(j) {
+    if (!cur?.tab) return;
+    const on = new Set();
+    if (j >= 0) for (const t of Object.values(cur.tab.tracks)) if (t.bars[j]?.n.some((beat) => beat[2]?.length)) on.add(t.kind);
+    const key = [...on].sort().join();
+    if (key === cur.lit) return;
+    cur.lit = key;
+    for (const b of pick.children) b.classList.toggle('plays', on.has(b.dataset.kind));
   }
 
   function choose(k) {
@@ -695,7 +719,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     const j = floorIndex(cur.secs, pos);
     const sg = cur.segs?.[cur.segOf[j]];
     const cell = sg ? cur.cells[sg.first + ((j - sg.first) % sg.p)] : cur.cells[j];
-    if (j !== cur.now) cur.now = j;
+    if (j !== cur.now) { cur.now = j; paintPlaying(j); }
     if (cell !== cur.nowCell) {
       cur.nowCell?.classList.remove('now');
       cur.nowCell = cell;

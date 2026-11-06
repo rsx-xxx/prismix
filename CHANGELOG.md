@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.64.0
+
+In the tab view, the instrument buttons light up for the instruments that are playing in the current bar, even when their tab isn't the one shown. String letters now sit exactly in front of their strings.
+
 ## 0.63.0
 
 Search runs as you type, and songs you already have in the library show up first; click one to open it.
