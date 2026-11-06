@@ -166,11 +166,14 @@ const SEARCH_PAGE = 10;
 let searchRun = 0;
 const isLink = (text) => /^(https?:\/\/|www\.|(m\.|music\.)?youtu|spotify:)/i.test(text) || /^[\w-]{11}$/.test(text);
 
-/** Songs already in the library whose title or channel contains every typed word. */
+const searchWords = (text) => text.normalize('NFKC').toLowerCase().replaceAll('ё', 'е').match(/[\p{L}\p{N}]+/gu) ?? [];
+
+/** Songs already in the library whose title, channel or matched video name contains every typed word; punctuation and spacing don't matter. */
 function libraryMatches(q) {
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = searchWords(q);
+  if (!words.length) return [];
   return state.library.filter((it) => {
-    const hay = `${it.title} ${it.channel}`.toLowerCase();
+    const hay = searchWords(`${it.title} ${it.channel} ${it.match?.title ?? ''}`).join(' ');
     return words.every((w) => hay.includes(w));
   }).slice(0, 5);
 }

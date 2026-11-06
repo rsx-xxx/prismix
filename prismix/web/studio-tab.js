@@ -300,6 +300,9 @@ export function createTab({ player, chordsIn = () => [] }) {
     cur.row = -1;
     cur.now = -1;
     cur.shown = -2;
+    cur.lit = null;
+    cur.iv = null;
+    paintPlaying(player.position);
     declutter();
     if (!ro && window.ResizeObserver) { ro = new ResizeObserver(() => declutter()); ro.observe(body); }
   }
@@ -365,8 +368,6 @@ export function createTab({ player, chordsIn = () => [] }) {
       return b;
     }));
     pick.hidden = kinds.length < 2;
-    cur.lit = null;
-    paintPlaying(cur.now);
     const same = keys.filter((x) => cur.tab.tracks[x].kind === kind);
     const names = same.map((k) => cur.tab.tracks[k].name.replaceAll(' | ', ' · ') || cap(kind));
     const sel = el('select', { className: 'tab-sel', ariaLabel: `${cap(kind)} part` });
@@ -379,15 +380,56 @@ export function createTab({ player, chordsIn = () => [] }) {
     variants.hidden = same.length < 2 || kind === 'other'; // Others have their own dropdown above
   }
 
-  // Marks the picker buttons of the instruments that have notes in this bar, whether or not their tab is the one shown.
-  function paintPlaying(j) {
-    if (!cur?.tab) return;
-    const on = new Set();
-    if (j >= 0) for (const t of Object.values(cur.tab.tracks)) if (t.bars[j]?.n.some((beat) => beat[2]?.length)) on.add(t.kind);
+  // When each part really sounds: the spans its notes cover on the song's clock, with gaps under HOLD seconds bridged, so a part that
+  // plays a phrase is "on" through it and "off" in the silences between phrases, wherever the bars fall.
+  const HOLD = 1.2, TAIL = 0.25;
+  function spansOf(key) {
+    cur.iv ||= {};
+    if (cur.iv[key]) return cur.iv[key];
+    const raw = [];
+    cur.tab.tracks[key].bars.forEach((b, i) => {
+      if (cur.secs[i] == null) return;
+      const t0 = cur.secs[i], len = cur.ends[i] - t0;
+      for (const beat of b.n) if (beat[2]?.length) raw.push([t0 + beat[0] * len, t0 + (beat[0] + (beat[1] || 0)) * len]);
+    });
+    raw.sort((x, y) => x[0] - y[0]);
+    const out = [];
+    for (const r of raw) {
+      const last = out.at(-1);
+      if (last && r[0] - last[1] <= HOLD) last[1] = Math.max(last[1], r[1]);
+      else out.push([...r]);
+    }
+    return (cur.iv[key] = out);
+  }
+
+  function soundsAt(key, pos) {
+    const sp = spansOf(key);
+    let lo = 0, hi = sp.length - 1, at = -1;
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (sp[m][0] - 0.05 <= pos) { at = m; lo = m + 1; } else hi = m - 1; }
+    return at >= 0 && pos <= sp[at][1] + TAIL;
+  }
+
+  // Lights the instrument buttons whose parts sound right now, whether or not that tab is shown; inside a dropdown of
+  // same-kind parts the sounding ones carry a dot, and the dropdown lights when any of its parts sounds.
+  function paintPlaying(pos) {
+    if (!cur?.tab || !cur.secs.length) return;
+    const tracks = cur.tab.tracks, on = new Set(Object.keys(tracks).filter((k) => soundsAt(k, pos)));
     const key = [...on].sort().join();
     if (key === cur.lit) return;
     cur.lit = key;
-    for (const b of pick.children) b.classList.toggle('plays', on.has(b.dataset.kind));
+    const kinds = new Set([...on].map((k) => tracks[k].kind));
+    for (const b of pick.children) b.classList.toggle('plays', kinds.has(b.dataset.kind));
+    for (const s of root.querySelectorAll('#tab-part select, #tab-variant select')) {
+      let any = false;
+      for (const o of s.options) {
+        if (!o.value) continue;
+        o.dataset.base ??= o.textContent;
+        const here = on.has(o.value);
+        any ||= here;
+        o.textContent = here ? `● ${o.dataset.base}` : o.dataset.base;
+      }
+      s.classList.toggle('plays', any);
+    }
   }
 
   function choose(k) {
@@ -439,6 +481,7 @@ export function createTab({ player, chordsIn = () => [] }) {
   function paintStaff(cell, tb) {
     const stf = cell.querySelector('.stf'), rh = cell.querySelector('.rh'), fx = cell.querySelector('.fx'), hd = cell.querySelector('.hd');
     const X = (q) => (cell._x ? cell._x(q) : q);
+    cur.iv = null; // an edit may have changed when this part sounds
     stf.replaceChildren();
     rh?.replaceChildren();
     fx.replaceChildren();
@@ -719,7 +762,8 @@ export function createTab({ player, chordsIn = () => [] }) {
     const j = floorIndex(cur.secs, pos);
     const sg = cur.segs?.[cur.segOf[j]];
     const cell = sg ? cur.cells[sg.first + ((j - sg.first) % sg.p)] : cur.cells[j];
-    if (j !== cur.now) { cur.now = j; paintPlaying(j); }
+    if (j !== cur.now) cur.now = j;
+    paintPlaying(pos);
     if (cell !== cur.nowCell) {
       cur.nowCell?.classList.remove('now');
       cur.nowCell = cell;

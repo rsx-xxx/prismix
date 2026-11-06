@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.65.0
+
+Tab buttons now follow when each instrument really sounds, by time rather than by bar, so short silences switch the highlight off. Parts hidden in a same-instrument dropdown get a dot in the list while they sound, and the dropdown lights up too. Search finds library songs regardless of punctuation and also by the matched video name.
+
 ## 0.64.0
 
 In the tab view, the instrument buttons light up for the instruments that are playing in the current bar, even when their tab isn't the one shown. String letters now sit exactly in front of their strings.

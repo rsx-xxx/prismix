@@ -994,9 +994,9 @@ dialog[open]::backdrop { opacity: 1; }
 }
 
 .tab-sel { max-width: 280px; }
-#tab-part .plays { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+#tab-part .plays, #tab-variant .plays { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 #tab-part .btn.plays:not([aria-pressed=true]) { color: var(--accent); }
-#tab-part .plays::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: currentColor; vertical-align: middle; }
+#tab-part .btn.plays::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: currentColor; vertical-align: middle; }
 
 /* Band cloud: not uploaded → an Upload button that is always there; in the cloud → a white cloud that shows on hover */
 .card .pub, .pp-row .pub {
