@@ -375,19 +375,33 @@ def push_setup(video_id: str, setup: dict) -> bool:
         cloud.close()
 
 
+_tab_seen: dict[str, str] = {}  # song -> hash of the cloud tab already looked at
+_tab_tried: dict[str, float] = {}
+
+
+def _tab_bytes(video_id: str) -> tuple[dict, bytes] | None:
+    """This song's tab as shared: the user's edits laid over it, without the local `synced` marks."""
+    tab = tabdata.read(video_id)
+    if not tab or not tab.get("found"):
+        return None
+    tab = {**tab, "tracks": {k: {a: b for a, b in p.items() if a != "synced"} for k, p in tab["tracks"].items()}}
+    return tab, json.dumps(tab, ensure_ascii=False, separators=(",", ":")).encode()
+
+
 def push_tab(video_id: str) -> bool:
-    """Share the song's tab (after the user imported a file or slice) with the cloud copy, if there is one, so phones and other
-    computers get it. Only tab.json is sent and the committed manifest is sent again with its new hash. Quiet when offline,
-    signed out or the song is not in the cloud."""
+    """Share the song's tab (an imported file or slice, or the user's edits) with the cloud copy, if there is one, so phones and
+    other computers get it. Only tab.json is sent and the committed manifest is sent again with its new hash. What other devices
+    added meanwhile is taken first when nothing here would be lost. Quiet when offline, signed out or the song is not in the cloud."""
+    pull_tab(video_id, every=0.0)
     cloud = current()
     if not cloud:
         return False
     try:
         manifest = cloud.manifest(video_id)
-        tab = tabdata.read(video_id)
-        if not manifest or not tab or not tab.get("found"):
+        shared = _tab_bytes(video_id)
+        if not manifest or not shared:
             return False
-        data = json.dumps(tab, ensure_ascii=False, separators=(",", ":")).encode()
+        tab, data = shared
         digest = sha256(data)
         files = [f for f in manifest.get("files", []) if f.get("path") != "tab.json"]
         if not any(f.get("path") == "tab.json" and f.get("sha256") == digest for f in manifest.get("files", [])):
@@ -396,6 +410,7 @@ def push_tab(video_id: str) -> bool:
         keep = ("id", "title", "artist", "duration", "model", "quality", "stems")
         cloud.commit(video_id, {**{k: manifest[k] for k in keep if k in manifest}, "files": files, "setup": library.read_setup(video_id)})
         _tab_seen[video_id] = digest  # our own tab, nothing to pull back
+        tabdata.write_synced(video_id, tabdata.shared_sigs(tab))
         return True
     except (CloudError, httpx.HTTPError, ValueError, OSError):
         return False
@@ -403,23 +418,25 @@ def push_tab(video_id: str) -> bool:
         cloud.close()
 
 
-_tab_seen: dict[str, str] = {}  # song -> hash of the cloud tab already looked at
-_tab_tried: dict[str, float] = {}
-_IMPORTED = ("file", "soundslice")
+_tab_timers: dict[str, threading.Timer] = {}
 
 
-def _imported(tab: dict | None) -> set[str]:
-    """Signatures of the parts the user brought in (their own file or a Soundslice slice)."""
-    if not tab or not isinstance(tab.get("tracks"), dict):
-        return set()
-    return {tabdata._sig(p) for p in tab["tracks"].values() if isinstance(p, dict) and not p.get("auto") and (p.get("source") or tab.get("source")) in _IMPORTED}
+def push_tab_soon(video_id: str, delay: float = 4.0) -> None:
+    """Share the tab once the user has stopped editing for `delay` seconds (every keystroke saves)."""
+    if not load_credential():
+        return
+    with _sync_lock:
+        if old := _tab_timers.pop(video_id, None):
+            old.cancel()
+        t = _tab_timers[video_id] = threading.Timer(delay, lambda: (_tab_timers.pop(video_id, None), push_tab(video_id)))
+        t.daemon = True
+        t.start()
 
 
 def pull_tab(video_id: str, every: float = 120.0) -> bool:
-    """Take the cloud copy's tab when it holds imported parts this computer lacks, so every device shows the same tabs.
-
-    Only when nothing imported here would be lost (this computer's imported parts are all in the cloud tab too). Checked at
-    most once per `every` seconds per song. Quiet when offline, signed out or the song is not in the cloud."""
+    """Take the cloud copy's tab (imports and edits) when it differs and nothing of this computer's own work would be lost, so
+    every device shows the same tabs. Checked at most once per `every` seconds per song. Quiet when offline, signed out or the
+    song is not in the cloud."""
     with _sync_lock:
         if time.monotonic() - _tab_tried.get(video_id, -every) < every:
             return False
@@ -439,14 +456,15 @@ def pull_tab(video_id: str, every: float = 120.0) -> bool:
         _tab_seen[video_id] = entry["sha256"]
         if not isinstance(theirs, dict) or not theirs.get("found") or not isinstance(theirs.get("tracks"), dict):
             return False
-        mine = tabdata._raw(video_id)
-        have, want = _imported(mine if mine and mine.get("found") else None), _imported(theirs)
-        if not want - have or not have <= want:
+        mine = tabdata.read(video_id)
+        have, want = tabdata.shared_sigs(mine if mine and mine.get("found") else None), tabdata.shared_sigs(theirs)
+        if want == have:
+            tabdata.write_synced(video_id, have)
             return False
-        for p in theirs["tracks"].values():
-            p.pop("edited", None)
-        tabdata._save(video_id, theirs)
-        return True
+        unsynced = have - tabdata.read_synced(video_id)  # this computer's work the cloud has not seen
+        if unsynced and not have <= want:
+            return False  # both sides changed: this computer's version stays and goes up with its next change
+        return tabdata.adopt(video_id, theirs)
     except (CloudError, httpx.HTTPError, ValueError, OSError):
         return False
     finally:

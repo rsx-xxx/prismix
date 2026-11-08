@@ -192,7 +192,7 @@ def test_push_tab_sends_only_the_tab_and_keeps_the_rest(tmp_path, monkeypatch):
     assert cloud.push_tab(VID) and fake.puts == []  # the same tab again is not uploaded twice
 
 
-def test_pull_tab_adopts_imported_parts_only_when_nothing_is_lost(tmp_path, monkeypatch):
+def test_pull_tab_adopts_changes_only_when_nothing_is_lost(tmp_path, monkeypatch):
     from prismix import tabdata
 
     seed_song(tmp_path, monkeypatch)
@@ -204,24 +204,51 @@ def test_pull_tab_adopts_imported_parts_only_when_nothing_is_lost(tmp_path, monk
     mine = {"found": True, "source": "songsterr", "map": [0], "tracks": {"guitar": web}}
     theirs = {"found": True, "source": "songsterr", "map": [0], "tracks": {
         "guitar": web, "guitar2": {"kind": "guitar", "name": "Solo", "tuning": [64], "bars": [bar], "source": "file", "label": "a.gp", "edited": True}}}
-    store = {"tab": mine}
+    store = {"tab": theirs}
+
+    def read(v):
+        tab = json.loads(json.dumps(store["tab"]))
+        synced = tabdata.read_synced(v)
+        for p in tab["tracks"].values():
+            if tabdata._shared(tab, p) and tabdata._sig(p) in synced:
+                p["synced"] = True
+        return tab
+
     monkeypatch.setattr(tabdata, "_raw", lambda v: store["tab"])
     monkeypatch.setattr(tabdata, "_save", lambda v, d: store.__setitem__("tab", d))
-    monkeypatch.setattr(tabdata, "read", lambda v: theirs)
-    assert cloud.push_tab(VID)
-    cloud._tab_seen.clear()
-    cloud._tab_tried.clear()
+    monkeypatch.setattr(tabdata, "read", read)
+
+    def again():
+        cloud._tab_seen.clear()
+        cloud._tab_tried.clear()
+
+    assert cloud.push_tab(VID)  # another device shares its tab
+    assert tabdata.read(VID)["tracks"]["guitar2"]["synced"] and "synced" not in json.loads(fake.files["tab.json"])["tracks"]["guitar2"]
+    store["tab"] = mine
+    tabdata.write_synced(VID, set())
+    again()
     assert cloud.pull_tab(VID)  # the cloud has a file this computer lacks
     assert list(store["tab"]["tracks"]) == ["guitar", "guitar2"] and "edited" not in store["tab"]["tracks"]["guitar2"]
+    assert tabdata._read_edits(VID)["guitar2"]["bars"] == [bar]  # carried over as an edit, so it can be reverted here
     assert not cloud.pull_tab(VID)  # throttled
-    cloud._tab_tried.clear()
-    cloud._tab_seen.clear()
-    assert not cloud.pull_tab(VID)  # now identical: nothing to take
+    again()
+    assert not cloud.pull_tab(VID)  # identical now: nothing to take
+    # the other device edits the part again: this computer has no unsynced work, so it follows
+    newer = json.loads(json.dumps(theirs))
+    newer["tracks"]["guitar2"]["bars"] = [{"len": 1.0, "n": [[0.0, 1.0, [[0, 7]]]]}]
+    store["tab"] = newer
+    assert cloud.push_tab(VID)
+    store["tab"] = json.loads(json.dumps(theirs))
+    tabdata.write_synced(VID, tabdata.shared_sigs(theirs))
+    again()
+    assert cloud.pull_tab(VID) and store["tab"]["tracks"]["guitar2"]["bars"] == [bar]  # the file underneath stays, the edit changes
+    assert tabdata._read_edits(VID)["guitar2"]["bars"][0]["n"][0][2] == [[0, 7]]
+    # work here the cloud has not seen is never overwritten
     other = {"kind": "guitar", "name": "Mine", "tuning": [64], "bars": [{"len": 1.0, "n": [[0.0, 1.0, [[0, 9]]]]}], "source": "file", "label": "b.gp"}
     store["tab"] = {**mine, "tracks": {"guitar": web, "guitar2": other}}
-    cloud._tab_tried.clear()
-    cloud._tab_seen.clear()
-    assert not cloud.pull_tab(VID) and store["tab"]["tracks"]["guitar2"]["label"] == "b.gp"  # a different import here is never overwritten
+    tabdata.write_synced(VID, set())
+    again()
+    assert not cloud.pull_tab(VID) and store["tab"]["tracks"]["guitar2"]["label"] == "b.gp"
 
 
 def test_republish_skips_unchanged_files(tmp_path, monkeypatch):

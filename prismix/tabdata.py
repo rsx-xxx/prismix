@@ -582,7 +582,9 @@ def _upgrade(tab: dict) -> dict:
 
 
 def read(video_id: str) -> dict | None:
-    """The cached tab with the user's edits laid over it (each edited part is flagged `edited`)."""
+    """The cached tab with the user's edits laid over it (each edited part is flagged `edited`).
+
+    A part the user brought in or edited that the band cloud holds the same copy of is flagged `synced`."""
     tab = _raw(video_id)
     if tab is None or not tab.get("found"):
         return tab
@@ -590,7 +592,74 @@ def read(video_id: str) -> dict | None:
     for key, edit in _read_edits(video_id).items():
         base = tab["tracks"].get(key, {})
         tab["tracks"][key] = {**base, **edit, "edited": True}
+    synced = read_synced(video_id)
+    if synced:
+        for p in tab["tracks"].values():
+            if _shared(tab, p) and _sig(p) in synced:
+                p["synced"] = True
     return tab
+
+
+_SHARED_SOURCES = ("file", "soundslice")
+
+
+def _shared(tab: dict, part: dict) -> bool:
+    """A part that is the user's own work (an imported file or slice, or an edit) rather than a web download or a transcription."""
+    return isinstance(part, dict) and not part.get("auto") and (bool(part.get("edited")) or (part.get("source") or tab.get("source")) in _SHARED_SOURCES)
+
+
+def shared_sigs(tab: dict | None) -> set[str]:
+    """Signatures of the user's own parts of a tab: what the cloud copies carry between devices."""
+    if not tab or not isinstance(tab.get("tracks"), dict):
+        return set()
+    return {_sig(p) for p in tab["tracks"].values() if _shared(tab, p)}
+
+
+def _synced_path(video_id: str):
+    return library.video_dir(video_id) / "tabsync.json"
+
+
+def read_synced(video_id: str) -> set[str]:
+    """The user's parts as they were when this computer last agreed with the cloud copy."""
+    try:
+        got = json.loads(_synced_path(video_id).read_text())
+    except (OSError, ValueError):
+        return set()
+    return {x for x in got if isinstance(x, str)} if isinstance(got, list) else set()
+
+
+def write_synced(video_id: str, sigs: set[str]) -> None:
+    _write(_synced_path(video_id), sorted(sigs))
+
+
+def adopt(video_id: str, theirs: dict) -> bool:
+    """Make the cloud copy's tab this song's tab, edits included. False (nothing changed) when it is not a usable tab."""
+    local = _raw(video_id)
+    local_tracks = local["tracks"] if local and local.get("found") and isinstance(local.get("tracks"), dict) else {}
+    tracks, edits = {}, {}
+    try:
+        for key, part in theirs["tracks"].items():
+            if not _KEY.match(key) or not isinstance(part, dict) or not isinstance(part.get("tuning"), list):
+                return False
+            clean = {k: v for k, v in part.items() if k not in ("edited", "synced")}
+            if part.get("edited"):
+                edit = {k: clean[k] for k in ("kind", "name", "tuning", "bars") if k in clean}
+                edit["bars"] = _clean_bars(edit.get("bars"), len(edit["tuning"]))
+                edits[key] = edit
+                mine = local_tracks.get(key)  # keep the web or file version under the edit when this computer has the same part
+                same = isinstance(mine, dict) and mine.get("kind") == clean.get("kind") and mine.get("tuning") == clean.get("tuning")
+                tracks[key] = mine if same else clean
+            else:
+                tracks[key] = clean
+    except (TabDataError, KeyError, TypeError):
+        return False
+    _save(video_id, {**{k: v for k, v in theirs.items() if k != "tracks"}, "tracks": tracks})
+    if edits:
+        _write(_edits_path(video_id), edits)
+    else:
+        _edits_path(video_id).unlink(missing_ok=True)
+    write_synced(video_id, shared_sigs(read(video_id)))
+    return True
 
 
 def _clean_bars(bars, strings: int) -> list[dict]:

@@ -258,6 +258,8 @@ button:active, .lib li:active, [role=tab]:active, [role=radio]:active { filter: 
 .tab { --row: 1.15rem; padding: .5rem 0 40dvh; }
 .tab-src { margin: 0 0 .6rem; font-size: .72rem; color: var(--ink-2); }
 .tab-src a { color: var(--accent); }
+.sync-chip { display: inline-flex; align-items: center; margin-left: .35rem; padding: 0 .5rem; border-radius: 999px; font-size: .68rem; font-weight: 650; white-space: nowrap; color: var(--accent); background: color-mix(in oklab, var(--accent) 14%, transparent); border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent); }
+#tab-variant button.synced, #tab-part button.synced { box-shadow: inset 0 -2px 0 var(--accent); }
 .trow { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: .35rem; margin-top: .6rem; }
 .tab .bar { display: block; min-height: 0; padding: 1.1rem .45rem .35rem; }
 .tab.with-chords .bar { padding-top: 2.5rem; }

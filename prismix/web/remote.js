@@ -401,6 +401,8 @@ const firstOf = (tab, kind) => Object.keys(tab.tracks).find((k) => tab.tracks[k]
 const cap = (k) => k[0].toUpperCase() + k.slice(1);
 // Where a part came from: the web (Songsterr), a Soundslice slice, the user's own file, or Prismix's own transcription.
 const sourceOf = (tab, p) => (p.auto ? 'auto' : p.source || tab.source || 'songsterr');
+// Shared through the band cloud: marked by the host, or (reading from the cloud itself) every part the user brought in or edited.
+const syncedPart = (p) => !!p.synced || (CLOUD && !p.auto && (!!p.edited || ['file', 'soundslice'].includes(p.source)));
 const sourceName = (tab, p) => ({ auto: 'Prismix', soundslice: 'Soundslice', file: p.label || 'Your file', songsterr: 'Songsterr' })[sourceOf(tab, p)] || 'Songsterr';
 
 function paintParts() {
@@ -415,11 +417,19 @@ function paintParts() {
     b.setAttribute('aria-selected', String(pressed));
     return b;
   };
-  $('tab-part').replaceChildren(...kinds.map((k) => mk(cap(k), { kind: k }, k === kind)));
+  $('tab-part').replaceChildren(...kinds.map((k) => {
+    const b = mk(cap(k), { kind: k }, k === kind);
+    b.classList.toggle('synced', Object.values(tab.tracks).some((p) => p.kind === k && syncedPart(p)));
+    return b;
+  }));
   $('tab-part').hidden = kinds.length < 2;
   const same = on ? Object.keys(tab.tracks).filter((k) => tab.tracks[k].kind === kind) : [];
   const mixed = on && new Set(same.map((k) => sourceOf(tab, tab.tracks[k]))).size > 1; // parts from different places: say where each is from
-  $('tab-variant').replaceChildren(...same.map((k, i) => mk(mixed ? `${i + 1} · ${sourceName(tab, tab.tracks[k])}` : String(i + 1), { part: k }, k === S.part)));
+  $('tab-variant').replaceChildren(...same.map((k, i) => {
+    const b = mk(mixed ? `${i + 1} · ${sourceName(tab, tab.tracks[k])}` : String(i + 1), { part: k }, k === S.part);
+    b.classList.toggle('synced', syncedPart(tab.tracks[k]));
+    return b;
+  }));
   $('tab-variant').hidden = same.length < 2;
 }
 
@@ -560,7 +570,8 @@ function renderTab(stage, t) {
   box.append(el('p', { className: 'tab-src' },
     `${part.name.split('|').at(-1).trim() || S.part} · tab from `,
     link ? el('a', { href: link, target: '_blank', rel: 'noopener', textContent: srcName }) : srcName,
-    ' · original key'));
+    ' · original key',
+    ...(syncedPart(part) ? [el('span', { className: 'sync-chip', textContent: '☁ synced', title: 'Shared through the band cloud' })] : [])));
   nodes.bars = [];
   nodes.tabWords = [];
   nodes.tabCells = [];

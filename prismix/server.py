@@ -988,7 +988,9 @@ def create_app() -> FastAPI:
     async def edit_tab_part(video_id: str, key: str, req: TabEditRequest):
         # The user's hand-edited bars for one part; kept beside the cached tab so a re-download never loses them
         try:
-            return await asyncio.to_thread(tabdata.save_edit, video_id, key, req.bars)
+            tab = await asyncio.to_thread(tabdata.save_edit, video_id, key, req.bars)
+            cloud.push_tab_soon(video_id)  # the cloud copy follows once the editing pauses
+            return tab
         except ValueError:
             raise HTTPException(404, "Not found") from None
         except tabdata.TabDataError as e:
@@ -997,7 +999,9 @@ def create_app() -> FastAPI:
     @app.delete("/api/tabdata/{video_id}/tracks/{key}")
     async def revert_tab_part(video_id: str, key: str):
         try:
-            return await asyncio.to_thread(tabdata.revert_edit, video_id, key)
+            tab = await asyncio.to_thread(tabdata.revert_edit, video_id, key)
+            cloud.push_tab_soon(video_id)
+            return tab
         except ValueError:
             raise HTTPException(404, "Not found") from None
 

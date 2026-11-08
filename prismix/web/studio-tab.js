@@ -214,7 +214,8 @@ export function createTab({ player, chordsIn = () => [] }) {
       ? [`${shortName(p, part)} · written from the recording by the app, check it by ear`]
       : src === 'file'
         ? [`${shortName(p, part)} · from your file ${p.label || ''}`]
-        : [`${shortName(p, part)} · tab by `, el('a', { href: p.url || tab.url, target: '_blank', rel: 'noopener', textContent: src === 'soundslice' ? 'Soundslice' : 'Songsterr' })]), p.edited ? ' · edited' : '');
+        : [`${shortName(p, part)} · tab by `, el('a', { href: p.url || tab.url, target: '_blank', rel: 'noopener', textContent: src === 'soundslice' ? 'Soundslice' : 'Songsterr' })]), p.edited ? ' · edited' : '',
+    ...(p.synced ? [' ', el('span', { className: 'sync-chip', textContent: '☁ synced', title: 'Shared through your band cloud: the same on your other devices' })] : []));
     paintPicker();
     paintTools();
     announce();
@@ -383,6 +384,7 @@ export function createTab({ player, chordsIn = () => [] }) {
       const b = el('button', { type: 'button', className: 'btn small ghost', textContent: label });
       b.setAttribute('aria-pressed', String(k === kind));
       b.dataset.kind = k;
+      b.classList.toggle('synced', mine.some((x) => cur.tab.tracks[x].synced));
       b.addEventListener('click', () => {
         if (k === kind) return;
         const last = localStorage.getItem(`${PART_KEY}:${k}`);
@@ -396,7 +398,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     const sel = el('select', { className: 'tab-sel', ariaLabel: `${cap(kind)} part` });
     same.forEach((k, i) => {
       const t = cur.tab.tracks[k], dup = names.filter((x) => x === names[i]).length > 1;
-      sel.append(el('option', { value: k, selected: k === part, textContent: `${dup ? `${i + 1}. ` : ''}${names[i]}${t.edited ? ' ✎' : ''}` }));
+      sel.append(el('option', { value: k, selected: k === part, textContent: `${dup ? `${i + 1}. ` : ''}${names[i]}${t.edited ? ' ✎' : ''}${t.synced ? ' ☁' : ''}` }));
     });
     sel.addEventListener('change', () => choose(sel.value));
     variants.replaceChildren(sel);
