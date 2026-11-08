@@ -70,6 +70,24 @@ final class Offline {
         return arr;
     }
 
+    /** A song kept on the phone shows the tab the host has now: tabs imported later replace the saved copy. Quiet on any failure. */
+    static void refreshTab(final Context ctx, final String id, final String pin) {
+        if (!ID.matcher(id).matches() || ACTIVE.contains(id)) return;
+        QUEUE.execute(() -> {
+            try {
+                File dir = new File(root(ctx), id);
+                String host = Main.hostName();
+                if (!dir.isDirectory() || host.isEmpty()) return;
+                String path = "/api/tabdata/" + id;
+                byte[] b = get("https://" + host + ":" + Main.PORT + path, pin, 90000);
+                if (!new JSONObject(new String(b, StandardCharsets.UTF_8)).optBoolean("found")) return;
+                File f = mirror(dir, path), tmp = new File(f.getPath() + ".new");
+                write(tmp, b);
+                if (!tmp.renameTo(f)) tmp.delete();
+            } catch (Exception ignored) { }
+        });
+    }
+
     static void remove(Context ctx, String id) {
         if (ID.matcher(id).matches()) wipe(new File(root(ctx), id));
     }

@@ -102,6 +102,7 @@ export function createTab({ player, chordsIn = () => [] }) {
   let ro = null;
   let cur = null; // { id, tab, st, secs: bar start seconds, cells: [], row: -1 }
   let part = null;
+  let lastId = null; // the song the tab view was last open on: a different song starts on its imported tab
   let holdUntil = 0;
   let width = 0;
   let follow = true;
@@ -136,6 +137,11 @@ export function createTab({ player, chordsIn = () => [] }) {
     document.dispatchEvent(new Event('tab:kind'));
   }
 
+  // A part the user brought in (their own file or a Soundslice slice) opens first, in the instrument they last used; every other part stays in the picker.
+  function importedPart(tab, kind) {
+    const mine = Object.keys(tab.tracks).filter((k) => !tab.tracks[k].auto && ['file', 'soundslice'].includes(tab.tracks[k].source || tab.source));
+    return mine.find((k) => tab.tracks[k].kind === kind) || mine[0] || null;
+  }
   async function open(id, focus) {
     close();
     let tab, st;
@@ -146,7 +152,12 @@ export function createTab({ player, chordsIn = () => [] }) {
     } catch { return; }
     if (!tab?.found || !st?.bars?.length) return;
     cur = { id, tab, st, secs: [], ends: [], rec: st.bars.map((b) => beatSec(st.beats, b)), cells: [], rows: [], row: -1 };
+    for (const [k, t] of Object.entries(tab.tracks)) t.kind ||= kindOf(k);
+    const remembered = tab.tracks[localStorage.getItem(PART_KEY)];
+    const imported = id !== lastId ? importedPart(tab, remembered?.kind || 'guitar') : null;
+    lastId = id;
     if (focus && tab.tracks[focus]) part = focus;
+    else if (imported) part = imported;
     else if (!tab.tracks[part]) part = tab.tracks[localStorage.getItem(PART_KEY)] ? localStorage.getItem(PART_KEY) : Object.keys(tab.tracks)[0];
     for (const [k, t] of Object.entries(tab.tracks)) t.kind ||= kindOf(k);
     root.hidden = false;

@@ -418,6 +418,7 @@ public class Main extends Activity {
         @JavascriptInterface public void switchHost() { m.ui.post(() -> m.discover()); }
         @JavascriptInterface public String offlineList() { return Offline.list(m.getApplicationContext()).toString(); }
         @JavascriptInterface public void offlineSave(String id, String model, String pin) { Offline.save(m.getApplicationContext(), id, model, pin); }
+        @JavascriptInterface public void offlineRefreshTab(String id, String pin) { Offline.refreshTab(m.getApplicationContext(), id, pin); }
         @JavascriptInterface public void offlineRemove(String id) { Offline.remove(m.getApplicationContext(), id); }
         /** The page's settings (name, part, theme...) live per origin: keep a copy so the offline page starts with them. */
         @JavascriptInterface public void stash(String json) { if (json != null && json.length() < 16384) m.prefs.edit().putString("stash", json).apply(); }

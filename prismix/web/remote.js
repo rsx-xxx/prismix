@@ -302,8 +302,12 @@ async function loadTrack(id, model) {
         t.tabDone = true;
         if (!d?.found) { chrome(); if (S.view === 'tab') render(); return; }
         t.tab = d;
+        if (!OFFLINE && off.have.has(id)) droid?.offlineRefreshTab?.(id, store.pin || ''); // the copy saved on the phone follows the host's tab
         for (const [k, p] of Object.entries(d.tracks)) p.kind ||= k.replace(/\d+$/, '');
-        if (!S.part || !d.tracks[S.part]) S.part = firstOf(d, roleKey()) || Object.keys(d.tracks)[0];
+        // a part the user imported (their own file or a Soundslice slice) opens first, in their instrument when it has one; the rest stay in the picker
+        const mine = Object.keys(d.tracks).filter((k) => !d.tracks[k].auto && ['file', 'soundslice'].includes(d.tracks[k].source || d.source));
+        S.part = mine.find((k) => d.tracks[k].kind === roleKey()) || mine[0]
+          || (d.tracks[S.part] ? S.part : firstOf(d, roleKey()) || Object.keys(d.tracks)[0]);
         chrome();
         if (S.view === 'tab') render();
       }).catch(() => { t.tabDone = true; });
@@ -395,6 +399,9 @@ const drumLane = (m) => ([35, 36].includes(m) ? 3 : [37, 38, 39, 40].includes(m)
 const drumMark = (m) => (m === 46 ? 'o' : drumLane(m) === 0 ? 'x' : '●');
 const firstOf = (tab, kind) => Object.keys(tab.tracks).find((k) => tab.tracks[k].kind === kind);
 const cap = (k) => k[0].toUpperCase() + k.slice(1);
+// Where a part came from: the web (Songsterr), a Soundslice slice, the user's own file, or Prismix's own transcription.
+const sourceOf = (tab, p) => (p.auto ? 'auto' : p.source || tab.source || 'songsterr');
+const sourceName = (tab, p) => ({ auto: 'Prismix', soundslice: 'Soundslice', file: p.label || 'Your file', songsterr: 'Songsterr' })[sourceOf(tab, p)] || 'Songsterr';
 
 function paintParts() {
   const tab = S.track?.tab, on = !!tab && S.view === 'tab';
@@ -411,7 +418,8 @@ function paintParts() {
   $('tab-part').replaceChildren(...kinds.map((k) => mk(cap(k), { kind: k }, k === kind)));
   $('tab-part').hidden = kinds.length < 2;
   const same = on ? Object.keys(tab.tracks).filter((k) => tab.tracks[k].kind === kind) : [];
-  $('tab-variant').replaceChildren(...same.map((k, i) => mk(String(i + 1), { part: k }, k === S.part)));
+  const mixed = on && new Set(same.map((k) => sourceOf(tab, tab.tracks[k]))).size > 1; // parts from different places: say where each is from
+  $('tab-variant').replaceChildren(...same.map((k, i) => mk(mixed ? `${i + 1} · ${sourceName(tab, tab.tracks[k])}` : String(i + 1), { part: k }, k === S.part)));
   $('tab-variant').hidden = same.length < 2;
 }
 
@@ -548,9 +556,10 @@ function renderTab(stage, t) {
   const drums = part.kind === 'drums';
   const strings = drums ? DRUM_LANES : part.tuning.length;
   const box = el('div', { className: `tab${S.tabChords ? ' with-chords' : ''}`, style: `--strings:${strings}` });
+  const srcName = sourceName(tab, part), link = sourceOf(tab, part) === 'songsterr' || sourceOf(tab, part) === 'soundslice' ? part.url || tab.url : '';
   box.append(el('p', { className: 'tab-src' },
-    `${part.name.split('|').at(-1).trim() || S.part} · tab by `,
-    el('a', { href: tab.url, target: '_blank', rel: 'noopener', textContent: 'Songsterr' }),
+    `${part.name.split('|').at(-1).trim() || S.part} · tab from `,
+    link ? el('a', { href: link, target: '_blank', rel: 'noopener', textContent: srcName }) : srcName,
     ' · original key'));
   nodes.bars = [];
   nodes.tabWords = [];

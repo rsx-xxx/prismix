@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.69.1
+
+Imported tab files now travel with the song. A tab imported from a file, a Soundslice slice or a folder is sent to the song's cloud copy, and a computer that has the song already picks up tabs imported elsewhere when it opens the tab. The phone app shows the imported tab first and names where each part comes from (your file, Soundslice, Songsterr, Prismix); the other tabs stay in the picker. This works in cloud and LAN modes, and a song saved offline on Android refreshes its tab from the host.
+
 ## 0.69.0
 
 Importing the same tab file again no longer piles up copies: if every part is already there Prismix says so and adds nothing (and tidies copies left by earlier imports); if the file changed, it is imported and flagged as a newer version of the one already imported. The search field now drops its results down on every page, including the stems page, as you type: your own songs first and instantly, forgiving typos and accents, then YouTube; arrow keys, Enter and Escape work. Highlights use softer, theme-aware colours (the current chord, chord diagrams and chord text always keep readable contrast), and tab digits no longer show a box around them when a bar is hovered or highlighted.

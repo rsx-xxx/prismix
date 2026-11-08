@@ -894,7 +894,10 @@ def create_app() -> FastAPI:
     async def import_tabdata(req: TabsRequest):
         # Tab from a Soundslice link the user pasted; it replaces whatever tab the track had
         try:
-            return await asyncio.to_thread(tabdata.import_soundslice, req.video_id, req.url or "")
+            tab = await asyncio.to_thread(tabdata.import_soundslice, req.video_id, req.url or "")
+            if tab.get("status") != "duplicate":
+                await asyncio.to_thread(cloud.push_tab, req.video_id)
+            return tab
         except ValueError:
             raise HTTPException(404, "Not found") from None
         except tabdata.TabDataError as e:
@@ -904,6 +907,8 @@ def create_app() -> FastAPI:
     async def get_tabdata(video_id: str):
         # Guitar and bass tab for the Tab view; {"found": false} when there is none. Looked up once, then cached.
         try:
+            if library.VIDEO_ID_RE.match(video_id):
+                await asyncio.to_thread(cloud.pull_tab, video_id)  # tabs imported on another device arrive first
             return await asyncio.to_thread(tabdata.lookup, video_id)
         except ValueError:
             raise HTTPException(404, "Not found") from None
@@ -958,7 +963,10 @@ def create_app() -> FastAPI:
         # One score the user picked (Guitar Pro, MusicXML, MIDI) for this track; read whole, capped by tabfiles.MAX_BYTES
         data = await file.read(tabfiles.MAX_BYTES + 1)
         try:
-            return await asyncio.to_thread(tabfiles.import_file, video_id, file.filename or "tab", data)
+            tab = await asyncio.to_thread(tabfiles.import_file, video_id, file.filename or "tab", data)
+            if tab.get("status") != "duplicate":
+                await asyncio.to_thread(cloud.push_tab, video_id)  # the song's cloud copy gets the new tab, for phones and other computers
+            return tab
         except ValueError:
             raise HTTPException(404, "Not found") from None
         except (tabfiles.FileError, tabdata.TabDataError) as e:
@@ -969,7 +977,10 @@ def create_app() -> FastAPI:
         # A folder of the user's own Guitar Pro / MusicXML / MIDI files, matched to the library by name and checked against the audio
         own_window(request)
         try:
-            return await asyncio.to_thread(tabfiles.import_folder, body.folder)
+            result = await asyncio.to_thread(tabfiles.import_folder, body.folder)
+            for m in result["matched"]:
+                await asyncio.to_thread(cloud.push_tab, m["id"])
+            return result
         except tabfiles.FileError as e:
             raise HTTPException(422, str(e)) from e
 

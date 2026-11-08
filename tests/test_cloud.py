@@ -173,6 +173,57 @@ def test_setup_travels_with_the_song(tmp_path, monkeypatch):
     assert library.read_setup(VID) == {"semitones": 2}
 
 
+def test_push_tab_sends_only_the_tab_and_keeps_the_rest(tmp_path, monkeypatch):
+    from prismix import tabdata
+
+    seed_song(tmp_path, monkeypatch)
+    fake = FakeCloud()
+    cloud.publish(cloud_for(fake), VID, "htdemucs_ft")
+    monkeypatch.setattr(cloud, "current", lambda: cloud_for(fake))
+    assert not cloud.push_tab(VID)  # no tab yet: nothing to share
+    tab = {"found": True, "source": "file", "tracks": {"guitar": {"kind": "guitar", "name": "Solo", "bars": [], "source": "file", "label": "a.gp"}}}
+    monkeypatch.setattr(tabdata, "read", lambda v: tab)
+    fake.puts.clear()
+    assert cloud.push_tab(VID)
+    assert fake.puts == ["tab.json"]
+    paths = {f["path"] for f in fake.committed["files"]}
+    assert paths == {"cover.jpg", "mix.m4a", "stems/drums.m4a", "stems/vocals.m4a", "tab.json"}
+    fake.puts.clear()
+    assert cloud.push_tab(VID) and fake.puts == []  # the same tab again is not uploaded twice
+
+
+def test_pull_tab_adopts_imported_parts_only_when_nothing_is_lost(tmp_path, monkeypatch):
+    from prismix import tabdata
+
+    seed_song(tmp_path, monkeypatch)
+    fake = FakeCloud()
+    cloud.publish(cloud_for(fake), VID, "htdemucs_ft")
+    monkeypatch.setattr(cloud, "current", lambda: cloud_for(fake))
+    bar = {"len": 1.0, "n": [[0.0, 1.0, [[0, 5]]]]}
+    web = {"kind": "guitar", "name": "G", "tuning": [64], "bars": [{"len": 1.0, "n": []}], "source": "songsterr"}
+    mine = {"found": True, "source": "songsterr", "map": [0], "tracks": {"guitar": web}}
+    theirs = {"found": True, "source": "songsterr", "map": [0], "tracks": {
+        "guitar": web, "guitar2": {"kind": "guitar", "name": "Solo", "tuning": [64], "bars": [bar], "source": "file", "label": "a.gp", "edited": True}}}
+    store = {"tab": mine}
+    monkeypatch.setattr(tabdata, "_raw", lambda v: store["tab"])
+    monkeypatch.setattr(tabdata, "_save", lambda v, d: store.__setitem__("tab", d))
+    monkeypatch.setattr(tabdata, "read", lambda v: theirs)
+    assert cloud.push_tab(VID)
+    cloud._tab_seen.clear()
+    cloud._tab_tried.clear()
+    assert cloud.pull_tab(VID)  # the cloud has a file this computer lacks
+    assert list(store["tab"]["tracks"]) == ["guitar", "guitar2"] and "edited" not in store["tab"]["tracks"]["guitar2"]
+    assert not cloud.pull_tab(VID)  # throttled
+    cloud._tab_tried.clear()
+    cloud._tab_seen.clear()
+    assert not cloud.pull_tab(VID)  # now identical: nothing to take
+    other = {"kind": "guitar", "name": "Mine", "tuning": [64], "bars": [{"len": 1.0, "n": [[0.0, 1.0, [[0, 9]]]]}], "source": "file", "label": "b.gp"}
+    store["tab"] = {**mine, "tracks": {"guitar": web, "guitar2": other}}
+    cloud._tab_tried.clear()
+    cloud._tab_seen.clear()
+    assert not cloud.pull_tab(VID) and store["tab"]["tracks"]["guitar2"]["label"] == "b.gp"  # a different import here is never overwritten
+
+
 def test_republish_skips_unchanged_files(tmp_path, monkeypatch):
     seed_song(tmp_path, monkeypatch)
     fake = FakeCloud()

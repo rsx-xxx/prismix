@@ -11,10 +11,12 @@ import json
 import os
 import re
 import shutil
+import tempfile
 import threading
 import time
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -368,6 +370,84 @@ def push_setup(video_id: str, setup: dict) -> bool:
         cloud.commit(video_id, {**{k: manifest[k] for k in keep if k in manifest}, "setup": setup})
         return True
     except (CloudError, httpx.HTTPError):
+        return False
+    finally:
+        cloud.close()
+
+
+def push_tab(video_id: str) -> bool:
+    """Share the song's tab (after the user imported a file or slice) with the cloud copy, if there is one, so phones and other
+    computers get it. Only tab.json is sent and the committed manifest is sent again with its new hash. Quiet when offline,
+    signed out or the song is not in the cloud."""
+    cloud = current()
+    if not cloud:
+        return False
+    try:
+        manifest = cloud.manifest(video_id)
+        tab = tabdata.read(video_id)
+        if not manifest or not tab or not tab.get("found"):
+            return False
+        data = json.dumps(tab, ensure_ascii=False, separators=(",", ":")).encode()
+        digest = sha256(data)
+        files = [f for f in manifest.get("files", []) if f.get("path") != "tab.json"]
+        if not any(f.get("path") == "tab.json" and f.get("sha256") == digest for f in manifest.get("files", [])):
+            cloud.put_file(video_id, "tab.json", data, digest)
+        files.append({"path": "tab.json", "sha256": digest, "bytes": len(data)})
+        keep = ("id", "title", "artist", "duration", "model", "quality", "stems")
+        cloud.commit(video_id, {**{k: manifest[k] for k in keep if k in manifest}, "files": files, "setup": library.read_setup(video_id)})
+        _tab_seen[video_id] = digest  # our own tab, nothing to pull back
+        return True
+    except (CloudError, httpx.HTTPError, ValueError, OSError):
+        return False
+    finally:
+        cloud.close()
+
+
+_tab_seen: dict[str, str] = {}  # song -> hash of the cloud tab already looked at
+_tab_tried: dict[str, float] = {}
+_IMPORTED = ("file", "soundslice")
+
+
+def _imported(tab: dict | None) -> set[str]:
+    """Signatures of the parts the user brought in (their own file or a Soundslice slice)."""
+    if not tab or not isinstance(tab.get("tracks"), dict):
+        return set()
+    return {tabdata._sig(p) for p in tab["tracks"].values() if isinstance(p, dict) and not p.get("auto") and (p.get("source") or tab.get("source")) in _IMPORTED}
+
+
+def pull_tab(video_id: str, every: float = 120.0) -> bool:
+    """Take the cloud copy's tab when it holds imported parts this computer lacks, so every device shows the same tabs.
+
+    Only when nothing imported here would be lost (this computer's imported parts are all in the cloud tab too). Checked at
+    most once per `every` seconds per song. Quiet when offline, signed out or the song is not in the cloud."""
+    with _sync_lock:
+        if time.monotonic() - _tab_tried.get(video_id, -every) < every:
+            return False
+        _tab_tried[video_id] = time.monotonic()
+    cloud = current()
+    if not cloud:
+        return False
+    try:
+        manifest = cloud.manifest(video_id)
+        entry = next((f for f in (manifest or {}).get("files", []) if f.get("path") == "tab.json" and isinstance(f.get("sha256"), str)), None)
+        if not entry or _tab_seen.get(video_id) == entry["sha256"]:
+            return False
+        with tempfile.TemporaryDirectory(prefix="prismix-tab-") as d:
+            dest = Path(d) / "tab.json"
+            _fetch(cloud, video_id, entry, dest)
+            theirs = json.loads(dest.read_text())
+        _tab_seen[video_id] = entry["sha256"]
+        if not isinstance(theirs, dict) or not theirs.get("found") or not isinstance(theirs.get("tracks"), dict):
+            return False
+        mine = tabdata._raw(video_id)
+        have, want = _imported(mine if mine and mine.get("found") else None), _imported(theirs)
+        if not want - have or not have <= want:
+            return False
+        for p in theirs["tracks"].values():
+            p.pop("edited", None)
+        tabdata._save(video_id, theirs)
+        return True
+    except (CloudError, httpx.HTTPError, ValueError, OSError):
         return False
     finally:
         cloud.close()
