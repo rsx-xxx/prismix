@@ -2,13 +2,13 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
-## 0.70.0
+## 0.69.2
+
+Imported tab files now travel with the song. A tab imported from a file, a Soundslice slice or a folder is sent to the song's cloud copy, and a computer that has the song already picks up tabs imported elsewhere when it opens the tab. The phone app shows the imported tab first and names where each part comes from (your file, Soundslice, Songsterr, Prismix); the other tabs stay in the picker. This works in cloud and LAN modes, and a song saved offline on Android refreshes its tab from the host.
 
 Tab edits now sync through the band cloud like imports do: edit a part and, a few seconds after you stop, the song's cloud copy follows; other computers pick it up when they open the tab, and phones in cloud or LAN mode show it. Prismix keeps track of what each computer last agreed on, so a device with no changes of its own simply follows, while work that the cloud has not seen is never overwritten. Tabs you imported or edited that are shared this way are highlighted: a "synced" chip next to the tab's credit, a cloud mark in the part list and an accent mark on the instrument buttons, on the desktop and on the phone.
 
-## 0.69.1
-
-Imported tab files now travel with the song. A tab imported from a file, a Soundslice slice or a folder is sent to the song's cloud copy, and a computer that has the song already picks up tabs imported elsewhere when it opens the tab. The phone app shows the imported tab first and names where each part comes from (your file, Soundslice, Songsterr, Prismix); the other tabs stay in the picker. This works in cloud and LAN modes, and a song saved offline on Android refreshes its tab from the host.
+This release also carries 0.69.1, whose build was cancelled, and replaces a 0.70.0 tag that was withdrawn.
 
 ## 0.69.0
 
