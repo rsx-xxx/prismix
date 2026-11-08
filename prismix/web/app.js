@@ -150,14 +150,16 @@ $('omni').addEventListener('submit', async (e) => {
   clearTimeout(previewTimer);
   const text = $('q').value.trim();
   if (!text) return;
+  const picked = optionRows().find((r) => r.getAttribute('aria-selected') === 'true');
+  if (picked && !resultsBox.hidden) { picked.go(); return; }
   notice('');
   location.hash = '#/';
   if (/^(https?:\/\/open\.spotify\.com\/(intl-[a-z-]+\/)?(album|playlist|artist)\/|spotify:(album|playlist|artist):)/i.test(text)) {
-    $('results').hidden = true;
+    closeResults();
     hidePreview();
     plPicker.openUrl(text);
   } else if (isLink(text)) {
-    $('results').hidden = true;
+    closeResults();
     hidePreview();
     askSplit(text, () => startProcess(text, $('quality').value));
   } else {
@@ -169,21 +171,76 @@ const SEARCH_PAGE = 10;
 let searchRun = 0;
 const isLink = (text) => /^(https?:\/\/|www\.|(m\.|music\.)?youtu|spotify:)/i.test(text) || /^[\w-]{11}$/.test(text);
 
-const searchWords = (text) => text.normalize('NFKC').toLowerCase().replaceAll('ё', 'е').match(/[\p{L}\p{N}]+/gu) ?? [];
+const fold = (text) => text.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replaceAll('ё', 'е').replaceAll('ß', 'ss');
+const searchWords = (text) => fold(text).match(/[\p{L}\p{N}]+/gu) ?? [];
 
-/** Songs already in the library whose title, channel or matched video name contains every typed word; punctuation and spacing don't matter. */
+/** One edit apart (substitution, insertion, deletion or swapped neighbours). */
+function nearWord(a, b) {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && a[i] === b[i]) i++;
+  if (i === a.length || i === b.length) return true;
+  return a.slice(i + 1) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i) || a.slice(i) === b.slice(i + 1)
+    || (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2));
+}
+
+/** How well one typed word matches a field's words: whole word > start of a word > inside a word > a typo away. */
+function wordScore(w, words) {
+  let best = 0;
+  for (const x of words) {
+    if (x === w) return 4;
+    if (x.startsWith(w)) best = Math.max(best, 3);
+    else if (x.includes(w)) best = Math.max(best, 1.5);
+    else if (w.length >= 4 && best < 1 && (nearWord(w, x.slice(0, w.length)) || nearWord(w, x))) best = 1;
+  }
+  return best;
+}
+
+/** Library songs for the typed words, best first: every word must hit the title, channel or matched video name (as you type, typos and accents forgiven). */
 function libraryMatches(q) {
   const words = searchWords(q);
   if (!words.length) return [];
-  return state.library.filter((it) => {
-    const hay = searchWords(`${it.title} ${it.channel} ${it.match?.title ?? ''}`).join(' ');
-    return words.every((w) => hay.includes(w));
-  }).slice(0, 5);
+  const out = [];
+  for (const it of state.library) {
+    if (!it.models.length) continue;
+    const title = searchWords(it.title), other = searchWords(`${it.channel} ${it.match?.title ?? ''}`);
+    let score = 0;
+    for (const w of words) {
+      const s = Math.max(wordScore(w, title), 0.6 * wordScore(w, other));
+      if (!s) { score = 0; break; }
+      score += s;
+    }
+    if (score && words.every((w, i) => title[i]?.startsWith(w))) score += 3; // the title begins with what was typed
+    if (score) out.push([score, it]);
+  }
+  return out.sort((x, y) => y[0] - x[0]).slice(0, 6).map((x) => x[1]);
 }
 
-function libraryRow(it, box) {
+const resultsBox = $('results');
+const qInput = $('q');
+let rowId = 0;
+
+function closeResults() {
+  resultsBox.hidden = true;
+  qInput.setAttribute('aria-expanded', 'false');
+  qInput.removeAttribute('aria-activedescendant');
+}
+
+function openResults() {
+  resultsBox.hidden = false;
+  qInput.setAttribute('aria-expanded', 'true');
+}
+
+const optionRows = () => [...resultsBox.querySelectorAll('[role=option]')];
+
+function activateRow(row) {
+  for (const r of optionRows()) r.setAttribute('aria-selected', String(r === row));
+  if (row) { qInput.setAttribute('aria-activedescendant', row.id); row.scrollIntoView({ block: 'nearest' }); } else qInput.removeAttribute('aria-activedescendant');
+}
+
+function libraryRow(it) {
   const open = () => {
-    box.hidden = true;
+    closeResults();
     hidePreview();
     state.plist = null;
     location.hash = `#/v/${it.id}/${it.models.includes(state.defaultModel) ? state.defaultModel : it.models[0]}`;
@@ -191,42 +248,51 @@ function libraryRow(it, box) {
   const pic = el('div', { className: 'pic' }, paintCover(el('img', { alt: '' }), it.id));
   const info = el('div', { className: 'info' }, el('div', { className: 't', textContent: it.title }),
     el('div', { className: 's', textContent: `${it.channel}${it.duration ? ' · ' + fmt(it.duration) : ''}` }));
-  const go = el('button', { className: 'btn small go', type: 'button', textContent: 'Open' });
-  const row = el('div', { className: 'result lib' }, pic, info, go);
-  row.style.cursor = 'pointer';
+  const go = el('span', { className: 'btn small go', textContent: 'Open' });
+  const row = el('div', { className: 'result lib', role: 'option', id: `opt-${++rowId}` }, pic, info, go);
   row.addEventListener('click', open);
+  row.go = open;
   return row;
 }
 
-function resultRow(it, box) {
-  const pic = el('button', { className: 'pic', type: 'button', title: 'Preview', ariaLabel: `Preview ${it.title}` },
+function resultRow(it) {
+  const pic = el('button', { className: 'pic', type: 'button', tabIndex: -1, title: 'Preview', ariaLabel: `Preview ${it.title}` },
     paintCover(el('img', { alt: '' }), it.id, { local: ytThumb(it.id) }));
   const info = el('div', { className: 'info' }, el('div', { className: 't', textContent: it.title }),
     el('div', { className: 's', textContent: `${it.channel}${it.duration ? ' · ' + fmt(it.duration) : ''}` }));
-  const go = el('button', { className: 'btn small go', type: 'button', textContent: inLibrary(it.id) ? 'Open' : 'Split' });
-  const row = el('div', { className: 'result' }, pic, info, go);
-  pic.addEventListener('click', () => showPreview(it, true));
-  info.addEventListener('click', () => showPreview(it, true));
-  go.addEventListener('click', () => {
-    const run = () => { box.hidden = true; hidePreview(); startProcess(it.id, $('quality').value); };
-    if (inLibrary(it.id)) run(); else askSplit(it.title, run);
-  });
+  const go = el('span', { className: 'btn small go', textContent: inLibrary(it.id) ? 'Open' : 'Split' });
+  const row = el('div', { className: 'result', role: 'option', id: `opt-${++rowId}` }, pic, info, go);
+  const run = () => { closeResults(); hidePreview(); startProcess(it.id, $('quality').value); };
+  const split = () => { if (inLibrary(it.id)) run(); else askSplit(it.title, run); };
+  // the preview lives on the home page; elsewhere a click goes straight to the split
+  const preview = () => { if ($('home').hidden) split(); else showPreview(it, true); };
+  pic.addEventListener('click', (e) => { e.stopPropagation(); preview(); });
+  info.addEventListener('click', preview);
+  go.addEventListener('click', split);
+  row.go = split;
   return row;
 }
 
-async function runSearch(q) {
-  const box = $('results');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** The dropdown under the search field, on every page: your own songs at once, YouTube after a short pause. */
+async function runSearch(q, delay = 0) {
+  const box = resultsBox;
   const run = ++searchRun;
   hidePreview();
-  box.hidden = false;
   box.onscroll = null;
+  const mine = libraryMatches(q);
+  const web = q.trim().length >= 2;
+  if (!mine.length && !web) { closeResults(); return; }
+  openResults();
   box.scrollTop = 0;
-  const mine = libraryMatches(q).filter((it) => it.models.length);
   const hits = el('div', { className: 'yt-hits' });
-  const head = (text) => el('p', { className: 'muted', textContent: text });
-  const searching = el('p', { className: 'muted', textContent: 'Searching…' });
-  hits.append(searching);
-  box.replaceChildren(...(mine.length ? [head('In your library'), ...mine.map((it) => libraryRow(it, box)), head('On YouTube')] : []), hits);
+  const head = (text) => el('p', { className: 'muted', role: 'presentation', textContent: text });
+  hits.append(el('p', { className: 'muted', textContent: 'Searching…' }));
+  box.replaceChildren(...(mine.length ? [head('In your library'), ...mine.map(libraryRow)] : []), ...(web ? [...(mine.length ? [head('On YouTube')] : []), hits] : []));
+  activateRow(null);
+  if (!web) return;
+  if (delay) { await sleep(delay); if (run !== searchRun) return; }
   const seen = new Set(mine.map((it) => it.id));
   const emptyHint = () => (mine.length ? 'Nothing more found.' : 'Nothing found.');
   let offset = 0, done = false, loading = false;
@@ -245,13 +311,13 @@ async function runSearch(q) {
       if (first && !fresh.length) { hits.replaceChildren(head(emptyHint())); return; }
       tail.remove();
       if (first) hits.replaceChildren();
-      hits.append(...fresh.map((it) => resultRow(it, box)));
+      hits.append(...fresh.map(resultRow));
       if (done) hits.append(head('End of results.'));
     } catch (err) {
       if (run !== searchRun) return;
       tail.remove();
       if (first) {
-        if (mine.length) hits.replaceChildren(head('YouTube search failed.')); else box.hidden = true;
+        if (mine.length) hits.replaceChildren(head('YouTube search failed.')); else closeResults();
         notice(err.message);
       } else { done = true; notice(err.message); }
     } finally {
@@ -262,6 +328,26 @@ async function runSearch(q) {
   box.onscroll = () => { if (box.scrollTop + box.clientHeight >= box.scrollHeight - 160) more(false); };
   await more(true);
 }
+
+// combobox keys: arrows move through the rows, Enter opens the highlighted one, Escape closes
+qInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { if (!resultsBox.hidden) { e.preventDefault(); closeResults(); } return; }
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const text = qInput.value.trim();
+  if (resultsBox.hidden) { if (text && !isLink(text)) { e.preventDefault(); runSearch(text); } return; }
+  const rows = optionRows();
+  if (!rows.length) return;
+  e.preventDefault();
+  const at = rows.findIndex((r) => r.getAttribute('aria-selected') === 'true');
+  const next = e.key === 'ArrowDown' ? (at + 1) % rows.length : (at <= 0 ? rows.length - 1 : at - 1);
+  activateRow(rows[next]);
+});
+qInput.addEventListener('focus', () => {
+  const text = qInput.value.trim();
+  if (text && !isLink(text) && resultsBox.hidden) runSearch(text);
+});
+document.addEventListener('pointerdown', (e) => { if (!resultsBox.hidden && !$('omni').contains(e.target)) closeResults(); });
+window.addEventListener('hashchange', closeResults);
 
 // ── YouTube preview ──
 const inLibrary = (id) => state.library.some((i) => i.id === id);
@@ -320,18 +406,19 @@ let typedPreview = false; // preview opened by typing a link (vs. clicking a sea
 if (matchMedia('(max-width: 760px)').matches) $('q').placeholder = $('q').dataset.short;
 $('q').addEventListener('input', () => {
   clearTimeout(previewTimer);
+  const text = $('q').value.trim();
+  const id = ytId(text);
+  if (text && !id && !isLink(text)) {
+    if (typedPreview) { typedPreview = false; hidePreview(); }
+    runSearch(text, 280);
+    return;
+  }
   previewTimer = setTimeout(() => {
-    const text = $('q').value.trim();
-    const id = ytId(text);
-    if (!id && !isLink(text) && text.length >= 2) {
-      runSearch(text);
-      return;
-    }
-    if (!id && !text) { searchRun++; $('results').hidden = true; }
+    if (!id && !text) { searchRun++; closeResults(); }
     if (id) {
       searchRun++;
       if (location.hash !== '#/' && location.hash !== '') location.hash = '#/';
-      $('results').hidden = true;
+      closeResults();
       const known = state.library.find((i) => i.id === id);
       showPreview({ id, title: known?.title, channel: known?.channel, duration: known?.duration }, false);
       typedPreview = true;
@@ -382,7 +469,7 @@ async function uploadFile(file) {
   if (!file) return;
   notice('');
   location.hash = '#/';
-  $('results').hidden = true;
+  closeResults();
   hidePreview();
   const box = $('job');
   const msg = el('span', { textContent: 'Uploading' });

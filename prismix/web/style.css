@@ -206,7 +206,11 @@ dialog legend { font-size: 12px; text-transform: uppercase; letter-spacing: .08e
 #ex-stems .chip { text-transform: capitalize; }
 
 /* ── search results ── */
-.results { display: grid; gap: 4px; max-height: min(70vh, 640px); overflow-y: auto; overscroll-behavior: contain; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; margin-bottom: 20px; }
+.omni { position: relative; }
+.results { position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 30; display: grid; gap: 2px; align-content: start; max-height: min(70vh, 640px); overflow-y: auto; overscroll-behavior: contain; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; box-shadow: 0 18px 48px rgb(0 0 0 / .35); }
+.results > .muted { margin: 6px 8px 2px; font-size: 12px; }
+.result[aria-selected=true] { background: var(--surface-2); outline: 2px solid var(--accent); outline-offset: -2px; }
+.result { cursor: pointer; }
 .result { display: flex; gap: 14px; align-items: center; padding: 8px; border-radius: 12px; border: 0; background: none; text-align: left; width: 100%; }
 .result:hover { background: var(--surface-2); }
 .result img { width: 112px; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; background: var(--surface-2); flex: none; }
@@ -320,7 +324,7 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .ahead b { font-size: 20px; line-height: 1.15; }
 .ahead small { font-size: 11px; color: var(--muted); }
 .ahead button.chord { opacity: .8; }
-.ahead button.cur { opacity: 1; background: var(--fill); box-shadow: none; color: #14110f; }
+.ahead button.cur { opacity: 1; background: var(--fill); box-shadow: none; color: var(--on, #14110f); }
 .ahead button.cur small { color: inherit; opacity: .65; }
 .ahead button.cur b { font-size: 28px; }
 .ahead button:not(.cur):nth-child(n+4) { opacity: .6; }
@@ -421,8 +425,8 @@ kbd { font: 12px var(--font); background: var(--surface-2); border: 1px solid va
 .cell small { position: absolute; top: 5px; left: 9px; font-size: 10px; font-weight: 600; color: var(--muted); }
 .cell .carried { color: var(--muted); font-weight: 500; }
 .cell:hover { border-color: var(--line-strong); }
-.cell.now { background: var(--text); color: var(--bg); border-color: transparent; }
-.cell.now small, .cell.now .carried { color: inherit; opacity: .6; }
+.cell.now { background: color-mix(in oklab, var(--accent) 16%, var(--surface)); color: var(--text); border-color: color-mix(in oklab, var(--accent) 60%, var(--line)); }
+.cell.now small, .cell.now .carried { color: var(--muted); }
 @media (max-width: 760px) { .ruler-spacer, .ruler { display: none; } .score-head h2 { width: 100%; } }
 
 /* ── small screens: controls full width, waveforms hidden (seek bar stays in the dock) ── */
@@ -442,7 +446,7 @@ kbd { font: 12px var(--font); background: var(--surface-2); border: 1px solid va
 /* chords: live highlight, visibility, fingering */
 .chart .cell span { border-radius: 6px; padding: 0 4px; margin: 0 -4px; transition: background .1s; }
 .chart .cell span.on { background: var(--accent); color: var(--on-primary); }
-.cell.now span.on { background: var(--bg); color: var(--text); }
+.cell.now span.on { background: var(--accent); color: var(--on-primary); }
 .fing-opts { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin-bottom: 12px; }
 .diagrams figure.alt { cursor: pointer; }
 .diagrams figure.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
@@ -530,8 +534,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
   box-shadow: inset 0 -2px 0 var(--fill);
   background: oklch(var(--l) var(--c) var(--h) / .16);
 }
-.chart .cell span.chord.on { background: var(--fill); color: #14110f; box-shadow: none; }
-.cell.now span.chord.on { background: var(--fill); color: #14110f; }
+.chart .cell span.chord.on, .cell.now span.chord.on { background: var(--fill); color: var(--on, #14110f); box-shadow: none; }
 .diagrams figcaption.chord { border-radius: 6px; padding: 0 6px; }
 
 /* lyrics */
@@ -816,7 +819,7 @@ body.dropping::after { content: 'Drop an audio or video file to add it'; positio
 .tbar .fx .pm { position: absolute; bottom: 0; border-bottom: 1px dashed var(--muted); border-left: 1px solid var(--muted); font-size: 9px; font-weight: 700; line-height: 11px; padding-left: 3px; white-space: nowrap; overflow: hidden; }
 .tbar .fx .pm.cont { border-left: 0; }
 .tbar .fx .pm.open { border-right: 0; }
-.tbar .stf .oval { position: absolute; width: 18px; margin-left: -7px; box-sizing: border-box; border: 1px solid var(--muted); border-radius: 9px; pointer-events: none; z-index: 1; }
+.tbar .stf .oval { position: absolute; width: 18px; margin-left: -7px; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--muted) 45%, transparent); border-radius: 9px; pointer-events: none; z-index: 1; }
 .tbar .sig { position: absolute; top: 6px; left: 24px; font-size: 9px; font-weight: 700; color: var(--muted); }
 .tbar .fx .ring { position: absolute; bottom: 0; border-bottom: 1px dashed var(--muted); border-left: 1px solid var(--muted); border-right: 1px solid var(--muted); font-style: italic; line-height: 11px; padding-left: 3px; white-space: nowrap; overflow: hidden; }
 .tbar .f.tied { color: var(--muted); }
@@ -1069,7 +1072,7 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
 .fg-pair svg { width: 100%; height: auto; max-width: 96px; }
 .fg-pair .next { opacity: .7; }
 .fg-pair .next svg { max-width: 64px; }
-.fg-pair figure svg { box-sizing: border-box; padding: 6px; border-radius: 10px; background: #fff; color: #14110f; --bg: #fff; }
+.fg-pair figure svg { box-sizing: border-box; padding: 6px; border-radius: 10px; color: var(--text); background: color-mix(in oklab, oklch(0.7 0.12 var(--h, 285)) 12%, var(--surface-2)); border: 1px solid color-mix(in oklab, oklch(0.7 0.12 var(--h, 285)) 30%, transparent); }
 .fg-pair figcaption { order: -1; font-weight: 800; font-size: 20px; line-height: 1.2; background: none; box-shadow: none; color: oklch(0.78 0.15 var(--h)); }
 .fg-pair .next figcaption { font-size: 15px; }
 :root[data-theme="light"] .fg-pair figcaption { color: oklch(0.5 0.2 var(--h)); }
@@ -1254,14 +1257,14 @@ img.cv.none { opacity: 0; }
 .trow.gt { align-items: flex-start; gap: 0; margin-bottom: 18px; }
 .trow.gt .strs { position: relative; flex: 0 0 1.3rem; margin-top: 47px; padding: 0 3px 0 0; justify-content: flex-start; height: calc(var(--strings) * var(--row)); }
 .trow.gt .strs::after, .tbar.gt .stf::after { content: ""; position: absolute; right: 0; top: calc(var(--row) / 2); bottom: calc(var(--row) / 2); width: 1px; background: var(--text); opacity: .7; }
-.tbar.gt { padding: 0; border: 0; border-radius: 0; background: none; }
-.tbar.gt:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.tbar.gt { --back: var(--bg); padding: 0; border: 0; border-radius: 0; background: none; transition: background-color .2s; }
+.tbar.gt:hover { --back: color-mix(in srgb, var(--text) 4%, var(--bg)); background: var(--back); }
 .tbar.gt.now { background: none; border-color: transparent; }
-.tbar.gt.weak { background: color-mix(in oklab, var(--warn, #e0a030) 8%, transparent); }
+.tbar.gt.weak { --back: color-mix(in oklab, var(--warn, #e0a030) 8%, var(--bg)); background: var(--back); }
 .tbar.gt .hd { padding: 0 4px; }
 .tbar.gt .tch { margin: 0; }
 .tbar.gt .stf { background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--row) / 2 - .5px), color-mix(in srgb, var(--text) 38%, transparent) calc(var(--row) / 2 - .5px) calc(var(--row) / 2 + .5px), transparent calc(var(--row) / 2 + .5px) var(--row)); }
-.tbar.gt .f { transform: translateX(-50%); padding: 0 2px; background: var(--bg); }
+.tbar.gt .f { transform: translateX(-50%); padding: 0 2px; border-radius: 4px; background: var(--back, var(--bg)); transition: background-color .2s; }
 .tbar.gt .rh { height: 26px; }
 
 /* SMuFL music glyphs (Bravura, SIL OFL) for flags, rests, dots and the tempo mark; 1em = 4 staff spaces */

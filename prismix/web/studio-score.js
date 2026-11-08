@@ -57,6 +57,7 @@ export function createScore({ player, api, notice, onSetup }) {
     node.style.setProperty('--h', p.hue);
     node.style.setProperty('--l', p.l);
     node.style.setProperty('--c', p.chroma);
+    node.style.setProperty('--on', p.l < 0.58 ? '#fff' : '#14110f'); // text on the fill: whichever of the two reads better (≥4.5:1)
     node.classList.add('chord');
     return node;
   };

@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.69.0
+
+Importing the same tab file again no longer piles up copies: if every part is already there Prismix says so and adds nothing (and tidies copies left by earlier imports); if the file changed, it is imported and flagged as a newer version of the one already imported. The search field now drops its results down on every page, including the stems page, as you type: your own songs first and instantly, forgiving typos and accents, then YouTube; arrow keys, Enter and Escape work. Highlights use softer, theme-aware colours (the current chord, chord diagrams and chord text always keep readable contrast), and tab digits no longer show a box around them when a bar is hovered or highlighted.
+
 ## 0.68.1
 
 Fixes the release build, which stopped at a lint check in the tab fingering code since 0.67.2. No change in behaviour; this release also carries everything from 0.67.2 and 0.68.0.

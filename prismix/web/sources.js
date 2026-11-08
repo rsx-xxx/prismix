@@ -157,8 +157,14 @@ export function createSources({ api, notice, onChange, onTab }) {
   // The score is added beside the tab the song has: say what arrived, and open the first new part.
   function added(target, tab, from) {
     const keys = tab.added || [];
+    if (tab.status === 'duplicate') {
+      notice(`${from} is already imported with exactly the same tabs. Nothing was added.`, 'ok');
+      onTab(target);
+      return;
+    }
     const names = keys.map((k) => tab.tracks[k]?.name?.split('|').at(-1).trim() || k);
-    notice(`Added from ${from}: ${names.join(', ') || 'tab'}. Shown in the Tabs view, labelled by source.`, 'ok');
+    const newer = tab.status === 'updated' ? ' It is a newer version of a file already imported and replaces it.' : '';
+    notice(`Added from ${from}: ${names.join(', ') || 'tab'}.${newer} Shown in the Tabs view, labelled by source.`, 'ok');
     onTab(target, keys[0]);
   }
 

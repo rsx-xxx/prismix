@@ -10,6 +10,7 @@ so a re-download never loses them.
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import logging
 import math
@@ -710,12 +711,22 @@ def add_auto(video_id: str, parts: dict[str, dict], nbars: int, flagged: dict[st
     return read(video_id) or raw
 
 
+def _sig(part: dict) -> str:
+    """What makes a part the same music: its kind, tuning and notes (not flags such as `weak`, nor where it came from)."""
+    bars = [{k: v for k, v in b.items() if k != "weak"} for b in part.get("bars", [])]
+    blob = json.dumps([part.get("kind"), part.get("tuning"), bars], sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(blob.encode()).hexdigest()
+
+
 def add_source(video_id: str, parts: dict[str, dict], fitted: dict, meta: dict) -> dict:
     """Keep a user-supplied score (a Soundslice slice, a file) beside the tab the track already has; returns the tab.
 
     Each new part is tagged with where it came from (`source`, `origin`, `label`, `url`). Its bars are laid on the tab's
     shared bar list through the recording's bars, so it stays in step with the audio and with every other part. The same
     origin imported again replaces its earlier parts. A track without a tab takes the score as its tab.
+
+    `status` in the result: `new`, `updated` (the origin was imported before and its music changed) or `duplicate`
+    (every part is already there, nothing is added).
     """
     for p in parts.values():
         p.update({"source": meta["source"], "origin": meta["origin"], "label": meta["label"], "url": meta.get("url", "")})
@@ -726,16 +737,8 @@ def add_source(video_id: str, parts: dict[str, dict], fitted: dict, meta: dict) 
             "artist": meta.get("artist", ""), "title": meta.get("title", ""), **fitted, "tracks": parts,
         })
         _edits_path(video_id).unlink(missing_ok=True)  # edits belonged to the tab this one replaces
-        return {**(read(video_id) or {}), "added": list(parts)}
+        return {**(read(video_id) or {}), "added": list(parts), "status": "new"}
     tracks = raw["tracks"]
-    for key in [k for k, p in tracks.items() if p.get("origin") == meta["origin"]]:
-        del tracks[key]
-        edits = _read_edits(video_id)
-        if edits.pop(key, None) is not None:
-            _write(_edits_path(video_id), edits)
-    for p in tracks.values():
-        p.setdefault("source", raw.get("source") or "songsterr")
-        p.setdefault("url", raw.get("url") or "")
     ref = next(iter(tracks.values()))["bars"]
     at = {j: k for k, j in reversed(list(enumerate(fitted["map"]))) if j is not None}  # recording bar -> this score's bar
     for part in parts.values():
@@ -744,15 +747,36 @@ def add_source(video_id: str, parts: dict[str, dict], fitted: dict, meta: dict) 
             dict(own[at[j]]) if j is not None and j in at and at[j] < len(own) else {"len": ref[i]["len"], "n": []}
             for i, j in enumerate(raw["map"])
         ]
+    have = {_sig(p) for p in tracks.values()}
+    if all(_sig(p) in have for p in parts.values()):
+        edits, seen = _read_edits(video_id), set()
+        for key in list(tracks):  # also tidy copies an earlier version of the import left behind
+            sig = (_sig(tracks[key]), tracks[key].get("label"))
+            if sig in seen and key not in edits:
+                del tracks[key]
+            seen.add(sig)
+        _save(video_id, raw)
+        return {**(read(video_id) or raw), "added": [], "status": "duplicate"}
+    old = [k for k, p in tracks.items() if p.get("origin") == meta["origin"]]
+    for key in old:
+        del tracks[key]
+        edits = _read_edits(video_id)
+        if edits.pop(key, None) is not None:
+            _write(_edits_path(video_id), edits)
+    for p in tracks.values():
+        p.setdefault("source", raw.get("source") or "songsterr")
+        p.setdefault("url", raw.get("url") or "")
     added = []
     for part in parts.values():
+        if _sig(part) in {_sig(p) for p in tracks.values()}:
+            continue  # this part is already there (another import brought it)
         n = 1
         while part_key(part["kind"], n) in tracks:
             n += 1
         added.append(part_key(part["kind"], n))
         tracks[added[-1]] = part
     _save(video_id, raw)
-    return {**(read(video_id) or raw), "added": added}
+    return {**(read(video_id) or raw), "added": added, "status": "updated" if old else "new"}
 
 
 def _download(song: dict) -> dict[str, dict]:

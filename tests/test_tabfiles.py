@@ -193,3 +193,26 @@ def test_add_source_lays_score_beside_existing_tab(tmp_path, monkeypatch):
     assert [b["n"][0][2][0][1] if b["n"] else None for b in new["bars"]] == [6, 7, None, 9]
     again = tabdata.add_source("v", {"guitar": dict(part, bars=[bar(5)] * 4)}, {"map": [0, 1, 2, 3]}, {"source": "file", "origin": "file:a.gp", "label": "a.gp"})
     assert list(again["tracks"]) == ["guitar", "guitar2"]  # the same file again replaces its parts
+
+
+def test_add_source_same_file_twice_is_a_duplicate_and_changes_are_an_update(tmp_path, monkeypatch):
+    from prismix import tabdata
+
+    store = {}
+    monkeypatch.setattr(tabdata, "_raw", lambda v: store.get("tab"))
+    monkeypatch.setattr(tabdata, "_save", lambda v, d: store.__setitem__("tab", d))
+    monkeypatch.setattr(tabdata, "_edits_path", lambda v: tmp_path / "edits.json")
+    bar = lambda f: {"len": 1.0, "n": [[0.0, 1.0, [[0, f]]]]}  # noqa: E731
+    store["tab"] = {
+        "found": True, "source": "songsterr", "url": "", "map": [0, 1],
+        "tracks": {"guitar": {"kind": "guitar", "name": "G", "tuning": [64], "bars": [bar(0)] * 2}},
+    }
+    meta = {"source": "file", "origin": "file:a.gp", "label": "a.gp"}
+    fitted = {"map": [0, 1]}
+    parts = lambda f: {"guitar": {"kind": "guitar", "name": "Solo", "tuning": [64], "bars": [bar(f)] * 2}}  # noqa: E731
+    assert tabdata.add_source("v", parts(5), fitted, meta)["status"] == "new"
+    same = tabdata.add_source("v", parts(5), fitted, dict(meta, origin="file:a (1).gp"))  # another file name, same music
+    assert same["status"] == "duplicate" and same["added"] == [] and list(same["tracks"]) == ["guitar", "guitar2"]
+    newer = tabdata.add_source("v", parts(7), fitted, meta)
+    assert newer["status"] == "updated" and list(newer["tracks"]) == ["guitar", "guitar2"]
+    assert newer["tracks"]["guitar2"]["bars"][0]["n"][0][2][0][1] == 7
