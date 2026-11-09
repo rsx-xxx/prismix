@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.69.3
+
+Songs imported twice by different routes (a folder first, then the same file by hand) no longer show two sets of the same tabs: a copy that only repeats another part is dropped, the fuller one stays, and parts you edited are never touched. Existing duplicates are cleaned up the next time the song's tab opens. In the light theme the chord diagrams are plain white again. The glow that follows the playhead no longer leaves boxes around the fret numbers during playback.
+
 ## 0.69.2
 
 Imported tab files now travel with the song. A tab imported from a file, a Soundslice slice or a folder is sent to the song's cloud copy, and a computer that has the song already picks up tabs imported elsewhere when it opens the tab. The phone app shows the imported tab first and names where each part comes from (your file, Soundslice, Songsterr, Prismix); the other tabs stay in the picker. This works in cloud and LAN modes, and a song saved offline on Android refreshes its tab from the host.

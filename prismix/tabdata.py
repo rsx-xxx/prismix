@@ -795,7 +795,7 @@ def _covers(a: dict, b: dict) -> bool:
     ba, bb = a.get("bars", []), b.get("bars", [])
     if len(ba) != len(bb):
         return False
-    return all(y.get("n") == x.get("n") for x, y in zip(ba, bb) if y.get("n"))
+    return all(y.get("n") == x.get("n") for x, y in zip(ba, bb, strict=True) if y.get("n"))
 
 
 def _notes(part: dict) -> int:
