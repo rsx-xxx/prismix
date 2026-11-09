@@ -1075,6 +1075,8 @@ body.song-drag .plcard { box-shadow: 0 0 0 1px var(--line-strong); animation: la
 .fg-pair .next { opacity: .7; }
 .fg-pair .next svg { max-width: 64px; }
 .fg-pair figure svg { box-sizing: border-box; padding: 6px; border-radius: 10px; color: var(--text); background: color-mix(in oklab, oklch(0.7 0.12 var(--h, 285)) 12%, var(--surface-2)); border: 1px solid color-mix(in oklab, oklch(0.7 0.12 var(--h, 285)) 30%, transparent); }
+:root[data-theme="light"] .fg-pair figure svg { background: var(--surface); border-color: var(--line); }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) .fg-pair figure svg { background: var(--surface); border-color: var(--line); } }
 .fg-pair figcaption { order: -1; font-weight: 800; font-size: 20px; line-height: 1.2; background: none; box-shadow: none; color: oklch(0.78 0.15 var(--h)); }
 .fg-pair .next figcaption { font-size: 15px; }
 :root[data-theme="light"] .fg-pair figcaption { color: oklch(0.5 0.2 var(--h)); }
@@ -1279,7 +1281,7 @@ img.cv.none { opacity: 0; }
 .tbar .tempo .smufl { font-size: 15px; line-height: 1; vertical-align: -1px; }
 
 /* the bar being played: no box, a playhead with a short glow trailing behind it, and an accent bar number */
-.tbar .stf::before { content: ""; position: absolute; top: 0; bottom: 0; left: max(0px, calc(var(--x, 0%) - 72px)); width: min(var(--x, 0%), 72px); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 18%, transparent)); opacity: 0; pointer-events: none; transition: opacity .2s; }
+.tbar .stf::before { content: ""; position: absolute; z-index: 2; top: 0; bottom: 0; left: max(0px, calc(var(--x, 0%) - 72px)); width: min(var(--x, 0%), 72px); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 18%, transparent)); opacity: 0; pointer-events: none; transition: opacity .2s; }
 .tbar.now .stf::before { opacity: 1; }
 .tbar .cursor { width: 2px; background: var(--accent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 80%, transparent); transition: opacity .2s; }
 .tbar.now .hd .n { color: var(--accent); font-weight: 800; }

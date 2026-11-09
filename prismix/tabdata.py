@@ -787,6 +787,45 @@ def _sig(part: dict) -> str:
     return hashlib.sha1(blob.encode()).hexdigest()
 
 
+def _covers(a: dict, b: dict) -> bool:
+    """Part `a` already holds all of part `b`: the same instrument, name and tuning, and every bar of `b` that has notes is the same in `a`.
+    The same score laid on the bars twice differs only in what the second pass left empty (gap fills, section marks)."""
+    if (a.get("kind"), a.get("name"), a.get("tuning")) != (b.get("kind"), b.get("name"), b.get("tuning")):
+        return False
+    ba, bb = a.get("bars", []), b.get("bars", [])
+    if len(ba) != len(bb):
+        return False
+    return all(y.get("n") == x.get("n") for x, y in zip(ba, bb) if y.get("n"))
+
+
+def _notes(part: dict) -> int:
+    return sum(len(b.get("n") or []) for b in part.get("bars", []))
+
+
+def tidy(video_id: str) -> bool:
+    """Drop parts that repeat another part (the same file imported more than once, by different routes). The fuller copy stays;
+    a part the user edited is never dropped. True when something was removed."""
+    raw = _raw(video_id)
+    if not raw or not raw.get("found") or not isinstance(raw.get("tracks"), dict):
+        return False
+    edits = _read_edits(video_id)
+    kept: dict[str, dict] = {}
+    for key, part in raw["tracks"].items():
+        if part.get("auto") or key in edits:
+            kept[key] = part
+            continue
+        if any(k not in edits and not p.get("auto") and _covers(p, part) and _notes(p) >= _notes(part) for k, p in kept.items()):
+            continue  # this one repeats an earlier, fuller part
+        for k in [k for k, p in kept.items() if k not in edits and not p.get("auto") and _covers(part, p)]:
+            del kept[k]  # an earlier part is contained in this one
+        kept[key] = part
+    if len(kept) == len(raw["tracks"]):
+        return False
+    raw["tracks"] = kept
+    _save(video_id, raw)
+    return True
+
+
 def add_source(video_id: str, parts: dict[str, dict], fitted: dict, meta: dict) -> dict:
     """Keep a user-supplied score (a Soundslice slice, a file) beside the tab the track already has; returns the tab.
 
@@ -816,15 +855,9 @@ def add_source(video_id: str, parts: dict[str, dict], fitted: dict, meta: dict) 
             dict(own[at[j]]) if j is not None and j in at and at[j] < len(own) else {"len": ref[i]["len"], "n": []}
             for i, j in enumerate(raw["map"])
         ]
-    have = {_sig(p) for p in tracks.values()}
-    if all(_sig(p) in have for p in parts.values()):
-        edits, seen = _read_edits(video_id), set()
-        for key in list(tracks):  # also tidy copies an earlier version of the import left behind
-            sig = (_sig(tracks[key]), tracks[key].get("label"))
-            if sig in seen and key not in edits:
-                del tracks[key]
-            seen.add(sig)
+    if all(any(_covers(t, p) for t in tracks.values()) for p in parts.values()):
         _save(video_id, raw)
+        tidy(video_id)  # also removes copies an earlier import left behind
         return {**(read(video_id) or raw), "added": [], "status": "duplicate"}
     old = [k for k, p in tracks.items() if p.get("origin") == meta["origin"]]
     for key in old:
@@ -837,7 +870,7 @@ def add_source(video_id: str, parts: dict[str, dict], fitted: dict, meta: dict) 
         p.setdefault("url", raw.get("url") or "")
     added = []
     for part in parts.values():
-        if _sig(part) in {_sig(p) for p in tracks.values()}:
+        if any(_covers(t, part) for t in tracks.values()):
             continue  # this part is already there (another import brought it)
         n = 1
         while part_key(part["kind"], n) in tracks:
@@ -897,6 +930,7 @@ def outdated(video_id: str) -> bool:
 
 def lookup(video_id: str, *, force: bool = False) -> dict:
     """Find, align and cache the tab. Always returns a result; {"found": False} when no tab fits."""
+    tidy(video_id)
     if not force and (hit := read(video_id)) is not None:
         if hit.get("found") and hit.get("source") == "songsterr" and hit.get("v", 1) < FORMAT:
             return _refresh(video_id, hit)

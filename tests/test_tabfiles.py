@@ -216,3 +216,20 @@ def test_add_source_same_file_twice_is_a_duplicate_and_changes_are_an_update(tmp
     newer = tabdata.add_source("v", parts(7), fitted, meta)
     assert newer["status"] == "updated" and list(newer["tracks"]) == ["guitar", "guitar2"]
     assert newer["tracks"]["guitar2"]["bars"][0]["n"][0][2][0][1] == 7
+
+
+def test_tidy_drops_a_part_repeated_by_a_second_import(tmp_path, monkeypatch):
+    from prismix import tabdata
+
+    store = {}
+    monkeypatch.setattr(tabdata, "_raw", lambda v: store.get("tab"))
+    monkeypatch.setattr(tabdata, "_save", lambda v, d: store.__setitem__("tab", d))
+    monkeypatch.setattr(tabdata, "_edits_path", lambda v: tmp_path / "edits.json")
+    note = {"len": 1.0, "n": [[0.0, 1.0, [[0, 5]]]], "mark": "Verse"}
+    full = {"kind": "guitar", "name": "Solo", "tuning": [64], "bars": [note, note, {"len": 1.0, "n": [[0.0, 1.0, [[0, 7]]]]}]}
+    laid = {"kind": "guitar", "name": "Solo", "tuning": [64], "bars": [{"len": 1.0, "n": note["n"]}, {"len": 1.0, "n": []}, {"len": 1.0, "n": full["bars"][2]["n"]}]}
+    web = {"kind": "guitar", "name": "Solo", "tuning": [64], "bars": [{"len": 1.0, "n": [[0.0, 1.0, [[0, 9]]]]}] * 3, "source": "songsterr"}
+    store["tab"] = {"found": True, "tracks": {"guitar": full, "guitar2": web, "guitar3": laid}}
+    assert tabdata.tidy("v")
+    assert list(store["tab"]["tracks"]) == ["guitar", "guitar2"]  # the emptier copy goes, a different tab with the same name stays
+    assert not tabdata.tidy("v")
