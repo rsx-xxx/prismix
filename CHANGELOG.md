@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.69.4
+
+The Drummer "Follow" button works again: it shared its id with the "follow playback" button, so a click went to the wrong one. It now lives in the ⋯ menu as "Follow a live drummer", and besides a MIDI kit it can listen through the microphone: it takes the stems' own sound out of what the microphone hears and picks the drummer's hits out of what is left, so the band keeps up with a drummer who rushes or drags; four clicks of sticks while stopped still start the stems at his tempo. Auto uses a MIDI kit when one is plugged in, else the microphone. Themes are just dark and light now (the Auto option is gone; a first run starts from the system's setting). Imported tab files are labelled by who made them and in what format (for example "by Valeriy · MusicXML") instead of a long file name, with the file's own details in a tooltip; a folder import now tags its parts the same way.
+
 ## 0.69.3
 
 Songs imported twice by different routes (a folder first, then the same file by hand) no longer show two sets of the same tabs: a copy that only repeats another part is dropped, the fuller one stays, and parts you edited are never touched. Existing duplicates are cleaned up the next time the song's tab opens. In the light theme the chord diagrams are plain white again. The glow that follows the playhead no longer leaves boxes around the fret numbers during playback.

@@ -838,6 +838,8 @@ def add_source(video_id: str, parts: dict[str, dict], fitted: dict, meta: dict) 
     """
     for p in parts.values():
         p.update({"source": meta["source"], "origin": meta["origin"], "label": meta["label"], "url": meta.get("url", "")})
+        if meta.get("file"):
+            p["file"] = meta["file"]  # what the imported file says about itself, for the tooltip
     raw = _raw(video_id)
     if not raw or not raw.get("found") or not raw.get("tracks"):
         _save(video_id, {

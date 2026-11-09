@@ -93,11 +93,12 @@ const BARS = { light: '#f6f3ec', dark: '#121110' };
 function applyLook() {
   const root = document.documentElement;
   root.style.setProperty('--fs', String(store.fs || 1));
-  if (store.theme === 'light' || store.theme === 'dark') root.dataset.theme = store.theme; else delete root.dataset.theme;
+  // dark or light; a phone that never chose (or chose the old "auto") starts from the system's setting
   const dark = store.theme === 'dark' || (store.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+  root.dataset.theme = dark ? 'dark' : 'light';
   document.querySelector('meta[name=theme-color]').content = dark ? BARS.dark : BARS.light;
   droid?.setBars?.(dark ? BARS.dark : BARS.light, !dark);
-  document.querySelectorAll('#theme-seg button').forEach((b) => b.setAttribute('aria-checked', String((store.theme || 'auto') === b.dataset.theme)));
+  document.querySelectorAll('#theme-seg button').forEach((b) => b.setAttribute('aria-checked', String((dark ? 'dark' : 'light') === b.dataset.theme)));
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyLook);
 applyLook();

@@ -1204,11 +1204,14 @@ player.addEventListener('mix', syncMixer);
 
 function syncFollow() {
   const on = rehearse.on;
-  $('follow').setAttribute('aria-pressed', String(on));
-  $('follow-l').textContent = on ? rehearse.status : 'Drummer';
-  const sel = $('follow-port');
-  sel.hidden = !on || !rehearse.ports.length || (rehearse.ports.length === 1 && !!rehearse.open);
-  const ports = rehearse.ports;
+  $('drum-follow').checked = on;
+  $('follow-opts').hidden = !on;
+  $('follow-src').value = rehearse.src;
+  const note = $('follow-note');
+  note.hidden = !on;
+  note.textContent = on ? rehearse.status : '';
+  const sel = $('follow-port'), ports = rehearse.ports;
+  sel.hidden = !on || rehearse.src === 'mic' || !ports.length || (ports.length === 1 && !!rehearse.open);
   if (sel.dataset.ports !== ports.join('\n') || sel.value !== rehearse.open) {
     sel.dataset.ports = ports.join('\n');
     sel.replaceChildren(new Option('Choose kit…', ''), ...ports.map((p) => new Option(p, p)));
@@ -1216,7 +1219,8 @@ function syncFollow() {
   }
   $('follow-trim').hidden = !on || !rehearse.canTrim;
 }
-$('follow').addEventListener('click', () => rehearse.setOn(!rehearse.on));
+$('drum-follow').addEventListener('change', (e) => rehearse.setOn(e.target.checked));
+$('follow-src').addEventListener('change', (e) => rehearse.setSource(e.target.value));
 $('follow-port').addEventListener('change', (e) => rehearse.use(e.target.value));
 $('follow-trim').addEventListener('click', () => { if (rehearse.trimNow()) notice('Stems now count as in time with the drummer', 'info'); });
 player.addEventListener('rate', () => syncDock());

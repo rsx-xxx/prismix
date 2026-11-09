@@ -233,3 +233,16 @@ def test_tidy_drops_a_part_repeated_by_a_second_import(tmp_path, monkeypatch):
     assert tabdata.tidy("v")
     assert list(store["tab"]["tracks"]) == ["guitar", "guitar2"]  # the emptier copy goes, a different tab with the same name stays
     assert not tabdata.tidy("v")
+
+
+def test_file_label_says_who_and_what_not_just_the_file_name(tmp_path):
+    xml = tmp_path / "Valeriy Linkinparkze -  Faint Vera!.xml"
+    xml.write_text(
+        '<score-partwise><work><work-title>Faint</work-title></work><identification><creator type="composer">Linkin Park</creator>'
+        "<encoding><software>MuseScore</software><encoder>Valeriy</encoder></encoding></identification></score-partwise>"
+    )
+    about = tabfiles.describe(xml)
+    assert about == {"format": "MusicXML", "title": "Faint", "artist": "Linkin Park", "tabber": "Valeriy"}
+    assert tabfiles.label_of(xml.name, about) == "by Valeriy · MusicXML"
+    assert tabfiles.label_of("Faint Vera!.gp5", {"format": "Guitar Pro 5"}) == "Faint Vera! · Guitar Pro 5"
+    assert tabfiles.describe(tmp_path / "missing.gp")["format"] == "Guitar Pro"  # a file that will not describe itself still gets a label

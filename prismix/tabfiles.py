@@ -532,6 +532,54 @@ def read_file(path: Path) -> dict[str, dict]:
         raise FileError(f"Could not read {path.name}") from e
 
 
+# ───────────────────────── what a file is ─────────────────────────
+
+def _clean(text: str | None) -> str:
+    return " ".join((text or "").replace("\x00", " ").split())[:80]
+
+
+def describe(path: Path) -> dict:
+    """What the file says about itself: format, title, artist and who tabbed or encoded it. Best effort; never raises."""
+    ext = path.suffix.lower()
+    out = {"format": "", "title": "", "artist": "", "tabber": ""}
+    try:
+        if ext in (".mid", ".midi"):
+            out["format"] = "MIDI"
+        elif ext == ".gp":
+            out["format"] = "Guitar Pro"
+            score = _gpif_root(path).find(".//Score")
+            if score is not None:
+                out.update(title=_clean(score.findtext("Title")), artist=_clean(score.findtext("Artist")), tabber=_clean(score.findtext("Tabber")))
+        elif ext in (".gp3", ".gp4", ".gp5"):
+            import guitarpro
+
+            song = guitarpro.parse(str(path))
+            out.update(format=f"Guitar Pro {ext[-1]}", title=_clean(song.title), artist=_clean(song.artist), tabber=_clean(getattr(song, "tab", "")))
+        else:
+            out["format"] = "MusicXML"
+            root = _xml_root(path)
+            software = _clean(root.findtext(".//encoding/software"))
+            who = _clean(root.findtext(".//encoding/encoder"))
+            out.update(title=_clean(root.findtext("work/work-title") or root.findtext("movement-title")),
+                       artist=_clean(next((c.text for c in root.iter("creator") if c.get("type") in (None, "composer", "arranger") and c.text), "")),
+                       tabber=who if who and who.lower() != software.lower() else "")
+    except Exception:  # noqa: BLE001 - the label is a courtesy: a file that will not describe itself still imports
+        log.info("could not describe %s", path.name)
+    return out
+
+
+def label_of(filename: str, info: dict) -> str:
+    """A short name that tells files apart at a glance: who made it and in what format, else the file's own name."""
+    stem = _clean(Path(filename).stem)
+    if len(stem) > 30:
+        stem = stem[:29].rstrip() + "…"
+    who = info.get("tabber") or ""
+    fmt = info.get("format") or ""
+    if who:
+        return f"by {who} · {fmt}" if fmt else f"by {who}"
+    return f"{stem} · {fmt}" if fmt and stem else stem or fmt or "file"
+
+
 # ───────────────────────── matching ─────────────────────────
 
 def name_score(path: Path, info: dict) -> float:
@@ -564,6 +612,7 @@ def import_file(video_id: str, filename: str, data: bytes) -> dict:
         path = Path(d) / f"score{suffix}"
         path.write_bytes(data)
         parts = read_file(path)
+        about = describe(path)
     if not parts:
         raise FileError("That file has no guitar, bass, keys or drum notes")
     fitted = tabdata.fit(parts, structure)
@@ -573,7 +622,8 @@ def import_file(video_id: str, filename: str, data: bytes) -> dict:
     tabdata.mark_weak(parts, fitted, structure)
     tabdata.retune(parts, fitted["shift"])
     return tabdata.add_source(video_id, parts, fitted, {
-        "source": "file", "origin": f"file:{Path(filename).name}", "label": Path(filename).name, "title": Path(filename).stem,
+        "source": "file", "origin": f"file:{Path(filename).name}", "label": label_of(filename, about), "title": Path(filename).stem,
+        "file": {"name": Path(filename).name, **about},
     })
 
 
@@ -607,8 +657,9 @@ def import_folder(folder: str) -> dict:
             tabdata.gapfill(parts, fitted, structure)
             tabdata.mark_weak(parts, fitted, structure)
             tabdata.retune(parts, fitted["shift"])
-            tabdata._save(vid, {
-                "found": True, "v": tabdata.FORMAT, "source": "file", "url": "", "artist": "", "title": f.stem, **fitted, "tracks": parts,
+            tabdata.add_source(vid, parts, fitted, {
+                "source": "file", "origin": f"file:{f.name}", "label": label_of(f.name, describe(f)), "title": f.stem,
+                "file": {"name": f.name, **describe(f)},
             })
             done.append({"id": vid, "title": info.get("title") or vid, "file": f.name})
     return {"scanned": len(files), "tried": tried, "matched": done}

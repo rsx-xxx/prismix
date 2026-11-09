@@ -205,6 +205,8 @@ export function createTab({ player, chordsIn = () => [] }) {
 
   const announce = () => { root.dataset.kind = cur?.tab.tracks[part]?.kind || ''; document.dispatchEvent(new Event('tab:kind')); };
 
+  // The imported file's own details for a tooltip: its name, then what it says about itself.
+  const fileTip = (p) => (p.file ? [p.file.name, p.file.title && `Title: ${p.file.title}`, p.file.artist && `Artist: ${p.file.artist}`, p.file.tabber && `Tab by: ${p.file.tabber}`, p.file.format].filter(Boolean).join('\n') : p.label || '');
   function render() {
     if (!cur) return;
     const { tab, st, rec: secs } = cur;
@@ -213,7 +215,7 @@ export function createTab({ player, chordsIn = () => [] }) {
     credit.replaceChildren(...(src === 'auto'
       ? [`${shortName(p, part)} · written from the recording by the app, check it by ear`]
       : src === 'file'
-        ? [`${shortName(p, part)} · from your file ${p.label || ''}`]
+        ? [`${shortName(p, part)} · from `, el('span', { textContent: p.label || 'your file', title: fileTip(p) })]
         : [`${shortName(p, part)} · tab by `, el('a', { href: p.url || tab.url, target: '_blank', rel: 'noopener', textContent: src === 'soundslice' ? 'Soundslice' : 'Songsterr' })]), p.edited ? ' · edited' : '',
     ...(p.synced ? [' ', el('span', { className: 'sync-chip', textContent: '☁ synced', title: 'Shared through your band cloud: the same on your other devices' })] : []));
     paintPicker();
