@@ -58,6 +58,7 @@
   </form>
 
   <main id="app" hidden>
+    <button id="setup-bar" class="setup-bar" type="button" hidden>Finish setup: allow what Prismix needs <span aria-hidden="true">›</span></button>
     <header class="top">
       <img id="logo" class="logo" alt="" hidden>
       <div class="who" id="who"><b id="title">Waiting for the host…</b><span id="sub"></span></div>
@@ -158,6 +159,13 @@
   <dialog id="sheet">
     <div class="sheet-bar"><h2>Controls</h2><button id="sheet-close" class="icon" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button></div>
     <div class="sheet-body">
+      <section class="group" id="setup" hidden>
+        <h3>Setup</h3>
+        <p class="hint" id="setup-note">Prismix needs a few things allowed on this phone.</p>
+        <div id="setup-rows" class="setup-rows"></div>
+        <button id="setup-all" class="btn primary wide" type="button">Allow everything</button>
+      </section>
+
       <section class="group">
         <h3>Sound</h3>
         <div class="seg wide" id="mode-seg" role="radiogroup">

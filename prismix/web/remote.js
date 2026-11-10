@@ -1074,7 +1074,26 @@ if (droid?.download) {
   };
 }
 
-const openSheet = () => { sheet.showModal(); showHostName(); modeUi(); $('me').textContent = `${store.name || 'You'} · ${ROLES[store.role] || ''}`; };
+// What the phone app still needs allowed (microphone, camera, notifications, background playback), asked for one row per button.
+// The state comes from the app each time, so what is already allowed never shows; with nothing left the bar and the card are gone.
+function paintSetup() {
+  let todo = [];
+  try { todo = JSON.parse(droid?.permState?.() || '[]').filter((p) => !p.granted); } catch { todo = []; }
+  $('setup').hidden = $('setup-bar').hidden = !todo.length;
+  $('setup-all').hidden = todo.length < 2;
+  $('setup-rows').replaceChildren(...todo.map((p) => {
+    const b = el('button', { className: 'btn', type: 'button', textContent: 'Allow' });
+    b.onclick = () => droid.permGrant(p.id);
+    return el('div', { className: 'setup-row' }, el('b', { textContent: p.label }), el('small', { textContent: p.why }), b);
+  }));
+}
+window.prismixPerms = paintSetup;
+$('setup-all').onclick = () => droid.permAll();
+$('setup-bar').onclick = () => { openSheet(); $('setup').scrollIntoView({ block: 'start' }); };
+document.addEventListener('visibilitychange', () => { if (!document.hidden) paintSetup(); });
+paintSetup();
+
+const openSheet = () => { paintSetup(); sheet.showModal(); showHostName(); modeUi(); $('me').textContent = `${store.name || 'You'} · ${ROLES[store.role] || ''}`; };
 $('more').onclick = openSheet;
 $('where').onclick = openSheet;
 createTuner({ opener: $('tuner-open') });

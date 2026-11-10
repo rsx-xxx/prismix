@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.69.5
+
+A first-run setup: the Android app and the macOS app now show what they still need allowed, one button per item. On Android that is the microphone, camera, notifications and background playback, with an "Allow everything" button that asks for all the runtime permissions in one dialog and then the battery exemption; a permission Android will not ask about again opens this app's own settings page. On macOS it is the microphone (a system dialog, or the right System Settings page when it was refused) and, if macOS is still holding the app back as an internet download, a button to Privacy & Security. Each list is read from the system every time, so what is already allowed never shows, and with nothing left the buttons and the setup bar disappear. The key in the player keeps its case: a minor key reads "Am" again, not "AM".
+
 ## 0.69.4
 
 The Drummer "Follow" button works again: it shared its id with the "follow playback" button, so a click went to the wrong one. It now lives in the ⋯ menu as "Follow a live drummer", and besides a MIDI kit it can listen through the microphone: it takes the stems' own sound out of what the microphone hears and picks the drummer's hits out of what is left, so the band keeps up with a drummer who rushes or drags; four clicks of sticks while stopped still start the stems at his tempo. Auto uses a MIDI kit when one is plugged in, else the microphone. Themes are just dark and light now (the Auto option is gone; a first run starts from the system's setting). Imported tab files are labelled by who made them and in what format (for example "by Valeriy · MusicXML") instead of a long file name, with the file's own details in a tooltip; a folder import now tags its parts the same way.

@@ -319,3 +319,12 @@ html.split .stage { padding: 0 max(1.1rem, 6vw); }
 .mpop input[type=range]::-moz-range-progress { width: 8px; border-radius: 99px; background: var(--accent); }
 .mpop input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-left: -6px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px #0000004d, 0 0 0 1px var(--line); }
 .mpop input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px #0000004d; }
+
+/* first-run setup: what the app still needs; the bar and the card disappear once everything is allowed */
+.setup-bar { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: .55rem 1rem; border: 0; background: color-mix(in oklab, var(--accent) 16%, var(--surface)); color: var(--ink); font-weight: 650; font-size: .85rem; text-align: left; }
+.setup-bar[hidden], #setup[hidden] { display: none; }
+.setup-rows { display: grid; gap: .6rem; }
+.setup-row { display: grid; grid-template-columns: 1fr auto; gap: .1rem .8rem; align-items: center; }
+.setup-row b { font-size: .95rem; }
+.setup-row small { grid-column: 1; color: var(--ink-2); }
+.setup-row .btn { grid-column: 2; grid-row: 1 / span 2; min-height: 40px; padding: 0 1rem; }

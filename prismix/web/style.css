@@ -350,6 +350,7 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .time span { color: var(--muted); font-size: 12px; }
 .knob { gap: 10px; }
 .knob label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+#key-l { text-transform: none; letter-spacing: .04em; font-size: 13px; font-weight: 600; } /* the key's name (Am, F# major) keeps its case: a capital M would read as major */
 .knob input[type=range] { width: 120px; }
 .stepper { display: inline-flex; align-items: center; background: var(--surface-2); border-radius: 999px; padding: 2px; }
 .stepper button { width: 30px; height: 30px; border: 0; background: none; border-radius: 50%; font-size: 18px; line-height: 1; color: var(--muted); }
@@ -1319,3 +1320,9 @@ img.cv.none { opacity: 0; }
 .master-pop input[type=range]::-moz-range-progress { width: 8px; border-radius: 99px; background: var(--accent); }
 .master-pop input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-left: -6px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px #0000004d, 0 0 0 1px var(--line); }
 .master-pop input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px #0000004d; }
+
+/* first-run setup on the desktop: one button per thing macOS still has to allow; gone once everything is */
+.setup-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.setup-bar[hidden] { display: none; }
+.perm-rows { display: grid; gap: 6px; justify-items: end; }
+.perm-rows .btn { white-space: nowrap; }

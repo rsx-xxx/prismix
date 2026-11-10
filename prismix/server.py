@@ -46,6 +46,7 @@ from . import (
     midi,
     notes,
     original,
+    perms,
     pipeline,
     playlists,
     quality,
@@ -395,6 +396,18 @@ def create_app() -> FastAPI:
             raise HTTPException(403, "Only on this computer")
         if not band_mod.same_origin(request.headers.get("origin"), request.headers.get("host")):
             raise HTTPException(403, "Cross-site request")
+
+    @app.get("/api/permissions")
+    async def permissions_state():
+        # What macOS still has to allow for this app (microphone, unlock); empty once everything is allowed
+        return await asyncio.to_thread(perms.state)
+
+    @app.post("/api/permissions/{key}")
+    async def permissions_grant(key: str, request: Request):
+        own_window(request)
+        if not await asyncio.to_thread(perms.grant, key):
+            raise HTTPException(404, "Nothing to allow")
+        return {"ok": True}
 
     @app.get("/api/client")
     def client_status(request: Request):

@@ -229,10 +229,90 @@ public class Main extends Activity {
     @Override
     public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
         super.onRequestPermissionsResult(code, perms, res);
+        refreshPerms();
+        if (code == 4) askSpecial(); // "Allow everything": the runtime grants are in, the settings-page ones follow
         if (code != 3 || micRequest == null) return;
         PermissionRequest req = micRequest;
         micRequest = null;
         if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED) req.grant(req.getResources()); else req.deny();
+    }
+
+    // ── what the app needs, for the page's setup card ──
+    // {id, label, why}: runtime grants first (one system dialog can ask for all of them), then the settings pages.
+    private static final String[][] RUNTIME = {
+        {"mic", "android.permission.RECORD_AUDIO", "Microphone", "Tuner and following a live drummer"},
+        {"camera", "android.permission.CAMERA", "Camera", "Scanning a QR code to join a host or band"},
+        {"notify", "android.permission.POST_NOTIFICATIONS", "Notifications", "Playback controls and the host's invitation"},
+    };
+
+    private boolean runtimeOn(String p) {
+        return Build.VERSION.SDK_INT < 23 || (p.endsWith("POST_NOTIFICATIONS") && Build.VERSION.SDK_INT < 33) || checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean batteryOn() {
+        if (Build.VERSION.SDK_INT < 23) return true;
+        android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+        return pm.isIgnoringBatteryOptimizations(getPackageName());
+    }
+
+    String permState() {
+        org.json.JSONArray a = new org.json.JSONArray();
+        try {
+            for (String[] r : RUNTIME) {
+                if (r[0].equals("notify") && Build.VERSION.SDK_INT < 33) continue;
+                a.put(new org.json.JSONObject().put("id", r[0]).put("label", r[2]).put("why", r[3]).put("granted", runtimeOn(r[1])));
+            }
+            if (Build.VERSION.SDK_INT >= 23) a.put(new org.json.JSONObject().put("id", "battery").put("label", "Keep playing in the background")
+                    .put("why", "Without this the phone may stop the music when the screen is off").put("granted", batteryOn()));
+        } catch (org.json.JSONException ignored) { /* literals only */ }
+        return a.toString();
+    }
+
+    void refreshPerms() {
+        ui.post(() -> web.evaluateJavascript("window.prismixPerms&&prismixPerms()", null));
+    }
+
+    /** One row's button: ask in the system dialog, or, when Android will not ask again, open this app's own settings page. */
+    void grantPerm(String id) {
+        ui.post(() -> {
+            try {
+                if (id.equals("battery")) {
+                    try { startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName()))); }
+                    catch (RuntimeException e) { startActivity(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)); }
+                    return;
+                }
+                for (String[] r : RUNTIME) {
+                    if (!r[0].equals(id)) continue;
+                    boolean asked = prefs.getBoolean("asked:" + id, false);
+                    if (asked && !shouldShowRequestPermissionRationale(r[1])) { appSettings(); return; } // denied for good: only the settings page can change it
+                    prefs.edit().putBoolean("asked:" + id, true).apply();
+                    requestPermissions(new String[] { r[1] }, 5);
+                    return;
+                }
+            } catch (RuntimeException e) { appSettings(); }
+        });
+    }
+
+    /** "Allow everything": every missing runtime grant in a single system dialog, then the battery exemption. */
+    void grantAll() {
+        ui.post(() -> {
+            java.util.ArrayList<String> need = new java.util.ArrayList<>();
+            for (String[] r : RUNTIME) {
+                if (r[0].equals("notify") && Build.VERSION.SDK_INT < 33) continue;
+                if (!runtimeOn(r[1])) { need.add(r[1]); prefs.edit().putBoolean("asked:" + r[0], true).apply(); }
+            }
+            if (!need.isEmpty() && Build.VERSION.SDK_INT >= 23) requestPermissions(need.toArray(new String[0]), 4);
+            else askSpecial();
+        });
+    }
+
+    private void askSpecial() {
+        if (!batteryOn()) grantPerm("battery");
+    }
+
+    private void appSettings() {
+        try { startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))); }
+        catch (RuntimeException e) { /* no such screen on this ROM */ }
     }
 
     private void whenNet(Runnable r) {
@@ -296,6 +376,7 @@ public class Main extends Activity {
     protected void onResume() {
         super.onResume();
         resumed = true;
+        refreshPerms(); // back from a settings page: show what was just allowed
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(HOST_NOTE);
         if (cloudMode && web.getVisibility() == View.VISIBLE) {
             nearby.watch(); // the network may have changed while we were away
@@ -419,6 +500,9 @@ public class Main extends Activity {
         @JavascriptInterface public String offlineList() { return Offline.list(m.getApplicationContext()).toString(); }
         @JavascriptInterface public void offlineSave(String id, String model, String pin) { Offline.save(m.getApplicationContext(), id, model, pin); }
         @JavascriptInterface public void offlineRefreshTab(String id, String pin) { Offline.refreshTab(m.getApplicationContext(), id, pin); }
+        @JavascriptInterface public String permState() { return m.permState(); }
+        @JavascriptInterface public void permGrant(String id) { m.grantPerm(id); }
+        @JavascriptInterface public void permAll() { m.grantAll(); }
         @JavascriptInterface public void offlineRemove(String id) { Offline.remove(m.getApplicationContext(), id); }
         /** The page's settings (name, part, theme...) live per origin: keep a copy so the offline page starts with them. */
         @JavascriptInterface public void stash(String json) { if (json != null && json.length() < 16384) m.prefs.edit().putString("stash", json).apply(); }

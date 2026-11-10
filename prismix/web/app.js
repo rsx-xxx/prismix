@@ -1869,3 +1869,23 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && more?.op
   };
   for (const ev of ['wheel', 'touchmove', 'pointerdown', 'keydown']) document.addEventListener(ev, show, { passive: true, capture: true });
 }
+
+// ── first-run setup: what macOS still has to allow (microphone, unlock). Listed only while missing, checked again whenever the window returns. ──
+async function paintSetup() {
+  let todo = [];
+  try { todo = await api('/api/permissions'); } catch { todo = []; }
+  $('setup-bar').hidden = $('perm-sec').hidden = !todo.length;
+  $('setup-list').textContent = todo.map((p) => p.label.toLowerCase()).join(', ');
+  $('perm-rows').replaceChildren(...todo.map((p) => {
+    const b = el('button', { className: 'btn small', type: 'button', textContent: p.how === 'ask' ? `Allow ${p.label.toLowerCase()}` : `Open ${p.label} settings`, title: p.why });
+    b.addEventListener('click', async () => {
+      try { await api(`/api/permissions/${p.id}`, { method: 'POST' }); } catch (err) { notice(err.message); }
+      setTimeout(paintSetup, 1500);
+    });
+    return b;
+  }));
+}
+$('setup-open').addEventListener('click', () => $('settings-btn').click());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) paintSetup(); });
+window.addEventListener('focus', paintSetup);
+paintSetup();
