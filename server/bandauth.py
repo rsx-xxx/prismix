@@ -668,6 +668,8 @@ def make_handler(app):
             self.send_header("Cache-Control", "no-store")
             for key, value in (headers or {}).items():
                 self.send_header(key, value)
+            if self.close_connection:
+                self.send_header("Connection", "close")  # say so: a client reusing this connection would hit a closed socket
             self.end_headers()
             if self.command != "HEAD":
                 self.wfile.write(body)

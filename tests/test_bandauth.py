@@ -70,6 +70,13 @@ def test_anonymous_cannot_issue(cloud):
     assert issue(client, "b" * 43).status_code == 401
 
 
+def test_a_refused_write_says_it_closes_the_connection(cloud):
+    # the server drops the connection after refusing a write it did not read; a keep-alive client must be told, not left to race it
+    client, _ = cloud
+    r = client.post("/api/v1/members")
+    assert r.status_code == 401 and r.headers.get("connection") == "close"
+
+
 def test_label_is_sanitised(cloud):
     client, _ = cloud
     name = issue(client, ADMIN, "../../é x!").json()["name"]

@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.69.6
+
+Fixes the release build, which kept failing a band cloud server test: after refusing an unauthorised write the server closed the connection without saying so, so a client that reused it could hit the closed socket. The server now announces that it is closing. This release also carries everything from 0.69.5 (first-run setup buttons for permissions, minor keys keep their case), whose build stopped at that test.
+
 ## 0.69.5
 
 A first-run setup: the Android app and the macOS app now show what they still need allowed, one button per item. On Android that is the microphone, camera, notifications and background playback, with an "Allow everything" button that asks for all the runtime permissions in one dialog and then the battery exemption; a permission Android will not ask about again opens this app's own settings page. On macOS it is the microphone (a system dialog, or the right System Settings page when it was refused) and, if macOS is still holding the app back as an internet download, a button to Privacy & Security. Each list is read from the system every time, so what is already allowed never shows, and with nothing left the buttons and the setup bar disappear. The key in the player keeps its case: a minor key reads "Am" again, not "AM".
