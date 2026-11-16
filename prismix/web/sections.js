@@ -26,7 +26,8 @@ export const kindOf = (name) => KINDS.find(([re]) => re.test(name))?.[1] ?? 'oth
 /** The text that fits `px` pixels at ~6.4px per character: full word, abbreviation, letter, or just the symbol. */
 export function fitLabel(sec, px) {
   const [full, mid, one, sym] = WORDS[sec.kind] ?? WORDS.other, n = sec.n ?? '';
-  if (sec.kind === 'other' && sec.raw) return px >= (sec.raw.length + 5) * 6.4 + 10 ? `Part ${sec.raw}` : px >= sec.raw.length * 6.4 + 10 ? sec.raw : '';
+  // A part the lyrics named themselves keeps that name. "аутро" stays "аутро", never "Part аутро".
+  if (sec.kind === 'other' && sec.raw) return px >= sec.raw.length * 6.4 + 10 ? sec.raw : '';
   for (const t of [`${full} ${n}`.trim(), `${mid}${n}`, `${one}${n}`]) if (px >= t.length * 6.4 + 10) return t;
   return px >= 16 ? sym : '';
 }

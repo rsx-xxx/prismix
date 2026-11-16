@@ -30,6 +30,23 @@ def test_genius_headers_name_numbered_parts_that_shorten_with_width(tmp_path):
     assert got["tiny"] == ""
 
 
+NAMED_SCRIPT = """
+import { fromLyrics, fitLabel } from %r;
+const lines = [{ t: 1, text: 'one', sec: 'аутро' }, { t: 5, text: 'two' }];
+const s = fromLyrics(lines, 10);
+console.log(JSON.stringify({ label: s.map((x) => x.label), wide: fitLabel(s.find((x) => x.raw === 'аутро'), 200) }));
+"""
+
+
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+def test_named_part_keeps_its_own_name(tmp_path):
+    f = tmp_path / "n.mjs"
+    f.write_text(NAMED_SCRIPT % (WEB / "sections.js").as_uri())
+    got = json.loads(subprocess.run([NODE, f], capture_output=True, text=True, check=True).stdout)
+    assert "аутро" in got["label"]
+    assert got["wide"] == "аутро"
+
+
 CHORD_SCRIPT = """
 import { fromChords } from %r;
 const prog = { A: ['C', 'G', 'Am', 'F'], B: ['F', 'C', 'G', 'G'] };
