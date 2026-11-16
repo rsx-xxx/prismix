@@ -1275,6 +1275,9 @@ const followBtn = (() => {
   const check = () => { btn.hidden = !(!!state.current && away()); };
   let queued = 0;
   btn.addEventListener('click', go);
+  const sing = $('sing');
+  sing.addEventListener('click', go);
+  sing.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   // Frames only come while playing; scrolling a pane or the page by hand also moves the position in or out of view, paused or not.
   window.addEventListener('scroll', () => { if (!queued) queued = requestAnimationFrame(() => { queued = 0; check(); }); }, true);
   return {

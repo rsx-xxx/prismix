@@ -278,7 +278,7 @@ dialog legend { font-size: 12px; text-transform: uppercase; letter-spacing: .08e
 }
 .tog.wide { width: auto; padding: 0 10px; }
 .tog[hidden] { display: none; }
-.sing { max-width: 1180px; width: 100%; margin: 0 auto; text-align: center; font-size: clamp(17px, 2.4vw, 24px); font-weight: 700; line-height: 1.3; padding-top: 30px; max-height: 118px; overflow: hidden; text-wrap: balance; pointer-events: none; }
+.sing { max-width: 1180px; width: 100%; margin: 0 auto; text-align: center; font-size: clamp(17px, 2.4vw, 24px); font-weight: 700; line-height: 1.3; padding-top: 30px; max-height: 118px; overflow: hidden; text-wrap: balance; cursor: pointer; }
 .sing .sy { position: relative; display: inline-flex; flex-direction: column; align-items: flex-start; vertical-align: bottom; color: var(--muted); transition: color .15s; }
 .sing .sy.sung { color: var(--text); }
 .sing .w { white-space: nowrap; }

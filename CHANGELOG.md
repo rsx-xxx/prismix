@@ -2,6 +2,10 @@
 
 Every release lists what changed. The section of a tag (`vX.Y.Z`) becomes the GitHub release notes automatically.
 
+## 0.69.7
+
+Clicking the words in the player scrolls the lyrics and the chords to that moment and keeps them together, the same as Follow. A part keeps the name it was given: a part called аутро stays аутро, and the same for any other part. Changing the key no longer slips back to the original pitch.
+
 ## 0.69.6
 
 Fixes the release build, which kept failing a band cloud server test: after refusing an unauthorised write the server closed the connection without saying so, so a client that reused it could hit the closed socket. The server now announces that it is closing. This release also carries everything from 0.69.5 (first-run setup buttons for permissions, minor keys keep their case), whose build stopped at that test.

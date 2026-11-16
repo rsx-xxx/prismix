@@ -168,7 +168,9 @@ export class StemPlayer extends EventTarget {
     this._prep ??= (async () => {
       for (const s of this.stems) {
         if (!s.node) { // the WASM engine is only instantiated once tempo or key is first changed
-          s.node = await SignalsmithStretch(this.ctx); // default options: 1 in, 2-ch out (0-input config yields silence)
+          // No live input: an unconnected input is sometimes a block of silence, and the
+          // stretcher then drops the pitched buffer so the original key plays instead.
+          s.node = await SignalsmithStretch(this.ctx, { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
           s.node.connect(s.gain);
           s.node.stop(); // idle until scheduled
         }
@@ -201,16 +203,24 @@ export class StemPlayer extends EventTarget {
       src.connect(s.gain);
       src.start(t, lp && (pos < lp.a || pos >= lp.b) ? lp.a : pos);
       s.src = src;
+      s.startedAt = t;
     }
   }
 
   _stopDirect(when) {
+    const now = this.ctx.currentTime;
     for (const s of this.stems) {
-      if (!s.src) continue;
-      try { s.src.stop(when); } catch { /* already ended */ }
-      const old = s.src;
-      old.onended = () => old.disconnect();
+      const src = s.src;
+      if (!src) continue;
       s.src = null;
+      const started = s.startedAt ?? now;
+      // A source whose start is still ahead of `when` ignores stop() and then
+      // plays the original key under the pitched stems. Disconnect it instead.
+      try {
+        if (started > now && when <= started) src.disconnect();
+        else src.stop(Math.max(when, now));
+      } catch { try { src.disconnect(); } catch { /* already gone */ } }
+      src.onended = () => { try { src.disconnect(); } catch { /* already gone */ } };
     }
   }
 

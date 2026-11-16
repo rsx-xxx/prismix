@@ -85,11 +85,20 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 					return result;
 				},
 				schedule: (objIn, adjustPrevious) => {
-					let outputTime = ('outputTime' in objIn) ? objIn.outputTime : currentTime;
+					// Callers pass `output` (the README, start() and stop()). Reading only
+					// `outputTime` made every call look like "now", so a change scheduled
+					// slightly ahead deleted the playback that had not started yet and the
+					// pitch fell back to the initial 0-semitone segment.
+					let outputTime = ('output' in objIn) ? objIn.output
+						: ('outputTime' in objIn) ? objIn.outputTime
+						: currentTime;
 
 					let latestSegment = this.timeMap[this.timeMap.length - 1];
 					while (this.timeMap.length && this.timeMap[this.timeMap.length - 1].output >= outputTime) {
 						latestSegment = this.timeMap.pop();
+					}
+					if (!latestSegment) {
+						latestSegment = {active: false, input: 0, output: 0, rate: 1, semitones: 0, tonalityHz: 8000, formantSemitones: 0, formantCompensation: false, formantBaseHz: 0, loopStart: 0, loopEnd: 0};
 					}
 
 					let obj = Object.assign({}, latestSegment);
@@ -113,17 +122,18 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 						}
 						previous.rate = (obj.input - previous.input)/(obj.output - previous.output);
 					}
-	
-					let currentMapSegment = this.timeMap[0];
-					while (this.timeMap.length > 1 && this.timeMap[1].output <= outputTime) {
+
+					// Drop only segments that have already finished. Pruning up to the new
+					// change's time threw away the segment that is sounding now.
+					while (this.timeMap.length > 1 && this.timeMap[1].output <= currentTime) {
 						this.timeMap.shift();
-						currentMapSegment = this.timeMap[0];
 					}
+					let currentMapSegment = this.timeMap[0];
 					let rate = (currentMapSegment.active ? currentMapSegment.rate : 0);
-					let inputTime = currentMapSegment.input + (outputTime - currentMapSegment.output)*rate;
+					let inputTime = currentMapSegment.input + (currentTime - currentMapSegment.output)*rate;
 					this.timeIntervalCounter = this.timeIntervalSamples;
 					this.port.postMessage(['time', inputTime]);
-					
+
 					return obj;
 				},
 				dropBuffers: toSeconds => {
@@ -131,6 +141,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 						let buffers = this.audioBuffers.flat(1).map(b => b.buffer);
 						this.audioBuffers = [];
 						this.audioBuffersStart = this.audioBuffersEnd = 0;
+						this._nextIn = null;
 						return {
 							value: {start: 0, end: 0},
 							transfer: buffers
@@ -232,6 +243,44 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 			}
 		}
 
+		/** Copy `count` samples starting at `startSample` into the WASM input buffers. Outside the stored audio this is silence. */
+		_copyInput(startSample, count) {
+			const memory = this.wasmModule.exports ? this.wasmModule.exports.memory.buffer : this.wasmModule.HEAP8.buffer;
+			const buffers = [];
+			for (let c = 0; c < this.channels; c++) {
+				const buffer = new Float32Array(memory, this.buffersIn[c], count);
+				buffer.fill(0);
+				buffers.push(buffer);
+			}
+			if (count <= 0) return;
+			let pos = startSample;
+			let written = 0;
+			if (pos < this.audioBuffersStart) {
+				const skip = Math.min(count, this.audioBuffersStart - pos);
+				pos += skip;
+				written += skip;
+			}
+			let origin = this.audioBuffersStart;
+			for (let i = 0; i < this.audioBuffers.length && written < count; i++) {
+				const audioBuffer = this.audioBuffers[i];
+				const len = audioBuffer[0].length;
+				const end = origin + len;
+				if (pos < end) {
+					const startIndex = Math.max(0, pos - origin);
+					const n = Math.min(len - startIndex, count - written);
+					if (n > 0) {
+						for (let c = 0; c < buffers.length; c++) {
+							const channel = audioBuffer[c % audioBuffer.length];
+							buffers[c].set(channel.subarray(startIndex, startIndex + n), written);
+						}
+						written += n;
+						pos += n;
+					}
+				}
+				origin = end;
+			}
+		}
+
 		process(inputList, outputList, parameters) {
 			if (!this.wasmReady) {
 				outputList.forEach(output => {
@@ -257,32 +306,29 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 			// Check the input/output channel counts
 			if (outputList[0].length != this.channels) {
 				this.channels = outputList[0]?.length || 0;
-				configure();
+				this.configure();
 			}
 			let outputBlockSize = outputList[0][0].length;
 
 			let memory = wasmModule.exports ? wasmModule.exports.memory.buffer : wasmModule.HEAP8.buffer;
-			// Buffer list (one per channel)
+			// An unconnected input is sometimes a block of silence and sometimes absent.
+			// Treating that silence as a live input drops the pitched buffer and the
+			// original key leaks through, so stored audio always wins.
 			let inputs = inputList[0];
+			const useBuffers = this.audioBuffers.length > 0 || !inputs?.length;
 			if (!currentMapSegment.active) {
+				// Silence without feeding the stretcher: a long run of zero input latches
+				// its bypass, which then copies the next audio through at the original pitch.
+				outputList[0].forEach((channel) => channel.fill(0));
+				this._nextIn = null;
+				return true;
+			} else if (!useBuffers) {
 				outputList[0].forEach((_, c) => {
-					let channelBuffer = inputs[c%inputs.length];
+					let channelBuffer = inputs && inputs.length ? inputs[c % inputs.length] : null;
 					let buffer = new Float32Array(memory, this.buffersIn[c], outputBlockSize);
-					buffer.fill(0);
+					if (channelBuffer) buffer.set(channelBuffer);
+					else buffer.fill(0);
 				});
-				// Should detect silent input and skip processing
-				wasmModule._process(outputBlockSize, outputBlockSize);
-			} else if (inputs?.length) {
-				// Live input
-				outputList[0].forEach((_, c) => {
-					let channelBuffer = inputs[c%inputs.length];
-					let buffer = new Float32Array(memory, this.buffersIn[c], outputBlockSize);
-					if (channelBuffer) {
-						buffer.set(channelBuffer);
-					} else {
-						buffer.fill(0);
-					}
-				})
 				wasmModule._process(outputBlockSize, outputBlockSize);
 			} else {
 				let inputTime = currentMapSegment.input + (outputTime - currentMapSegment.output)*currentMapSegment.rate;
@@ -290,54 +336,31 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 				if (loopLength > 0 && inputTime >= currentMapSegment.loopEnd) {
 					currentMapSegment.input -= loopLength;
 					inputTime -= loopLength;
-				}
-				
-				inputTime += this.inputLatencySeconds;
-				let inputSamplesEnd = Math.round(inputTime*sampleRate);
-
-				// Fill the buffer with previous input
-				let buffers = outputList[0].map((_, c) => new Float32Array(memory, this.buffersIn[c], this.bufferLength));
-
-				let blockSamples = 0; // current write position in the temporary input buffer
-				let audioBufferIndex = 0;
-				let audioSamples = this.audioBuffersStart; // start of current audio buffer
-				// zero-pad until the start of the audio data
-				let inputSamples = inputSamplesEnd - this.bufferLength;
-				if (inputSamples < audioSamples) {
-					blockSamples = audioSamples - inputSamples;
-					buffers.forEach(b => b.fill(0, 0, blockSamples));
-					inputSamples = audioSamples;
-				}
-				while (audioBufferIndex < this.audioBuffers.length && audioSamples < inputSamplesEnd) {
-					let audioBuffer = this.audioBuffers[audioBufferIndex];
-					let startIndex = inputSamples - audioSamples; // start index within the audio buffer
-					let bufferEnd = audioSamples + audioBuffer[0].length;
-					// how many samples to copy: min(how many left in the buffer, how many more we need)
-					let count = Math.min(audioBuffer[0].length - startIndex, inputSamplesEnd - inputSamples);
-					if (count > 0) {
-						buffers.forEach((buffer, c) => {
-							let channelBuffer = audioBuffer[c%audioBuffer.length];
-							buffer.subarray(blockSamples).set(channelBuffer.subarray(startIndex, startIndex + count));
-						});
-						audioSamples += count;
-						blockSamples += count;
-					} else { // we're already past this buffer - skip it
-						audioSamples += audioBuffer[0].length;
-					}
-					++audioBufferIndex;
-				}
-				if (blockSamples < this.bufferLength) {
-					buffers.forEach(buffer => buffer.subarray(blockSamples).fill(0));
+					this._nextIn = null;
 				}
 
-				// constantly seeking, so we don't have to worry about the input buffers needing to be a rate-dependent size
-				wasmModule._seek(this.bufferLength, currentMapSegment.rate);
-				wasmModule._process(0, outputBlockSize);
+				const end = Math.round((inputTime + this.inputLatencySeconds)*sampleRate);
+				const rate = currentMapSegment.rate > 0 ? currentMapSegment.rate : 1;
+				// Seek only when the playhead jumps. Seeking every block restarts the
+				// phase vocoder, and any frame that loses its spectral peaks is resynthesised
+				// at the original pitch.
+				const jump = this._nextIn == null || end < this._nextIn - 1 || end - this._nextIn > this.bufferLength;
+				if (jump) {
+					this._copyInput(end - this.bufferLength, this.bufferLength);
+					wasmModule._seek(this.bufferLength, rate);
+					wasmModule._process(0, outputBlockSize);
+					this._nextIn = end;
+				} else {
+					const count = end - this._nextIn;
+					if (count > 0) this._copyInput(this._nextIn, count);
+					wasmModule._process(Math.max(count, 0), outputBlockSize);
+					this._nextIn = end;
+				}
 
 				this.timeIntervalCounter -= outputBlockSize;
 				if (this.timeIntervalCounter <= 0) {
 					this.timeIntervalCounter = this.timeIntervalSamples;
-					this.port.postMessage(['time', inputTime]);
+					this.port.postMessage(['time', inputTime + this.inputLatencySeconds]);
 				}
 			}
 			
